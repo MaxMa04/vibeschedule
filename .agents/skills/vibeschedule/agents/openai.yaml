@@ -1,0 +1,3 @@
+display_name: vibeschedule
+short_description: Run the vibeschedule TikTok CLI.
+default_prompt: Use the vibeschedule repository skill to install the CLI, configure Post for Me and Cloudflare R2, sync accounts, upload media, create TikTok video posts or native photo slideshow drafts, schedule batches, and inspect or cancel posts.
