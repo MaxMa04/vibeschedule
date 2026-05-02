@@ -11,6 +11,7 @@ import { uploadMedia } from "./media.js";
 import { schedulePost } from "./schedule.js";
 import { runBatch } from "./batch.js";
 import { cancelPost, getPostStatus, listLocalPosts, refreshPost } from "./posts.js";
+import { listPostAnalytics, syncAnalytics } from "./analytics.js";
 
 const program = new Command();
 
@@ -146,6 +147,14 @@ program
   .option("--draft", "Create as draft")
   .option("--now", "Post immediately")
   .option("--auto-add-music", "Ask TikTok to auto-add music for photo posts")
+  .option("--hook <text>", "Creative hook metadata")
+  .option("--cta <text>", "Call-to-action metadata")
+  .option("--hook-category <category>", "Hook category metadata")
+  .option("--creative-dir <dir>", "Directory containing source creative assets")
+  .option("--source <source>", "Creative source metadata, e.g. agent, script, manual")
+  .option("--tag <tag>", "Metadata tag; repeatable", collect, [])
+  .option("--metadata <key=value>", "Additional metadata; repeatable", collect, [])
+  .addOption(new Option("--slideshow-preset <preset>", "Validate image set for a known slideshow preset").choices(["marketing-6"]))
   .option("--dry-run", "Print payload without uploading/posting")
   .option("--allow-past", "Allow past scheduled_at values")
   .action(async function (options) {
@@ -172,6 +181,14 @@ program
         dryRun: options.dryRun,
         allowPast: options.allowPast,
         autoAddMusic: options.autoAddMusic,
+        hook: options.hook,
+        cta: options.cta,
+        hookCategory: options.hookCategory,
+        creativeDir: options.creativeDir,
+        source: options.source,
+        tag: options.tag,
+        metadata: options.metadata,
+        slideshowPreset: options.slideshowPreset,
       });
       printResult(
         json
@@ -274,9 +291,76 @@ posts
     }
   });
 
+const analytics = program.command("analytics").description("Sync and inspect raw post analytics from Post4Me feeds");
+
+analytics
+  .command("sync")
+  .description("Fetch social account feeds with metrics and store local analytics snapshots")
+  .option("--account <alias>", "Account alias; repeatable. Defaults to all synced TikTok accounts.", collect, [])
+  .option("--platform <platform>", "Platform", "tiktok")
+  .action(async function (options) {
+    const json = globalJson(this);
+    try {
+      const { db, postForMe } = withPostForMeOnly();
+      const result = await syncAnalytics(db, postForMe, {
+        accounts: options.account,
+        platform: options.platform,
+      });
+      printResult(
+        json
+          ? { ok: true, ...result }
+          : [
+              `Synced ${result.synced} analytics snapshots`,
+              ...result.accounts.map((account) => `${account.alias}\t${account.social_account_id}\t${account.items} feed items`),
+            ],
+        json,
+      );
+    } catch (error) {
+      printError(error, json);
+    }
+  });
+
+analytics
+  .command("posts")
+  .description("List latest locally stored post analytics snapshots")
+  .option("--account <alias>", "Account alias")
+  .option("--days <days>", "Only snapshots fetched in the last N days", parseInteger)
+  .action(function (options) {
+    const json = globalJson(this);
+    try {
+      const config = loadPartialConfig();
+      const db = openDb(config.VIBESCHEDULE_DB_PATH ?? ".vibeschedule.sqlite");
+      const rows = listPostAnalytics(db, { account: options.account, days: options.days });
+      printResult(
+        json
+          ? { ok: true, posts: rows }
+          : rows.map(({ snapshot, post }) =>
+              [
+                snapshot.account_alias ?? snapshot.social_account_id,
+                snapshot.fetched_at,
+                snapshot.views ?? "",
+                snapshot.likes ?? "",
+                snapshot.comments ?? "",
+                snapshot.shares ?? "",
+                post?.hook ?? snapshot.caption ?? snapshot.feed_item_id ?? "",
+              ].join("\t"),
+            ),
+        json,
+      );
+    } catch (error) {
+      printError(error, json);
+    }
+  });
+
 function collect(value: string, previous: string[]): string[] {
   previous.push(value);
   return previous;
+}
+
+function parseInteger(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) throw new Error(`Invalid integer: ${value}`);
+  return parsed;
 }
 
 program.parseAsync().catch((error) => printError(error, Boolean(program.optsWithGlobals<{ json?: boolean }>().json)));

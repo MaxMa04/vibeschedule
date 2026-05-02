@@ -129,6 +129,39 @@ npm run dev -- schedule \
   --auto-add-music
 ```
 
+Create a six-image marketing slideshow draft with creative metadata:
+
+```bash
+npm run dev -- schedule \
+  --account bulkup-main \
+  --image ./slide-01.png \
+  --image ./slide-02.png \
+  --image ./slide-03.png \
+  --image ./slide-04.png \
+  --image ./slide-05.png \
+  --image ./slide-06.png \
+  --caption-file ./caption.txt \
+  --title "Slideshow title" \
+  --draft \
+  --auto-add-music \
+  --slideshow-preset marketing-6 \
+  --hook "I showed my landlord what AI thinks our kitchen should look like" \
+  --cta "Search Snugly on the App Store" \
+  --hook-category person-conflict-ai \
+  --creative-dir ./posts/2026-05-02-0730 \
+  --source agent \
+  --tag home \
+  --metadata app=Snugly
+```
+
+Sync and inspect post analytics:
+
+```bash
+npm run dev -- analytics sync --account bulkup-main
+npm run dev -- analytics posts --account bulkup-main --days 7
+npm run dev -- --json analytics posts --days 30
+```
+
 Batch dry-run:
 
 ```bash
@@ -148,5 +181,8 @@ npm run dev -- posts cancel <local-id-or-external-id> --yes
 - Immediate posting is blocked unless `--now` is passed.
 - `--at` values must be in the future unless `--allow-past` is passed.
 - TikTok video posts use `--file` or `--media-url`; native photo posts use repeatable `--image` or `--image-url`. Do not mix video and images in the same post.
+- `--slideshow-preset marketing-6` requires exactly six images and validates local images as portrait 2:3 when dimensions can be read.
+- Analytics are fetched from Post for Me social account feeds with `expand=metrics`. The connected account must have feed/metrics permission; otherwise the provider may return no feed data.
+- Analytics sync stores raw feed snapshots and best-effort matches them to local posts using provider IDs, external IDs, captions, and account aliases.
 - Media is not deleted automatically.
 - `.env` and SQLite files are ignored by git.

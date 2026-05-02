@@ -1,6 +1,6 @@
 ---
 name: vibeschedule
-description: Install, configure, operate, validate, and extend the vibeschedule repository CLI for scheduling TikTok videos and native TikTok photo slideshow drafts through Post for Me with Cloudflare R2 media hosting. Use when an agent works in this repository and needs setup instructions, local usage commands, account sync, media upload, post scheduling, batch scheduling, post inspection/cancelation, or operational guardrails.
+description: Install, configure, operate, validate, and extend the vibeschedule repository CLI for scheduling TikTok videos and native TikTok photo slideshow drafts through Post for Me with Cloudflare R2 media hosting. Use when an agent works in this repository and needs setup instructions, local usage commands, account sync, media upload, post scheduling, creative metadata, slideshow validation, analytics sync, batch scheduling, post inspection/cancelation, or operational guardrails.
 ---
 
 # vibeschedule
@@ -12,7 +12,7 @@ Use this skill from the repository root. `vibeschedule` is a Node/TypeScript CLI
 Current proven scope:
 - TikTok video posts from a local video file or already-public media URL.
 - Native TikTok photo slideshow drafts from local image files or already-public image URLs.
-- Single post scheduling, immediate posting with explicit `--now`, batch dry-runs, account alias sync, status refresh, and cancel/delete.
+- Single post scheduling, immediate posting with explicit `--now`, batch dry-runs, account alias sync, status refresh, cancel/delete, creative metadata capture, slideshow validation, and raw Post for Me feed analytics snapshots.
 
 Do not assume this is a generic social scheduler. Post for Me supports more platforms, but this repository is currently implemented and tested around TikTok workflows.
 
@@ -196,6 +196,58 @@ npm run dev -- schedule \
 ```
 
 Do not mix `--file`/`--media-url` video inputs with `--image`/`--image-url` photo inputs in the same post.
+
+For six-image marketing slideshow drafts, ask the agent or script to generate images first, then let `vibeschedule` validate/upload/schedule them and store creative metadata:
+
+```bash
+npm run dev -- schedule \
+  --account <alias> \
+  --image ./slide-01.png \
+  --image ./slide-02.png \
+  --image ./slide-03.png \
+  --image ./slide-04.png \
+  --image ./slide-05.png \
+  --image ./slide-06.png \
+  --caption-file ./caption.txt \
+  --title "Slideshow title" \
+  --draft \
+  --auto-add-music \
+  --slideshow-preset marketing-6 \
+  --hook "I showed my landlord what AI thinks our kitchen should look like" \
+  --cta "Search Snugly on the App Store" \
+  --hook-category person-conflict-ai \
+  --creative-dir ./posts/2026-05-02-0730 \
+  --source agent \
+  --tag home \
+  --metadata app=Snugly
+```
+
+`--slideshow-preset marketing-6` requires exactly six images and validates local images as portrait 2:3 when dimensions can be read. The metadata fields are stored locally with the scheduled post so later analytics can be connected to hooks and CTAs.
+
+## Analytics
+
+Post for Me exposes analytics through social account feeds, not a separate analytics endpoint. The connected account must have feed/metrics permission; otherwise the provider may return no feed data.
+
+Fetch feed metrics and store raw snapshots locally:
+
+```bash
+npm run dev -- analytics sync --account <alias>
+```
+
+Sync all local TikTok accounts:
+
+```bash
+npm run dev -- analytics sync
+```
+
+List latest stored snapshots:
+
+```bash
+npm run dev -- analytics posts --account <alias> --days 7
+npm run dev -- --json analytics posts --days 30
+```
+
+Analytics sync stores raw feed items, extracted metrics (`views`, `likes`, `comments`, `shares`, `saves` when present), and best-effort local post matches using provider IDs, external IDs, captions, and account aliases. Treat output as raw infrastructure data; campaign interpretation remains the agent/skill layer.
 
 ## Batch Scheduling
 

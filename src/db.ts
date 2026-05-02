@@ -33,6 +33,13 @@ export interface ScheduledPostRow {
   post_for_me_post_id: string | null;
   caption: string;
   title: string | null;
+  hook: string | null;
+  cta: string | null;
+  hook_category: string | null;
+  creative_dir: string | null;
+  source: string | null;
+  tags_json: string | null;
+  metadata_json: string | null;
   scheduled_at: string | null;
   timezone: string;
   status: string;
@@ -42,6 +49,28 @@ export interface ScheduledPostRow {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AnalyticsSnapshotRow {
+  id: number;
+  scheduled_post_id: number | null;
+  external_id: string | null;
+  post_for_me_post_id: string | null;
+  social_account_id: string;
+  account_alias: string | null;
+  platform: string;
+  feed_item_id: string | null;
+  feed_item_url: string | null;
+  caption: string | null;
+  published_at: string | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  metrics_json: string | null;
+  raw_json: string;
+  fetched_at: string;
 }
 
 export function openDb(path: string): Db {
@@ -102,7 +131,48 @@ export function migrate(db: Db): void {
 
     CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status);
     CREATE INDEX IF NOT EXISTS idx_scheduled_posts_external_id ON scheduled_posts(external_id);
+
+    CREATE TABLE IF NOT EXISTS analytics_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scheduled_post_id INTEGER,
+      external_id TEXT,
+      post_for_me_post_id TEXT,
+      social_account_id TEXT NOT NULL,
+      account_alias TEXT,
+      platform TEXT NOT NULL DEFAULT 'tiktok',
+      feed_item_id TEXT,
+      feed_item_url TEXT,
+      caption TEXT,
+      published_at TEXT,
+      views INTEGER,
+      likes INTEGER,
+      comments INTEGER,
+      shares INTEGER,
+      saves INTEGER,
+      metrics_json TEXT,
+      raw_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      FOREIGN KEY(scheduled_post_id) REFERENCES scheduled_posts(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_post ON analytics_snapshots(scheduled_post_id);
+    CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_account ON analytics_snapshots(social_account_id);
+    CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_fetched ON analytics_snapshots(fetched_at);
   `);
+  addColumnIfMissing(db, "scheduled_posts", "hook", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "cta", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "hook_category", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "creative_dir", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "source", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "tags_json", "TEXT");
+  addColumnIfMissing(db, "scheduled_posts", "metadata_json", "TEXT");
+}
+
+function addColumnIfMissing(db: Db, table: string, column: string, definition: string): void {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!rows.some((row) => row.name === column)) {
+    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+  }
 }
 
 export function nowIso(): string {
@@ -183,17 +253,60 @@ export function insertScheduledPost(
     .prepare(
       `
         INSERT INTO scheduled_posts (
-          external_id, post_for_me_post_id, caption, title, scheduled_at, timezone, status,
-          media_asset_id, account_aliases_json, post_for_me_response_json, last_error, created_at, updated_at
+          external_id, post_for_me_post_id, caption, title, hook, cta, hook_category, creative_dir, source,
+          tags_json, metadata_json, scheduled_at, timezone, status, media_asset_id, account_aliases_json,
+          post_for_me_response_json, last_error, created_at, updated_at
         )
         VALUES (
-          @external_id, @post_for_me_post_id, @caption, @title, @scheduled_at, @timezone, @status,
-          @media_asset_id, @account_aliases_json, @post_for_me_response_json, @last_error, @created_at, @updated_at
+          @external_id, @post_for_me_post_id, @caption, @title, @hook, @cta, @hook_category, @creative_dir, @source,
+          @tags_json, @metadata_json, @scheduled_at, @timezone, @status, @media_asset_id, @account_aliases_json,
+          @post_for_me_response_json, @last_error, @created_at, @updated_at
         )
       `,
     )
     .run({ ...input, created_at: now, updated_at: now });
   return getScheduledPost(db, Number(result.lastInsertRowid))!;
+}
+
+export function insertAnalyticsSnapshot(
+  db: Db,
+  input: Omit<AnalyticsSnapshotRow, "id" | "fetched_at"> & { fetched_at?: string },
+): AnalyticsSnapshotRow {
+  const fetched_at = input.fetched_at ?? nowIso();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO analytics_snapshots (
+          scheduled_post_id, external_id, post_for_me_post_id, social_account_id, account_alias, platform,
+          feed_item_id, feed_item_url, caption, published_at, views, likes, comments, shares, saves,
+          metrics_json, raw_json, fetched_at
+        )
+        VALUES (
+          @scheduled_post_id, @external_id, @post_for_me_post_id, @social_account_id, @account_alias, @platform,
+          @feed_item_id, @feed_item_url, @caption, @published_at, @views, @likes, @comments, @shares, @saves,
+          @metrics_json, @raw_json, @fetched_at
+        )
+      `,
+    )
+    .run({ ...input, fetched_at });
+  return db.prepare("SELECT * FROM analytics_snapshots WHERE id = ?").get(result.lastInsertRowid) as AnalyticsSnapshotRow;
+}
+
+export function listAnalyticsSnapshots(db: Db, options: { account?: string; days?: number } = {}): AnalyticsSnapshotRow[] {
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (options.account) {
+    conditions.push("account_alias = @account");
+    params.account = options.account;
+  }
+  if (options.days !== undefined) {
+    conditions.push("fetched_at >= @since");
+    params.since = new Date(Date.now() - options.days * 86400000).toISOString();
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  return db
+    .prepare(`SELECT * FROM analytics_snapshots ${where} ORDER BY fetched_at DESC, id DESC`)
+    .all(params) as AnalyticsSnapshotRow[];
 }
 
 export function getScheduledPost(db: Db, idOrExternalId: number | string): ScheduledPostRow | undefined {

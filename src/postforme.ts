@@ -45,6 +45,10 @@ export class PostForMeClient {
     return this.request("/social-post-results", { query: params });
   }
 
+  getSocialAccountFeed(socialAccountId: string, params: { expand?: string } = {}): Promise<unknown> {
+    return this.request(`/social-account-feeds/${encodeURIComponent(socialAccountId)}`, { query: params });
+  }
+
   private async request(
     path: string,
     options: {
