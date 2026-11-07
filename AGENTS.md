@@ -34,6 +34,7 @@ Lokale Konfiguration steht in `.env` (Vorlage `.env.example`), beide Apps lesen 
 
 - Kein eigener Scheduler, keine Queue: Posts gehen mit `scheduled_at` an PfM. Status kommt über den PfM-Webhook `POST /public/pfm/webhook` und den Abgleich beim Laden des Kalenders.
 - Kanäle sind PfM-Social-Accounts (`Integration.internalId` = PfM-ID). Plattformen nur die zehn aus `pfm.platforms.ts`.
+- Nach dem OAuth leitet PfM immer auf die im PfM-Dashboard hinterlegte Projekt-URL `https://vibeschedule.vibelabs.to/integrations/social/postforme` weiter (Quickstart-Projekte erlauben keinen Override). Lokal verbundene Konten landen also auf Prod; lokal danach den Sync-Button neben "Kanal hinzufügen" nutzen.
 - Plattform-Einstellungen eines Posts tragen die Feldnamen von PfM `platform_configurations` (snake_case). Das DTO in `libraries/nestjs-libraries/src/dtos/posts/providers-settings` ist zugleich die Whitelist; Frontend-Formular (`apps/frontend/src/components/new-launch/providers`) und CLI-Doku (`apps/cli/PLATFORM_SETTINGS.md`) bei Änderungen mitziehen.
 - Medien nur auf R2, öffentliche URLs unter `CLOUDFLARE_BUCKET_URL`. PfM lädt sie von dort.
 - Ein Workspace: genau eine `Organization`, Nutzer legt ein Admin unter Einstellungen an. Keine Selbstregistrierung. Der erste Admin entsteht beim Start aus `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`, wenn noch kein Nutzer existiert.
