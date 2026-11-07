@@ -5,13 +5,12 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 
-export type PostValidationError = {
-  /** Provider identifier, e.g. "x", "linkedin-page". */
+type PostValidationError = {
   provider: string;
-  /** Human readable provider name, e.g. "X", "LinkedIn Page". */
   name: string;
-  /** The readable validation error. */
   error: string;
 };
 
@@ -24,17 +23,41 @@ export class PostValidationException extends HttpException {
 @Catch(PostValidationException)
 export class PostValidationExceptionFilter implements ExceptionFilter {
   catch(exception: PostValidationException, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
-    const status = exception.getStatus();
     const { provider, name, error } =
       exception.getResponse() as PostValidationError;
-
-    response.status(status).json({
-      statusCode: status,
+    host.switchToHttp().getResponse<Response>().status(400).json({
+      statusCode: 400,
       provider,
       name,
       message: error,
     });
   }
 }
+
+// Drafts may be incomplete, only empty posts are refused for them
+export const assertValidPosts = (
+  validation: Awaited<ReturnType<PostsService['validatePosts']>>,
+  draft: boolean
+) => {
+  for (const item of validation) {
+    const error = item.emptyContent
+      ? 'Der Beitrag braucht Text oder mindestens ein Bild.'
+      : draft
+      ? ''
+      : !item.valid
+      ? item.settingsError
+      : item.errors !== true
+      ? item.errors
+      : item.tooLong
+      ? `Der Beitrag ist zu lang (maximal ${item.maximumCharacters} Zeichen).`
+      : '';
+
+    if (error) {
+      throw new PostValidationException({
+        provider: item.identifier,
+        name: item.name,
+        error,
+      });
+    }
+  }
+};

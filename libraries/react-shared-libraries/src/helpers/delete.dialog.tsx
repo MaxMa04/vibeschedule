@@ -1,5 +1,5 @@
-import i18next from '@gitroom/react/translation/i18next';
-import { areYouSure } from '@gitroom/frontend/components/layout/new-modal';
+import i18next from '@vibeschedule/react/translation/i18next';
+import { areYouSure } from '@vibeschedule/frontend/components/layout/new-modal';
 
 export const deleteDialog = async (
   message: string,
@@ -9,11 +9,10 @@ export const deleteDialog = async (
   destructive?: boolean
 ) => {
   return areYouSure({
-    title: title || i18next.t('are_you_sure', 'Are you sure?'),
+    title: title || i18next.t('are_you_sure'),
     description: message,
-    approveLabel:
-      confirmButton || i18next.t('yes_delete_it', 'Yes, delete it!'),
-    cancelLabel: cancelButton || i18next.t('no_cancel', 'No, cancel!'),
+    approveLabel: confirmButton || i18next.t('yes_delete_it'),
+    cancelLabel: cancelButton || i18next.t('no_cancel'),
     destructive,
   });
 };

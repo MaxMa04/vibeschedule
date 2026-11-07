@@ -1,11 +1,12 @@
-export const dynamic = 'force-dynamic';
 import { Metadata } from 'next';
-import { PlatformAnalytics } from '@gitroom/frontend/components/platform-analytics/platform.analytics';
-import { isGeneralServerSide } from '@gitroom/helpers/utils/is.general.server.side';
+import { PlatformAnalytics } from '@vibeschedule/frontend/components/platform-analytics/platform.analytics';
+
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
-  title: `${isGeneralServerSide() ? 'Postiz' : 'Gitroom'} Analytics`,
-  description: '',
+  title: 'Analytics | vibeschedule',
 };
-export default async function Index() {
+
+export default function Page() {
   return <PlatformAnalytics />;
 }

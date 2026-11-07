@@ -1,16 +1,19 @@
 'use client';
 
-import { useCalendar, ListStateFilter } from '@gitroom/frontend/components/launches/calendar.context';
+import {
+  useCalendar,
+  ListStateFilter,
+} from '@vibeschedule/frontend/components/launches/calendar.context';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { useCallback, useState } from 'react';
-import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
-import { SelectChannels } from '@gitroom/frontend/components/launches/select.channels';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { SelectCustomer } from '@vibeschedule/frontend/components/launches/select.customer';
+import { SelectChannels } from '@vibeschedule/frontend/components/launches/select.channels';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import i18next from 'i18next';
-import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
-import { BottomSheet } from '@gitroom/frontend/components/ui/bottom.sheet.component';
-import { FilterIcon } from '@gitroom/frontend/components/ui/icons';
+import { newDayjs } from '@vibeschedule/frontend/components/layout/set.timezone';
+import { BottomSheet } from '@vibeschedule/frontend/components/ui/bottom.sheet.component';
+import { FilterIcon } from '@vibeschedule/frontend/components/ui/icons';
 
 // Helper function to get start and end dates based on display type
 function getDateRange(
@@ -272,10 +275,10 @@ export const Filters = () => {
   );
 
   const listStateOptions: { value: ListStateFilter; label: string }[] = [
-    { value: 'all', label: t('all', 'All') },
-    { value: 'scheduled', label: t('scheduled', 'Scheduled') },
-    { value: 'draft', label: t('draft', 'Draft') },
-    { value: 'published', label: t('published', 'Published') },
+    { value: 'all', label: t('all') },
+    { value: 'scheduled', label: t('scheduled') },
+    { value: 'draft', label: t('draft') },
+    { value: 'published', label: t('published') },
   ];
 
   const previousPage = useCallback(() => {
@@ -298,7 +301,7 @@ export const Filters = () => {
           <div className="border h-[42px] border-newTableBorder bg-newTableBorder gap-[1px] flex items-center rounded-[8px] overflow-hidden mobile:flex-1 mobile:min-w-0">
             <div
               onClick={previous}
-              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
+              className="cursor-pointer text-textColor px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -326,7 +329,7 @@ export const Filters = () => {
             </div>
             <div
               onClick={next}
-              className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
+              className="cursor-pointer text-textColor px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -351,7 +354,7 @@ export const Filters = () => {
                 onClick={setToday}
                 className="hover:text-textItemFocused hover:bg-boxFocused py-[3px] px-[9px] flex justify-center items-center rounded-[8px] transition-all cursor-pointer text-[14px] bg-newBgColorInner border border-newTableBorder"
               >
-                {t('today', 'Today')}
+                {t('today')}
               </div>
             </div>
           </div>
@@ -368,7 +371,7 @@ export const Filters = () => {
             <div
               onClick={previousPage}
               className={clsx(
-                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
+                'text-textColor px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
                 calendar.listPage > 0
                   ? 'cursor-pointer hover:text-textItemFocused hover:bg-boxFocused'
                   : 'opacity-50 cursor-not-allowed'
@@ -392,13 +395,14 @@ export const Filters = () => {
             </div>
             <div className="min-w-[200px] mobile:min-w-0 mobile:flex-1 text-center bg-newBgColorInner h-full flex items-center justify-center">
               <div className="py-[3px] px-[9px] rounded-[5px] transition-all text-[14px]">
-                {t('page', 'Page')} {calendar.listPage + 1} {t('of', 'of')} {Math.max(1, calendar.listTotalPages)}
+                {t('page')} {calendar.listPage + 1} {t('of')}{' '}
+                {Math.max(1, calendar.listTotalPages)}
               </div>
             </div>
             <div
               onClick={nextPage}
               className={clsx(
-                'text-textColor rtl:rotate-180 px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
+                'text-textColor px-[9px] mobile:px-0 mobile:w-[36px] bg-newBgColorInner h-full flex items-center justify-center',
                 calendar.listPage < calendar.listTotalPages - 1
                   ? 'cursor-pointer hover:text-textItemFocused hover:bg-boxFocused'
                   : 'opacity-50 cursor-not-allowed'
@@ -454,13 +458,13 @@ export const Filters = () => {
           className={clsx(
             'hidden mobile:flex mobile:order-2 relative w-[42px] h-[42px] rounded-[8px] border justify-center items-center cursor-pointer',
             calendar.selectedChannels
-              ? 'border-[#612BD3] text-[#612BD3]'
+              ? 'border-teal text-teal'
               : 'border-newTableBorder'
           )}
         >
           <FilterIcon />
           {calendar.selectedChannels && (
-            <div className="absolute top-[6px] end-[6px] w-[6px] h-[6px] rounded-full bg-[#612BD3]" />
+            <div className="absolute top-[6px] end-[6px] w-[6px] h-[6px] rounded-full bg-teal" />
           )}
         </div>
       )}
@@ -477,7 +481,7 @@ export const Filters = () => {
           )}
           onClick={setDay}
         >
-          {t('day', 'Day')}
+          {t('day')}
         </div>
         <div
           className={clsx(
@@ -486,7 +490,7 @@ export const Filters = () => {
           )}
           onClick={setWeek}
         >
-          {t('week', 'Week')}
+          {t('week')}
         </div>
         <div
           className={clsx(
@@ -495,7 +499,7 @@ export const Filters = () => {
           )}
           onClick={setMonth}
         >
-          {t('month', 'Month')}
+          {t('month')}
         </div>
         {/* the list toggle joins the view switcher on phones */}
         <div
@@ -505,7 +509,7 @@ export const Filters = () => {
           )}
           onClick={setList}
         >
-          {t('list', 'List')}
+          {t('list')}
         </div>
       </div>
       <div className="flex flex-row p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] mobile:hidden">
@@ -560,10 +564,10 @@ export const Filters = () => {
       </div>
       {filtersOpen && (
         <BottomSheet
-          title={t('select_channels', 'Select Channels')}
+          title={t('select_channels')}
           onClose={() => setFiltersOpen(false)}
           button={{
-            label: t('done', 'Done'),
+            label: t('done'),
             onClick: () => setFiltersOpen(false),
           }}
         >

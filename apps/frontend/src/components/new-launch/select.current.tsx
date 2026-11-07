@@ -4,18 +4,18 @@ import { FC, RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import {
   SelectedIntegrations,
   useLaunchStore,
-} from '@gitroom/frontend/components/new-launch/store';
+} from '@vibeschedule/frontend/components/new-launch/store';
 import clsx from 'clsx';
-import SafeImage from '@gitroom/react/helpers/safe.image';
+import SafeImage from '@vibeschedule/react/helpers/safe.image';
 import { useShallow } from 'zustand/react/shallow';
-import { GlobalIcon } from '@gitroom/frontend/components/ui/icons';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
-import { useExistingData } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
+import { GlobalIcon } from '@vibeschedule/frontend/components/ui/icons';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
 import {
   useDecisionModal,
   useModals,
-} from '@gitroom/frontend/components/layout/new-modal';
+} from '@vibeschedule/frontend/components/layout/new-modal';
 
 export function useHasScroll(ref: RefObject<HTMLElement | null>): boolean {
   const [hasHorizontalScroll, setHasHorizontalScroll] = useState(false);
@@ -74,15 +74,15 @@ export const SelectCurrent: FC = () => {
 
   const contentRef = useRef<HTMLDivElement>(null);
   const hasScroll = useHasScroll(contentRef);
+  const t = useT();
 
   const removeSocial = useCallback(
     (sIntegration: Integrations) => async (e: any) => {
       e.stopPropagation();
       e.preventDefault();
       const open = await modals.open({
-        title: 'Remove Social Account',
-        description:
-          'Are you sure you want to remove this social from scheduling?',
+        title: t('remove_channel'),
+        description: t('remove_channel_from_post'),
       });
 
       if (!open) {
@@ -114,8 +114,8 @@ export const SelectCurrent: FC = () => {
               className={clsx(
                 'cursor-pointer flex gap-[8px] rounded-[8px] w-[40px] h-[40px] mobile:w-[44px] mobile:h-[44px] mobile:shrink-0 justify-center items-center bg-newBgLineColor mobile:bg-newSettings',
                 current !== 'global'
-                  ? 'text-[#A3A3A3]'
-                  : 'border mobile:border-[1.5px] border-[#FC69FF] text-[#FC69FF]'
+                  ? 'text-textItemBlur'
+                  : 'border mobile:border-[1.5px] border-teal text-teal'
               )}
             >
               <div>
@@ -133,7 +133,7 @@ export const SelectCurrent: FC = () => {
               className={clsx(
                 'border mobile:border-[1.5px] cursor-pointer relative flex gap-[8px] w-[40px] h-[40px] mobile:w-[44px] mobile:h-[44px] mobile:shrink-0 rounded-[8px] items-center bg-newBgLineColor mobile:bg-newSettings justify-center',
                 current === integration.id
-                  ? 'border-[#FC69FF] text-[#FC69FF]'
+                  ? 'border-teal text-teal'
                   : 'border-transparent'
               )}
             >
@@ -142,7 +142,7 @@ export const SelectCurrent: FC = () => {
                 <>
                   <div
                     onClick={removeSocial(integration)}
-                    className="absolute justify-center items-center flex mobile:hidden w-[8px] h-[8px] -top-[1px] -start-[3px] bg-red-500 rounded-full text-white text-[8px]"
+                    className="absolute justify-center items-center flex mobile:hidden w-[8px] h-[8px] -top-[1px] -start-[3px] bg-error rounded-full text-white text-[8px]"
                   >
                     X
                   </div>
@@ -211,11 +211,8 @@ export const IsGlobal: FC<{ id: string }> = ({ id }) => {
   return (
     <div
       data-tooltip-id="tooltip"
-      data-tooltip-content={t(
-        'no_longer_global_mode',
-        'No longer in global mode'
-      )}
-      className="w-[8px] h-[8px] bg-[#FC69FF] -top-[1px] -end-[3px] absolute rounded-full"
+      data-tooltip-content={t('no_longer_global_mode')}
+      className="w-[8px] h-[8px] bg-teal -top-[1px] -end-[3px] absolute rounded-full"
     />
   );
 };

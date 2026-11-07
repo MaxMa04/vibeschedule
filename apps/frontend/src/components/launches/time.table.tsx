@@ -1,29 +1,29 @@
 'use client';
 
 import React, { FC, useCallback, useMemo, useState } from 'react';
-import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
 import dayjs from 'dayjs';
-import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
-import { Select } from '@gitroom/react/form/select';
-import { Button } from '@gitroom/react/form/button';
+import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
+import { Select } from '@vibeschedule/react/form/select';
+import { Button } from '@vibeschedule/react/form/button';
 import utc from 'dayjs/plugin/utc';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 // @ts-ignore
 import useKeypress from 'react-use-keypress';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { sortBy } from 'lodash';
-import { usePreventWindowUnload } from '@gitroom/react/helpers/use.prevent.window.unload';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { usePreventWindowUnload } from '@vibeschedule/react/helpers/use.prevent.window.unload';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
   fromUtc,
   newDayjs,
-} from '@gitroom/frontend/components/layout/set.timezone';
+} from '@vibeschedule/frontend/components/layout/set.timezone';
 import clsx from 'clsx';
 import {
   TrashIcon,
   PlusIcon,
   DelayIcon,
-} from '@gitroom/frontend/components/ui/icons';
+} from '@vibeschedule/frontend/components/ui/icons';
 
 dayjs.extend(utc);
 
@@ -54,11 +54,8 @@ export const TimeTable: FC<{
   const askClose = useCallback(async () => {
     if (
       !(await deleteDialog(
-        t(
-          'are_you_sure_you_want_to_close_the_window',
-          'Are you sure you want to close the window?'
-        ),
-        t('yes_close', 'Yes, close')
+        t('are_you_sure_you_want_to_close_the_window'),
+        t('yes_close')
       ))
     ) {
       return;
@@ -71,12 +68,7 @@ export const TimeTable: FC<{
   const removeSlot = useCallback(
     (index: number) => async () => {
       if (
-        !(await deleteDialog(
-          t(
-            'are_you_sure_you_want_to_delete_this_slot',
-            'Are you sure you want to delete this slot?'
-          )
-        ))
+        !(await deleteDialog(t('are_you_sure_you_want_to_delete_this_slot')))
       ) {
         return;
       }
@@ -130,14 +122,14 @@ export const TimeTable: FC<{
       {/* Add Time Slot Section */}
       <div className="bg-newBgColorInner rounded-[12px] p-[20px] border border-newTableBorder">
         <div className="text-[15px] font-semibold mb-[16px] flex items-center gap-[8px]">
-          <DelayIcon size={18} className="text-[#612BD3]" />
-          {t('add_time_slot', 'Add Time Slot')}
+          <DelayIcon size={18} className="text-teal" />
+          {t('add_time_slot')}
         </div>
 
         <div className="flex gap-[12px] items-end">
           <div className="flex-1">
             <Select
-              label={t('hour', 'Hour')}
+              label={t('hour')}
               name="hour"
               disableForm={true}
               hideErrors={true}
@@ -153,7 +145,7 @@ export const TimeTable: FC<{
           </div>
           <div className="flex-1">
             <Select
-              label={t('minutes', 'Minutes')}
+              label={t('minutes')}
               name="minutes"
               disableForm={true}
               hideErrors={true}
@@ -170,10 +162,10 @@ export const TimeTable: FC<{
           <button
             type="button"
             onClick={addHour}
-            className="h-[42px] px-[16px] bg-[#612BD3] hover:bg-[#7640e0] transition-colors rounded-[8px] flex items-center gap-[6px] text-white text-[14px] font-medium"
+            className="h-[42px] px-[16px] bg-ink hover:opacity-90 transition-colors rounded-[12px] flex items-center gap-[6px] text-surface text-[14px] font-medium"
           >
             <PlusIcon size={14} />
-            {t('add', 'Add')}
+            {t('add')}
           </button>
         </div>
       </div>
@@ -181,12 +173,12 @@ export const TimeTable: FC<{
       {/* Time Slots List */}
       <div className="mt-[20px]">
         <div className="text-[14px] text-newTextColor/60 mb-[12px]">
-          {t('scheduled_times', 'Scheduled Times')} ({times.length})
+          {t('scheduled_times')} ({times.length})
         </div>
 
         {times.length === 0 ? (
           <div className="text-center py-[32px] text-newTextColor/40 text-[14px] border border-dashed border-newTableBorder rounded-[12px]">
-            {t('no_time_slots', 'No time slots added yet')}
+            {t('no_time_slots')}
           </div>
         ) : (
           <div className="flex flex-col gap-[8px]">
@@ -197,11 +189,11 @@ export const TimeTable: FC<{
                   'group flex items-center justify-between',
                   'h-[48px] px-[16px] rounded-[8px]',
                   'bg-newBgColorInner border border-newTableBorder',
-                  'hover:border-[#612BD3]/40 transition-colors'
+                  'hover:border-teal/40 transition-colors'
                 )}
               >
                 <div className="flex items-center gap-[12px]">
-                  <div className="w-[8px] h-[8px] rounded-full bg-[#612BD3]" />
+                  <div className="w-[8px] h-[8px] rounded-full bg-teal" />
                   <span className="text-[15px] font-medium tabular-nums">
                     {timeSlot.formatted}
                   </span>
@@ -209,7 +201,7 @@ export const TimeTable: FC<{
                 <button
                   type="button"
                   onClick={removeSlot(index)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-red-500/10 rounded-[6px] text-red-400 hover:text-red-500"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-error/10 rounded-[6px] text-error hover:opacity-80"
                 >
                   <TrashIcon size={16} />
                 </button>
@@ -222,7 +214,7 @@ export const TimeTable: FC<{
       {/* Save Button */}
       <div className="mt-[24px]">
         <Button type="button" className="w-full rounded-[8px]" onClick={save}>
-          {t('save_changes', 'Save Changes')}
+          {t('save_changes')}
         </Button>
       </div>
     </div>

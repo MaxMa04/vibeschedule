@@ -1,89 +1,55 @@
 {
   "type": "schedule",
-  "date": "2024-12-25T12:00:00Z",
-  "shortLink": true,
-  "tags": [
-    {
-      "value": "holiday",
-      "label": "Holiday"
-    },
-    {
-      "value": "marketing",
-      "label": "Marketing"
-    }
-  ],
+  "date": "2026-12-03T09:00:00Z",
+  "tags": [],
   "posts": [
     {
       "integration": {
-        "id": "twitter-integration-id"
+        "id": "X_KANAL_ID"
       },
       "value": [
         {
-          "content": "Happy Holidays! 🎄 Check out our special offers!",
+          "content": "Version 2.0 ist da.",
           "image": [
             {
-              "id": "holiday1",
-              "path": "https://example.com/holiday-twitter.jpg"
+              "id": "media-1",
+              "path": "https://vibeschedule-media.vibelabs.to/beispiel/bild.jpg"
             }
           ]
-        },
-        {
-          "content": "Limited time offer - 50% off! 🎁",
-          "image": [],
-          "delay": 3600000
         }
-      ],
-      "settings": {
-        "__type": "EmptySettings"
-      }
+      ]
     },
     {
       "integration": {
-        "id": "linkedin-integration-id"
+        "id": "LINKEDIN_KANAL_ID"
       },
       "value": [
         {
-          "content": "Season's greetings from our team! We're offering exclusive holiday promotions.",
+          "content": "Version 2.0 ist da. Was neu ist, steht im Blog.",
           "image": [
             {
-              "id": "holiday2",
-              "path": "https://example.com/holiday-linkedin.jpg"
+              "id": "media-1",
+              "path": "https://vibeschedule-media.vibelabs.to/beispiel/bild.jpg"
             }
           ]
         }
-      ],
-      "settings": {
-        "__type": "EmptySettings"
-      }
+      ]
     },
     {
       "integration": {
-        "id": "facebook-integration-id"
+        "id": "BLUESKY_KANAL_ID"
       },
       "value": [
         {
-          "content": "🎅 Happy Holidays! Special announcement in the comments!",
+          "content": "Version 2.0 ist da.",
           "image": [
             {
-              "id": "holiday3",
-              "path": "https://example.com/holiday-facebook-main.jpg"
+              "id": "media-1",
+              "path": "https://vibeschedule-media.vibelabs.to/beispiel/bild.jpg"
             }
           ]
-        },
-        {
-          "content": "Our holiday sale is now live! Visit our website for amazing deals 🎁",
-          "image": [
-            {
-              "id": "holiday4",
-              "path": "https://example.com/holiday-sale-banner.jpg"
-            }
-          ],
-          "delay": 300000
         }
-      ],
-      "settings": {
-        "__type": "EmptySettings"
-      }
+      ]
     }
   ]
 }

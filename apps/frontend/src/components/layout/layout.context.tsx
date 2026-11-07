@@ -1,125 +1,40 @@
 'use client';
 
 import { ReactNode, useCallback } from 'react';
-import { FetchWrapperComponent } from '@gitroom/helpers/utils/custom.fetch';
-import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
-import { useReturnUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
-export default function LayoutContext(params: { children: ReactNode }) {
-  if (params?.children) {
-    // eslint-disable-next-line react/no-children-prop
-    return <LayoutContextInner children={params.children} />;
-  }
-  return <></>;
-}
+import { FetchWrapperComponent } from '@vibeschedule/helpers/utils/custom.fetch';
+import { useReturnUrl } from '@vibeschedule/frontend/app/(app)/auth/return.url.component';
+import { useVariables } from '@vibeschedule/react/helpers/variable.context';
+
 export function setCookie(cname: string, cvalue: string, exdays: number) {
-  if (typeof document === 'undefined') {
-    return;
-  }
   const d = new Date();
   d.setTime(d.getTime() + exdays * 24 * 60 * 60 * 1000);
-  const expires = 'expires=' + d.toUTCString();
-  document.cookie = cname + '=' + cvalue + ';' + expires + ';path=/';
+  document.cookie =
+    cname + '=' + cvalue + ';expires=' + d.toUTCString() + ';path=/';
 }
-function LayoutContextInner(params: { children: ReactNode }) {
+
+export default function LayoutContext({ children }: { children: ReactNode }) {
   const returnUrl = useReturnUrl();
-  const { backendUrl, isGeneral, isSecured } = useVariables();
+  const { backendUrl, isSecured } = useVariables();
   const afterRequest = useCallback(
     async (url: string, options: RequestInit, response: Response) => {
-      if (
-        typeof window !== 'undefined' &&
-        (window.location.href.includes('/p/') ||
-          window.location.pathname.startsWith('/provider/'))
-      ) {
-        return true;
-      }
       const headerAuth =
-        response?.headers?.get('auth') || response?.headers?.get('Auth');
-      const showOrg =
-        response?.headers?.get('showorg') || response?.headers?.get('Showorg');
-      const impersonate =
-        response?.headers?.get('impersonate') ||
-        response?.headers?.get('Impersonate');
+        response.headers.get('auth') || response.headers.get('Auth');
       const logout =
-        response?.headers?.get('logout') || response?.headers?.get('Logout');
+        response.headers.get('logout') || response.headers.get('Logout');
       if (headerAuth) {
         setCookie('auth', headerAuth, 365);
       }
-      if (showOrg) {
-        setCookie('showorg', showOrg, 365);
-      }
-      if (impersonate) {
-        setCookie('impersonate', impersonate, 365);
-      }
-      if (logout && !isSecured) {
-        setCookie('auth', '', -10);
-        setCookie('showorg', '', -10);
-        setCookie('impersonate', '', -10);
-        window.location.href = '/';
-        return true;
-      }
-      const reloadOrOnboarding =
-        response?.headers?.get('reload') ||
-        response?.headers?.get('onboarding');
-      if (reloadOrOnboarding) {
-        const getAndClear = returnUrl.getAndClear();
-        if (getAndClear) {
-          window.location.href = getAndClear;
-          return true;
-        }
-      }
-      if (response?.headers?.get('onboarding')) {
-        window.location.href = isGeneral
-          ? '/launches?onboarding=true'
-          : '/analytics?onboarding=true';
+
+      if (response.headers.get('reload')) {
+        window.location.href = returnUrl.getAndClear() || '/launches';
         return true;
       }
 
-      if (response?.headers?.get('reload')) {
-        window.location.reload();
-        return true;
-      }
-
-      if (response.status === 401 || response?.headers?.get('logout')) {
+      if (response.status === 401 || logout) {
         if (!isSecured) {
           setCookie('auth', '', -10);
-          setCookie('showorg', '', -10);
-          setCookie('impersonate', '', -10);
         }
         window.location.href = '/';
-      }
-      if (response.status === 406) {
-        if (
-          await deleteDialog(
-            "This feature is not available during the trial. You can end the trial now: your plan's first payment is charged today instead of at the end of the trial.",
-            'End trial and pay now',
-            'Trial',
-
-          )
-        ) {
-          window.open('/billing?finishTrial=true', '_blank');
-          return false;
-        }
-        return false;
-      }
-
-      if (response.status === 402) {
-        if (
-          await deleteDialog(
-            (
-              await response
-                .clone()
-                .json()
-                .catch(() => ({}))
-            ).message,
-            'Move to billing',
-            'Payment Required'
-          )
-        ) {
-          window.open('/billing', '_blank');
-          return false;
-        }
-        return true;
       }
       return true;
     },
@@ -127,7 +42,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
   );
   return (
     <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>
-      {params?.children || <></>}
+      {children}
     </FetchWrapperComponent>
   );
 }

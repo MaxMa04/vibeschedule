@@ -4,12 +4,12 @@ import React, { FC, useCallback, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { uniqBy } from 'lodash';
 import { useClickOutside } from '@mantine/hooks';
-import { useCalendar } from '@gitroom/frontend/components/launches/calendar.context';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { Checkbox } from '@gitroom/react/form/checkbox';
-import { FilterIcon } from '@gitroom/frontend/components/ui/icons';
-import { Check } from '@gitroom/frontend/components/launches/tags.component';
-import { IntegrationListRow } from '@gitroom/frontend/components/new-launch/picks.socials.component';
+import { useCalendar } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { Checkbox } from '@vibeschedule/react/form/checkbox';
+import { FilterIcon } from '@vibeschedule/frontend/components/ui/icons';
+import { Check } from '@vibeschedule/frontend/components/launches/tags.component';
+import { IntegrationListRow } from '@vibeschedule/frontend/components/new-launch/picks.socials.component';
 
 export const SelectChannels: FC<{
   list?: boolean;
@@ -26,8 +26,7 @@ export const SelectChannels: FC<{
   });
 
   const channels = useMemo(
-    () =>
-      integrations.filter((i) => !customer || i.customer?.id === customer),
+    () => integrations.filter((i) => !customer || i.customer?.id === customer),
     [integrations, customer]
   );
 
@@ -71,16 +70,14 @@ export const SelectChannels: FC<{
       <div className="flex flex-col gap-[4px]">
         {hasCustomers && (
           <div className="text-[14px] font-[600] text-textItemBlur">
-            {t('channels', 'Channels')}
+            {t('channels')}
           </div>
         )}
         <div
           onClick={toggleAll}
           className="flex items-center gap-[12px] py-[8px] cursor-pointer select-none"
         >
-          <div className="flex-1 text-[14px] font-[600]">
-            {t('select_all', 'Select all')}
-          </div>
+          <div className="flex-1 text-[14px] font-[600]">{t('select_all')}</div>
           <Check onChange={() => {}} value={allSelected} />
         </div>
         {channels.map((p) => (
@@ -96,14 +93,14 @@ export const SelectChannels: FC<{
   }
 
   return (
-    <div className="relative select-none z-[500]" ref={ref}>
+    <div className="relative select-none z-[100]" ref={ref}>
       <div
         data-tooltip-id="tooltip"
-        data-tooltip-content={t('select_channels_tooltip', 'Select Channels')}
+        data-tooltip-content={t('select_channels_tooltip')}
         onClick={openClose}
         className={clsx(
           'relative z-[20] cursor-pointer h-[42px] rounded-[8px] px-[12px] border flex items-center',
-          open || !allSelected ? 'border-[#612BD3]' : 'border-newColColor'
+          open || !allSelected ? 'border-teal' : 'border-newColColor'
         )}
       >
         <FilterIcon />
@@ -118,7 +115,7 @@ export const SelectChannels: FC<{
               disableForm={true}
               checked={allSelected}
               onChange={toggleAll}
-              label={t('select_all', 'Select all')}
+              label={t('select_all')}
             />
           </div>
           {channels.map((p) => (

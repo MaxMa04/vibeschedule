@@ -1,102 +1,76 @@
 'use client';
 
-import { FC } from 'react';
-import {
-  PostComment,
-  withProvider,
-} from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
-import { YoutubeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/youtube.settings.dto';
-import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
-import { Input } from '@gitroom/react/form/input';
-import { MediumTags } from '@gitroom/frontend/components/new-launch/providers/medium/medium.tags';
-import { useWatch } from 'react-hook-form';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { Select } from '@gitroom/react/form/select';
-import { YoutubePreview } from '@gitroom/frontend/components/new-launch/providers/youtube/youtube.preview';
-const type = [
-  {
-    label: 'Public',
-    value: 'public',
-  },
-  {
-    label: 'Private',
-    value: 'private',
-  },
-  {
-    label: 'Unlisted',
-    value: 'unlisted',
-  },
+import { IsNotEmpty, MaxLength } from 'class-validator';
+import { withProvider } from '@vibeschedule/frontend/components/new-launch/providers/high.order.provider';
+import { Input } from '@vibeschedule/react/form/input';
+import { Select } from '@vibeschedule/react/form/select';
+import { Checkbox } from '@vibeschedule/react/form/checkbox';
+import { useSettings } from '@vibeschedule/frontend/components/launches/helpers/use.values';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { YoutubePreview } from '@vibeschedule/frontend/components/new-launch/providers/youtube/youtube.preview';
+
+class YoutubeSettingsDto {
+  @IsNotEmpty({ message: 'youtube_title_required' })
+  @MaxLength(100, { message: 'youtube_title_too_long' })
+  title: string;
+}
+
+const privacyStatuses = [
+  { value: 'public', label: 'privacy_public' },
+  { value: 'private', label: 'privacy_private' },
+  { value: 'unlisted', label: 'privacy_unlisted' },
 ];
 
-const madeForKids = [
-  {
-    label: 'No',
-    value: 'no',
-  },
-  {
-    label: 'Yes',
-    value: 'yes',
-  },
-];
-const YoutubeSettings: FC = () => {
+const toList = (value: string) =>
+  value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const YoutubeSettings = () => {
   const t = useT();
-  const { register, control, setValue } = useSettings();
-  // the thumbnail is set from the media settings now, older posts may still
-  // carry one here, and it wins over the media thumbnail
-  const thumbnail = useWatch({ control, name: 'thumbnail' });
+  const {
+    register,
+    formState: { errors },
+  } = useSettings();
+
   return (
     <div className="flex flex-col">
-      <Input label="Title" {...register('title')} maxLength={100} />
+      <Input
+        label={t('title')}
+        maxLength={100}
+        error={errors.title && t(errors.title.message as string)}
+        {...register('title')}
+      />
       <Select
-        label="Type"
-        {...register('type', {
+        label={t('privacy_status')}
+        {...register('privacy_status', {
           value: 'public',
         })}
       >
-        {type.map((t) => (
-          <option key={t.value} value={t.value}>
-            {t.label}
+        {privacyStatuses.map((item) => (
+          <option key={item.value} value={item.value}>
+            {t(item.label)}
           </option>
         ))}
       </Select>
-      <Select
-        label="Made for kids"
-        {...register('selfDeclaredMadeForKids', {
-          value: 'no',
+      <Input
+        label={t('tags_comma_separated')}
+        {...register('tags', {
+          setValueAs: toList,
         })}
-      >
-        {madeForKids.map((t) => (
-          <option key={t.value} value={t.value}>
-            {t.label}
-          </option>
-        ))}
-      </Select>
-      <MediumTags label="Tags" {...register('tags')} />
-      {!!thumbnail?.path && (
-        <div className="mt-[20px] flex items-center gap-[10px] text-[12px]">
-          <div className="flex-1">
-            {t(
-              'youtube_thumbnail_overrides_media',
-              'This post has a YouTube-specific thumbnail, which overrides the thumbnail set in the media settings.'
-            )}
-          </div>
-          <div
-            onClick={() =>
-              setValue('thumbnail', undefined, { shouldDirty: true })
-            }
-            className="cursor-pointer text-[#FF3F3F] font-[600]"
-          >
-            {t('remove', 'Remove')}
-          </div>
-        </div>
-      )}
+      />
+      <Checkbox
+        label={t('youtube_made_for_kids')}
+        {...register('made_for_kids', {
+          value: false,
+        })}
+      />
     </div>
   );
 };
+
 export default withProvider({
-  postComment: PostComment.COMMENT,
-  comments: false,
-  minimumCharacters: [],
   SettingsComponent: YoutubeSettings,
   CustomPreviewComponent: YoutubePreview,
   dto: YoutubeSettingsDto,

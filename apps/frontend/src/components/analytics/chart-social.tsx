@@ -2,9 +2,13 @@
 
 import { FC, useEffect, useMemo, useRef } from 'react';
 import DrawChart from 'chart.js/auto';
-import { TotalList } from '@gitroom/frontend/components/analytics/stars.and.forks.interface';
 import { chunk } from 'lodash';
 import useCookie from 'react-use-cookie';
+
+interface TotalList {
+  date: string;
+  total: number;
+}
 
 function mergeDataPoints(data: TotalList[], numPoints: number): TotalList[] {
   const res = chunk(data, Math.ceil(data.length / numPoints));
@@ -16,12 +20,19 @@ function mergeDataPoints(data: TotalList[], numPoints: number): TotalList[] {
   });
 }
 
+// VibeLabs coral, teal and amber
+const colorSchemes = {
+  coral: { fill: 'rgba(255, 107, 74, 0.12)', border: 'rgb(255, 107, 74)' },
+  teal: { fill: 'rgba(31, 182, 166, 0.12)', border: 'rgb(31, 182, 166)' },
+  amber: { fill: 'rgba(232, 169, 75, 0.12)', border: 'rgb(232, 169, 75)' },
+};
+
 export const ChartSocial: FC<{
   data: TotalList[];
-  color?: 'purple' | 'green' | 'blue';
+  color: keyof typeof colorSchemes;
 }> = (props) => {
-  const { data, color = 'purple' } = props;
-  const [mode] = useCookie('mode', 'dark');
+  const { data, color } = props;
+  const [mode] = useCookie('mode', 'light');
 
   const list = useMemo(() => {
     const merged = data.length < 7 ? data : mergeDataPoints(data, 7);
@@ -38,32 +49,9 @@ export const ChartSocial: FC<{
   const ref = useRef<any>(null);
   const chart = useRef<null | DrawChart>(null);
 
-  const colorSchemes = {
-    purple: {
-      start: 'rgba(97, 43, 211, 0.8)',
-      end: 'rgba(97, 43, 211, 0.1)',
-      border: 'rgb(97, 43, 211)',
-    },
-    green: {
-      start: 'rgba(50, 213, 131, 0.8)',
-      end: 'rgba(50, 213, 131, 0.1)',
-      border: 'rgb(50, 213, 131)',
-    },
-    blue: {
-      start: 'rgba(29, 155, 240, 0.8)',
-      end: 'rgba(29, 155, 240, 0.1)',
-      border: 'rgb(29, 155, 240)',
-    },
-  };
-
   const colors = colorSchemes[color];
 
   useEffect(() => {
-    const ctx = ref.current.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, ref.current.height);
-    gradient.addColorStop(0, colors.start);
-    gradient.addColorStop(1, colors.end);
-
     chart.current = new DrawChart(ref.current!, {
       type: 'line',
       options: {
@@ -104,10 +92,10 @@ export const ChartSocial: FC<{
           },
           tooltip: {
             enabled: true,
-            backgroundColor: mode === 'dark' ? '#1e1d1d' : '#fff',
-            titleColor: mode === 'dark' ? '#fff' : '#000',
-            bodyColor: mode === 'dark' ? '#9c9c9c' : '#777',
-            borderColor: mode === 'dark' ? '#2b2b2b' : '#e7e9eb',
+            backgroundColor: mode === 'dark' ? '#141518' : '#FFFFFF',
+            titleColor: mode === 'dark' ? '#F2F2F2' : '#16232E',
+            bodyColor: mode === 'dark' ? '#A8A8A8' : '#4A5A66',
+            borderColor: mode === 'dark' ? '#232529' : '#E2E2DA',
             borderWidth: 1,
             padding: 10,
             cornerRadius: 8,
@@ -129,15 +117,15 @@ export const ChartSocial: FC<{
           {
             borderColor: colors.border,
             borderWidth: 2,
-            label: 'Total',
-            backgroundColor: gradient,
+            label: '',
+            backgroundColor: colors.fill,
             fill: true,
             data: list.map((row) => row.total),
             tension: 0.4,
             pointRadius: 0,
             pointHoverRadius: 6,
             pointHoverBackgroundColor: colors.border,
-            pointHoverBorderColor: mode === 'dark' ? '#1e1d1d' : '#fff',
+            pointHoverBorderColor: mode === 'dark' ? '#141518' : '#FFFFFF',
             pointHoverBorderWidth: 2,
           },
         ],

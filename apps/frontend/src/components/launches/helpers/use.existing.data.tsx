@@ -1,9 +1,14 @@
 import { createContext, FC, ReactNode, useContext } from 'react';
 import { Post } from '@prisma/client';
+import { Media } from '@vibeschedule/frontend/components/new-launch/store';
+
+// GET /posts/group/:group returns the media already parsed
+export type ExistingPost = Omit<Post, 'image'> & { image: Media[] };
+
 const ExistingDataContext = createContext({
   integration: '',
   group: undefined as undefined | string,
-  posts: [] as Post[],
+  posts: [] as ExistingPost[],
   settings: {} as any,
   // the other channels the post was created with
   siblings: undefined as
@@ -11,7 +16,7 @@ const ExistingDataContext = createContext({
     | {
         integration: string;
         group: string;
-        posts: Post[];
+        posts: ExistingPost[];
         settings: any;
       }[],
 });

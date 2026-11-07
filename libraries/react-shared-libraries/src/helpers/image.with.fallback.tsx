@@ -1,19 +1,19 @@
 import { FC, useEffect, useState } from 'react';
 import SafeImage from './safe.image';
+
 interface ImageSrc {
-  src: string;
+  src?: string | null;
   fallbackSrc: string;
   width: number;
   height: number;
   [key: string]: any;
 }
+
 const ImageWithFallback: FC<ImageSrc> = (props) => {
   const { src, fallbackSrc, ...rest } = props;
-  const [imgSrc, setImgSrc] = useState(src);
+  const [imgSrc, setImgSrc] = useState(src || fallbackSrc);
   useEffect(() => {
-    if (src !== imgSrc) {
-      setImgSrc(src);
-    }
+    setImgSrc(src || fallbackSrc);
   }, [src]);
   return (
     <SafeImage
@@ -26,4 +26,5 @@ const ImageWithFallback: FC<ImageSrc> = (props) => {
     />
   );
 };
+
 export default ImageWithFallback;

@@ -3,11 +3,11 @@
 import React, { FC, ReactNode, useState } from 'react';
 import clsx from 'clsx';
 import { useClickOutside } from '@mantine/hooks';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
   ChevronLeftIcon,
   DropdownArrowIcon,
-} from '@gitroom/frontend/components/ui/icons';
+} from '@vibeschedule/frontend/components/ui/icons';
 
 export interface MobileTopBarAction {
   label: string;
@@ -16,8 +16,8 @@ export interface MobileTopBarAction {
 }
 
 const actionColors = {
-  primary: 'bg-btnPrimary text-white',
-  secondary: 'bg-[#D82D7E] text-white',
+  primary: 'bg-ink text-surface',
+  secondary: 'bg-coral text-white',
   tertiary: 'bg-btnSimple text-btnText',
 };
 
@@ -39,9 +39,9 @@ export const MobileTopBar: FC<{
     <div className="hidden mobile:flex sticky top-0 z-[450] h-[60px] items-center gap-[8px] px-[16px] bg-newBgColorInner select-none">
       <div
         onClick={onBack}
-        className="w-[24px] h-[24px] flex justify-center items-center cursor-pointer text-[#A3A3A3]"
+        className="w-[24px] h-[24px] flex justify-center items-center cursor-pointer text-textItemBlur"
       >
-        <ChevronLeftIcon strokeWidth={1.5} className="rtl:rotate-180" />
+        <ChevronLeftIcon strokeWidth={1.5} className="" />
       </div>
       <div className="flex-1 min-w-0 flex">{children}</div>
       <div ref={ref} className="relative">
@@ -59,7 +59,7 @@ export const MobileTopBar: FC<{
             </div>
           )}
           <div className={clsx(loading && 'invisible')}>
-            {single ? actions[0].label : t('post', 'Post')}
+            {single ? actions[0].label : t('post')}
           </div>
           {!single && (
             <DropdownArrowIcon

@@ -1,27 +1,22 @@
 import {
   ValidationArguments,
-  ValidatorConstraintInterface,
   ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 import striptags from 'striptags';
 
+// A post needs text or at least one image
 @ValidatorConstraint({ name: 'validateContent', async: false })
 export class ValidContent implements ValidatorConstraintInterface {
   validate(contentRaw: string, args: ValidationArguments) {
-    const content = striptags(contentRaw || '');
-    if (
-      // @ts-ignore
-      (!args?.object?.image || !Array.isArray(args?.object?.image) || !args?.object?.image.length) &&
-      (!content || typeof content !== 'string' || content?.trim() === '')
-    ) {
-      return false;
-    }
-
-    return true;
+    const { image } = args.object as { image?: unknown[] };
+    return (
+      (Array.isArray(image) && image.length > 0) ||
+      striptags(contentRaw || '').trim() !== ''
+    );
   }
 
-  defaultMessage(args: ValidationArguments) {
-    // here you can provide default error message if validation failed
-    return ' If images do not exist, content must be a non-empty string.';
+  defaultMessage() {
+    return 'Der Beitrag braucht Text oder mindestens ein Bild.';
   }
 }

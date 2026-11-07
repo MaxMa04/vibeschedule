@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import useCookie from 'react-use-cookie';
 import EventEmitter from 'events';
 
 export const modeEmitter = new EventEmitter();
 
 const ModeComponent = () => {
-  const [mode, setMode] = useCookie('mode', 'dark');
+  const [mode, setMode] = useCookie('mode', 'light');
 
   const changeMode = useCallback(() => {
     modeEmitter.emit('mode', mode === 'dark' ? 'light' : 'dark');

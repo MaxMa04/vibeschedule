@@ -1,12 +1,12 @@
 'use client';
 
 import React, { FC, useCallback, useEffect, useState } from 'react';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { Integration } from '@prisma/client';
 import useSWR from 'swr';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { Button } from '@gitroom/react/form/button';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { Button } from '@vibeschedule/react/form/button';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 export const CustomerModal: FC<{
   integration: Integration & {
     customer?: {
@@ -51,14 +51,14 @@ export const CustomerModal: FC<{
     <div className="relative w-full">
       <div className="mb-[80px] flex flex-col gap-[6px]">
         <label htmlFor="customer-name" className="text-[14px] text-white">
-          {t('select_customer_label', 'Select Customer')}
+          {t('select_customer_label')}
         </label>
         <input
           id="customer-name"
           list="customer-name-options"
           value={customer ?? ''}
           onChange={(e) => setCustomer(e.target.value)}
-          placeholder={t('start_typing', 'Start typing...')}
+          placeholder={t('start_typing')}
           autoComplete="off"
           className="bg-newBgColorInner h-[42px] border-newTableBorder border rounded-[8px] text-textColor placeholder-textColor px-[16px] text-[14px] outline-none"
         />
@@ -70,10 +70,10 @@ export const CustomerModal: FC<{
       </div>
 
       <div className="my-[16px] flex gap-[10px]">
-        <Button onClick={() => saveCustomer()}>{t('save', 'Save')}</Button>
+        <Button onClick={() => saveCustomer()}>{t('save')}</Button>
         {!!integration?.customer?.name && (
-          <Button className="bg-red-700" onClick={removeFromCustomer}>
-            {t('remove_from_customer', 'Remove from customer')}
+          <Button className="bg-error" onClick={removeFromCustomer}>
+            {t('remove_from_customer')}
           </Button>
         )}
       </div>

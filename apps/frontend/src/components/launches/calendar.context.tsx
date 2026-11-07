@@ -13,7 +13,7 @@ import {
 } from 'react';
 import dayjs from 'dayjs';
 import useSWR from 'swr';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { Post, Integration, Tags } from '@prisma/client';
 import { useSearchParams } from 'next/navigation';
 import isoWeek from 'dayjs/plugin/isoWeek';
@@ -23,9 +23,11 @@ import useCookie from 'react-use-cookie';
 import {
   fromUtc,
   newDayjs,
-} from '@gitroom/frontend/components/layout/set.timezone';
-import { timer } from '@gitroom/helpers/utils/timer';
-import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
+} from '@vibeschedule/frontend/components/layout/set.timezone';
+import {
+  expandPostsList,
+  expandPosts,
+} from '@vibeschedule/helpers/utils/posts.list.minify';
 extend(isoWeek);
 extend(weekOfYear);
 
@@ -36,16 +38,7 @@ export const CalendarContext = createContext({
   endDate: newDayjs().endOf('isoWeek').format('YYYY-MM-DD'),
   customer: null as string | null,
   loading: true,
-  sets: [] as { name: string; id: string; content: string[] }[],
-  signature: undefined as any,
-  comments: [] as Array<{
-    date: string;
-    total: number;
-  }>,
-  integrations: [] as (Integrations & {
-    refreshNeeded?: boolean;
-  })[],
-  trendings: [] as string[],
+  integrations: [] as Integrations[],
   posts: [] as Array<
     Post & {
       integration: Integration;
@@ -54,8 +47,7 @@ export const CalendarContext = createContext({
       }[];
     }
   >,
-  // the publish date of each post, in the user's timezone. Keyed by the post
-  // itself, the occurrences of a recurring post share the same id
+  // the publish date of each post, in the user's timezone
   postDates: new Map<object, dayjs.Dayjs>(),
   reloadCalendarView: () => {
     /** empty **/
@@ -72,7 +64,6 @@ export const CalendarContext = createContext({
   changeDate: (id: string, date: dayjs.Dayjs) => {
     /** empty **/
   },
-  // List view specific
   listPosts: [] as Array<
     Post & {
       integration: Integration;
@@ -99,19 +90,12 @@ export const CalendarContext = createContext({
 
 export interface Integrations {
   name: string;
-  originalName?: string;
   id: string;
   disabled?: boolean;
-  inBetweenSteps: boolean;
-  editor: 'none' | 'normal' | 'markdown' | 'html';
-  stripLinks?: boolean;
   display: string;
   identifier: string;
   type: string;
   picture: string;
-  changeProfilePicture: boolean;
-  additionalSettings: string;
-  changeNickName: boolean;
   time: {
     time: number;
   }[];
@@ -172,7 +156,6 @@ export const CalendarWeekProvider: FC<{
 }> = ({ children, integrations }) => {
   const fetch = useFetch();
   const [internalData, setInternalData] = useState([] as any[]);
-  const [trendings] = useState<string[]>([]);
   const searchParams = useSearchParams();
   // A 7-column week doesn't fit a phone, so default small screens (tailwind `mobile`) to the day view
   const [displaySaved, setDisplaySaved] = useCookie(
@@ -202,9 +185,9 @@ export const CalendarWeekProvider: FC<{
       ? { startDate: initStartDate, endDate: initEndDate }
       : getDateRange(display);
 
-  const [selectedChannels, setSelectedChannelsRaw] = useState<
-    string[] | null
-  >(null);
+  const [selectedChannels, setSelectedChannelsRaw] = useState<string[] | null>(
+    null
+  );
   const setSelectedChannels = useCallback((next: string[] | null) => {
     setSelectedChannelsRaw(next);
     setListPage(0);
@@ -264,16 +247,12 @@ export const CalendarWeekProvider: FC<{
     data: calendarData,
     isLoading: calendarIsLoading,
     mutate: mutateCalendar,
-  } = useSWR(
-    filters.display !== 'list' ? `/posts-${params}` : null,
-    loadData,
-    {
-      refreshInterval: 3600000,
-      refreshWhenOffline: false,
-      refreshWhenHidden: false,
-      revalidateOnFocus: false,
-    }
-  );
+  } = useSWR(filters.display !== 'list' ? `/posts-${params}` : null, loadData, {
+    refreshInterval: 3600000,
+    refreshWhenOffline: false,
+    refreshWhenHidden: false,
+    revalidateOnFocus: false,
+  });
 
   // SWR for list view
   const {
@@ -290,31 +269,6 @@ export const CalendarWeekProvider: FC<{
       revalidateOnFocus: false,
     }
   );
-
-  const defaultSign = useCallback(async () => {
-    return await (await fetch('/signatures/default')).json();
-  }, []);
-
-  const setList = useCallback(async () => {
-    return (await fetch('/sets')).json();
-  }, []);
-
-  const { data: sets, mutate } = useSWR('sets', setList, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-    revalidateOnMount: true,
-    refreshWhenHidden: false,
-    refreshWhenOffline: false,
-  });
-  const { data: sign } = useSWR('default-sign', defaultSign, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-    revalidateOnMount: true,
-    refreshWhenHidden: false,
-    refreshWhenOffline: false,
-  });
 
   const setFiltersWrapper = useCallback(
     (newFilters: {
@@ -352,7 +306,6 @@ export const CalendarWeekProvider: FC<{
   );
 
   const posts = useMemo(() => calendarData?.posts || [], [calendarData?.posts]);
-  const comments = useMemo(() => calendarData?.comments || [], [calendarData?.comments]);
 
   // List view data
   const listPosts = useMemo(() => listData?.posts || [], [listData?.posts]);
@@ -389,7 +342,8 @@ export const CalendarWeekProvider: FC<{
   }, [mutateCalendar, mutateList]);
 
   // Determine loading state based on current view
-  const loading = filters.display === 'list' ? listIsLoading : calendarIsLoading;
+  const loading =
+    filters.display === 'list' ? listIsLoading : calendarIsLoading;
 
   // one clock for every calendar cell, instead of a timer per cell
   const currentHour = useNow('hour');
@@ -407,7 +361,6 @@ export const CalendarWeekProvider: FC<{
   return (
     <CalendarContext.Provider
       value={{
-        trendings,
         reloadCalendarView,
         ...filters,
         posts: calendarIsLoading ? [] : filterByChannels(internalData),
@@ -416,10 +369,6 @@ export const CalendarWeekProvider: FC<{
         integrations,
         setFilters: setFiltersWrapper,
         changeDate,
-        comments,
-        sets: sets || [],
-        signature: sign,
-        // List view specific
         listPosts,
         listPage,
         listTotalPages,

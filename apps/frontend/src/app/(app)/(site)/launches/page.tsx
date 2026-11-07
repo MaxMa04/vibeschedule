@@ -1,11 +1,12 @@
-export const dynamic = 'force-dynamic';
-import { LaunchesComponent } from '@gitroom/frontend/components/launches/launches.component';
 import { Metadata } from 'next';
-import { isGeneralServerSide } from '@gitroom/helpers/utils/is.general.server.side';
+import { LaunchesComponent } from '@vibeschedule/frontend/components/launches/launches.component';
+
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
-  title: `${isGeneralServerSide() ? 'Postiz Calendar' : 'Gitroom Launches'}`,
-  description: '',
+  title: 'Kalender | vibeschedule',
 };
-export default async function Index() {
+
+export default function Page() {
   return <LaunchesComponent />;
 }

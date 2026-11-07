@@ -1,20 +1,8 @@
 'use client';
 
-import {
-  PostComment,
-  withProvider,
-} from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
-import { ThreadFinisher } from '@gitroom/frontend/components/new-launch/finisher/thread.finisher';
-
-const SettingsComponent = () => {
-  return <ThreadFinisher />;
-};
+import { withProvider } from '@vibeschedule/frontend/components/new-launch/providers/high.order.provider';
 
 export default withProvider({
-  postComment: PostComment.POST,
-  minimumCharacters: [],
-  SettingsComponent: SettingsComponent,
-  CustomPreviewComponent: undefined,
-  dto: undefined,
+  SettingsComponent: null,
   maximumCharacters: 300,
 });

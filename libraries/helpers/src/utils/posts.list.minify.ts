@@ -23,8 +23,6 @@ const POST_ITEM_KEYS: Record<string, string> = {
   group: 'g',
   tags: 'tg',
   integration: 'n',
-  intervalInDays: 'iv',
-  actualDate: 'ad',
   creationMethod: 'cm',
 };
 

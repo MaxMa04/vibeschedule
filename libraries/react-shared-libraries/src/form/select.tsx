@@ -10,7 +10,6 @@ import {
 import { clsx } from 'clsx';
 import { useFormContext } from 'react-hook-form';
 import { RegisterOptions } from 'react-hook-form/dist/types/validator';
-import { TranslatedLabel } from '../translation/translated-label';
 
 export const Select: FC<
   DetailedHTMLProps<
@@ -23,8 +22,6 @@ export const Select: FC<
     label: string;
     name: string;
     hideErrors?: boolean;
-    translationKey?: string;
-    translationParams?: Record<string, string | number>;
   }
 > = forwardRef((props, ref) => {
   const {
@@ -34,8 +31,6 @@ export const Select: FC<
     disableForm,
     error,
     extraForm,
-    translationKey,
-    translationParams,
     ...rest
   } = props;
   const form = useFormContext();
@@ -46,13 +41,7 @@ export const Select: FC<
   }, [form?.formState?.errors?.[props?.name!]?.message, error]);
   return (
     <div className={clsx('flex flex-col', label ? 'gap-[6px]' : '')}>
-      <div className={`text-[14px]`}>
-        <TranslatedLabel
-          label={label}
-          translationKey={translationKey}
-          translationParams={translationParams}
-        />
-      </div>
+      <div className={`text-[14px]`}>{label}</div>
       <select
         ref={ref}
         {...(disableForm ? {} : form.register(props.name, extraForm))}
@@ -63,7 +52,7 @@ export const Select: FC<
         {...rest}
       />
       {!hideErrors && (
-        <div className="text-red-400 text-[12px]">{err || <>&nbsp;</>}</div>
+        <div className="text-error text-[12px]">{err || <>&nbsp;</>}</div>
       )}
     </div>
   );

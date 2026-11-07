@@ -11,30 +11,20 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Button } from '@gitroom/react/form/button';
+import { Button } from '@vibeschedule/react/form/button';
 import useSWR from 'swr';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { hasExtension } from '@vibeschedule/helpers/utils/has.extension';
 import { Media } from '@prisma/client';
-import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
-import EventEmitter from 'events';
-import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import clsx from 'clsx';
-import { VideoFrame } from '@gitroom/react/helpers/video.frame';
-import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
-import dynamic from 'next/dynamic';
-import { useUser } from '@gitroom/frontend/components/layout/user.context';
-import { AiImage } from '@gitroom/frontend/components/launches/ai.image';
-import { DropFiles } from '@gitroom/frontend/components/layout/drop.files';
-import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ThirdPartyMedia } from '@gitroom/frontend/components/third-parties/third-party.media';
+import { VideoFrame } from '@vibeschedule/react/helpers/video.frame';
+import { useUppyUploader } from '@vibeschedule/frontend/components/media/new.uploader';
+import { DropFiles } from '@vibeschedule/frontend/components/layout/drop.files';
+import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { ReactSortable } from 'react-sortablejs';
-import { MediaComponentInner } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
-import { AiVideo } from '@gitroom/frontend/components/launches/ai.video';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { ThirdPartyMediaLibrary } from '@gitroom/frontend/components/third-parties/third-party.media-library';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { Dashboard } from '@uppy/react';
 import {
   ChevronLeftIcon,
@@ -43,21 +33,12 @@ import {
   DeleteCircleIcon,
   CloseCircleIcon,
   DragHandleIcon,
-  MediaSettingsIcon,
   InsertMediaIcon,
-  DesignMediaIcon,
   VerticalDividerIcon,
   NoMediaIcon,
   TrashIcon,
-} from '@gitroom/frontend/components/ui/icons';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { useShallow } from 'zustand/react/shallow';
-import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+} from '@vibeschedule/frontend/components/ui/icons';
 import { useDebounce } from 'use-debounce';
-const Polonto = dynamic(
-  () => import('@gitroom/frontend/components/launches/polonto')
-);
-const showModalEmitter = new EventEmitter();
 // on phones the media library takes the whole screen
 export const mediaLibrarySize = () =>
   window.matchMedia('(max-width: 1025px)').matches
@@ -129,11 +110,11 @@ export const Pagination: FC<{
       <li className={clsx(current === 0 && 'opacity-20 pointer-events-none')}>
         <div
           className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 ps-2.5 text-gray-400 hover:text-white border-[#1F1F1F] hover:bg-forth"
-          aria-label="Go to previous page"
+          aria-label={t('previous')}
           onClick={() => setPage(current - 1)}
         >
           <ChevronLeftIcon className="lucide lucide-chevron-left h-4 w-4" />
-          <span className="mobile:hidden">{t('previous', 'Previous')}</span>
+          <span className="mobile:hidden">{t('previous')}</span>
         </div>
       </li>
       {paginationItems.map((item, index) => (
@@ -169,48 +150,16 @@ export const Pagination: FC<{
       >
         <a
           className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-forth"
-          aria-label="Go to next page"
+          aria-label={t('next')}
           onClick={() => setPage(current + 1)}
         >
-          <span className="mobile:hidden">{t('next', 'Next')}</span>
+          <span className="mobile:hidden">{t('next')}</span>
           <ChevronRightIcon className="lucide lucide-chevron-right h-4 w-4" />
         </a>
       </li>
     </ul>
   );
 };
-export const ShowMediaBoxModal: FC = () => {
-  const modals = useModals();
-  const t = useT();
-  useEffect(() => {
-    showModalEmitter.on('show-modal', (cCallback) => {
-      modals.openModal({
-        title: t('media_library', 'Media Library'),
-        askClose: false,
-        closeOnEscape: true,
-        fullScreen: true,
-        size: mediaLibrarySize(),
-        height: mediaLibrarySize(),
-        children: (close) => (
-          <MediaBox
-            setMedia={(media) => cCallback(media[0])}
-            closeModal={close}
-          />
-        ),
-      });
-    });
-    return () => {
-      showModalEmitter.removeAllListeners('show-modal');
-    };
-  }, []);
-  return null;
-};
-export const showMediaBox = (
-  callback: (params: { id: string; path: string }) => void
-) => {
-  showModalEmitter.emit('show-modal', callback);
-};
-const CHUNK_SIZE = 1024 * 1024;
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
 export const MediaBox: FC<{
   setMedia: (params: { id: string; path: string }[]) => void;
@@ -241,7 +190,6 @@ export const MediaBox: FC<{
   const [selected, setSelected] = useState([]);
   const t = useT();
   const uploaderRef = useRef<any>(null);
-  const mediaDirectory = useMediaDirectory();
   const [loading, setLoading] = useState(false);
 
   const uppy = useUppyUploader({
@@ -309,13 +257,7 @@ export const MediaBox: FC<{
       const totalSize = files.reduce((acc, file) => acc + file.size, 0);
 
       if (totalSize > MAX_UPLOAD_SIZE) {
-        toaster.show(
-          t(
-            'upload_size_limit_exceeded',
-            'Upload size limit exceeded. Maximum 1 GB per upload session.'
-          ),
-          'warning'
-        );
+        toaster.show(t('upload_size_limit_exceeded'), 'warning');
         return;
       }
 
@@ -352,13 +294,7 @@ export const MediaBox: FC<{
       const totalSize = files.reduce((acc, file) => acc + file.size, 0);
 
       if (totalSize > MAX_UPLOAD_SIZE) {
-        toaster.show(
-          t(
-            'upload_size_limit_exceeded',
-            'Upload size limit exceeded. Maximum 1 GB per upload session.'
-          ),
-          'warning'
-        );
+        toaster.show(t('upload_size_limit_exceeded'), 'warning');
         return;
       }
 
@@ -380,16 +316,13 @@ export const MediaBox: FC<{
         children: (
           <div className="w-full h-full p-[50px]">
             {hasExtension(media.path, 'mp4') ? (
-              <VideoFrame
-                autoplay={true}
-                url={mediaDirectory.set(media.path)}
-              />
+              <VideoFrame autoplay={true} url={media.path} />
             ) : (
               <img
                 width="100%"
                 height="100%"
                 className="w-full h-full max-h-[100%] max-w-[100%] object-cover"
-                src={mediaDirectory.set(media.path)}
+                src={media.path}
                 alt="media"
               />
             )}
@@ -404,12 +337,7 @@ export const MediaBox: FC<{
     (media: Media) => async (e: any) => {
       e.stopPropagation();
       if (
-        !(await deleteDialog(
-          t(
-            'are_you_sure_you_want_to_delete_the_image',
-            'Are you sure you want to delete the image?'
-          )
-        ))
+        !(await deleteDialog(t('are_you_sure_you_want_to_delete_the_image')))
       ) {
         return;
       }
@@ -424,12 +352,7 @@ export const MediaBox: FC<{
   // phones have no hover, so the selected media are deleted together
   const deleteSelected = useCallback(async () => {
     if (
-      !(await deleteDialog(
-        t(
-          'are_you_sure_you_want_to_delete_selected_media',
-          'Are you sure you want to delete the selected media?'
-        )
-      ))
+      !(await deleteDialog(t('are_you_sure_you_want_to_delete_selected_media')))
     ) {
       return;
     }
@@ -466,21 +389,22 @@ export const MediaBox: FC<{
         ) : (
           <PlusIcon size={14} />
         )}
-        <div className={loading ? 'invisible' : undefined}>{t('upload', 'Upload')}</div>
+        <div className={loading ? 'invisible' : undefined}>{t('upload')}</div>
       </button>
     );
   }, [t, loading]);
 
   return (
-    <DropFiles disabled={loading} className="flex flex-col flex-1" onDrop={dragAndDrop}>
+    <DropFiles
+      disabled={loading}
+      className="flex flex-col flex-1"
+      onDrop={dragAndDrop}
+    >
       <div className="flex flex-col flex-1">
         <div
           className={clsx(
             'flex items-center gap-[12px] mobile:flex-wrap',
-            !isLoading &&
-              !data?.results?.length &&
-              !debouncedSearch &&
-              'hidden'
+            !isLoading && !data?.results?.length && !debouncedSearch && 'hidden'
           )}
         >
           <div className="flex-1 mobile:basis-full">
@@ -488,8 +412,8 @@ export const MediaBox: FC<{
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_media_by_name', 'Search by file name')}
-              className="w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#612BD3]"
+              placeholder={t('search_media_by_name')}
+              className="w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-teal"
             />
           </div>
           <input
@@ -499,25 +423,23 @@ export const MediaBox: FC<{
             className="hidden"
             multiple={true}
           />
-          <div className={clsx('flex gap-[8px]', !standalone && 'mobile:hidden')}>
+          <div
+            className={clsx('flex gap-[8px]', !standalone && 'mobile:hidden')}
+          >
             {btn}
-            <ThirdPartyMediaLibrary onImported={() => mutate()} />
           </div>
           {!standalone && !!data?.results?.length && (
             <div className="hidden mobile:block basis-full text-[14px] font-[600]">
-              {t(
-                'select_or_upload_pictures_max_1gb',
-                'Select or upload pictures (maximum 1 GB per upload).'
-              )}
+              {t('select_or_upload_pictures_max_1gb')}
             </div>
           )}
           {!!selected.length && (
             <div
               onClick={deleteSelected}
-              className="hidden mobile:flex basis-full justify-center items-center gap-[8px] h-[24px] text-[15px] font-[600] text-[#FF3F3F] cursor-pointer select-none"
+              className="hidden mobile:flex basis-full justify-center items-center gap-[8px] h-[24px] text-[15px] font-[600] text-error cursor-pointer select-none"
             >
               <TrashIcon size={18} />
-              {t('delete_selected', 'Delete Selected')} ({selected.length})
+              {t('delete_selected')} ({selected.length})
             </div>
           )}
         </div>
@@ -564,29 +486,15 @@ export const MediaBox: FC<{
                 <NoMediaIcon />
                 <div className="text-[20px] font-[600]">
                   {debouncedSearch
-                    ? t(
-                        'no_media_match_search',
-                        'No media matches your search'
-                      )
-                    : t(
-                        'you_dont_have_any_media_yet',
-                        "You don't have any media yet"
-                      )}
+                    ? t('no_media_match_search')
+                    : t('you_dont_have_any_media_yet')}
                 </div>
                 <div className="whitespace-pre-line text-newTextColor/[0.6] text-center">
-                  {t(
-                    'select_or_upload_pictures_max_1gb',
-                    'Select or upload pictures (maximum 1 GB per upload).'
-                  )}{' '}
-                  {'\n'}
-                  {t(
-                    'you_can_drag_drop_pictures',
-                    'You can also drag & drop pictures.'
-                  )}
+                  {t('select_or_upload_pictures_max_1gb')} {'\n'}
+                  {t('you_can_drag_drop_pictures')}
                 </div>
                 <div className="forceChange flex gap-[8px] mobile:w-full mobile:max-w-[300px] mobile:child:flex-1">
                   {btn}
-                  <ThirdPartyMediaLibrary onImported={() => mutate()} />
                 </div>
               </>
             )}
@@ -629,13 +537,13 @@ export const MediaBox: FC<{
                     className={clsx(
                       'w-full h-full rounded-[6px] border-[4px] relative',
                       !!selected.find((p) => p.id === media.id)
-                        ? 'border-[#612BD3]'
+                        ? 'border-teal'
                         : 'border-transparent'
                     )}
                     onClick={addRemoveSelected(media)}
                   >
                     {!!selected.find((p: any) => p.id === media.id) ? (
-                      <div className="text-white flex z-[101] justify-center items-center text-[14px] font-[500] w-[24px] h-[24px] rounded-full bg-[#612BD3] absolute -bottom-[10px] -end-[10px]">
+                      <div className="text-white flex z-[101] justify-center items-center text-[14px] font-[500] w-[24px] h-[24px] rounded-full bg-teal absolute -bottom-[10px] -end-[10px]">
                         {selected.findIndex((z: any) => z.id === media.id) + 1}
                       </div>
                     ) : (
@@ -680,13 +588,13 @@ export const MediaBox: FC<{
                         </div>
                       </div>
                       {hasExtension(media.path, 'mp4') ? (
-                        <VideoFrame url={mediaDirectory.set(media.path)} />
+                        <VideoFrame url={media.path} />
                       ) : (
                         <img
                           width="100%"
                           height="100%"
                           className="w-full h-full object-cover"
-                          src={mediaDirectory.set(media.path)}
+                          src={media.path}
                           alt="media"
                         />
                       )}
@@ -708,22 +616,21 @@ export const MediaBox: FC<{
             {!isLoading && !!data?.results?.length && (
               <div className="hidden mobile:flex gap-[8px] mobile:child:flex-1">
                 {btn}
-                <ThirdPartyMediaLibrary onImported={() => mutate()} />
               </div>
             )}
             <button
               onClick={() => modals.closeCurrent()}
               className="cursor-pointer h-[52px] px-[20px] items-center justify-center border border-newTextColor/10 flex rounded-[10px] mobile:hidden"
             >
-              {t('cancel', 'Cancel')}
+              {t('cancel')}
             </button>
             {!isLoading && !!data?.results?.length && (
               <button
                 onClick={standalone ? () => {} : addMedia}
                 disabled={selected.length === 0}
-                className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-[#612BD3] flex rounded-[10px] mobile:h-[44px] mobile:rounded-[8px] mobile:font-[600] mobile:disabled:opacity-100 mobile:disabled:bg-btnSimple mobile:disabled:text-textItemBlur"
+                className="cursor-pointer text-surface disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-ink flex rounded-[12px] mobile:h-[44px] mobile:rounded-[8px] mobile:font-[600] mobile:disabled:opacity-100 mobile:disabled:bg-btnSimple mobile:disabled:text-textItemBlur"
               >
-                {t('add_selected_media', 'Add selected media')}
+                {t('add_selected_media')}
               </button>
             )}
           </div>
@@ -733,43 +640,24 @@ export const MediaBox: FC<{
   );
 };
 export const MultiMediaComponent: FC<{
-  label: string;
-  description: string;
-  mediaNotAvailable?: boolean;
-  dummy: boolean;
-  allData: {
-    content: string;
-    id?: string;
-    image?: Array<{
-      id: string;
-      path: string;
-    }>;
-  }[];
   value?: Array<{
     path: string;
     id: string;
   }>;
-  text: string;
   name: string;
   error?: any;
-  onOpen?: () => void;
-  onClose?: () => void;
   toolBar?: React.ReactNode;
   // after the tools, outside of their scroll
   toolBarEnd?: React.ReactNode;
   toolsClassName?: string;
   toolsStyle?: React.CSSProperties;
   information?: React.ReactNode;
-  insertInContent?: (media: Array<{ id: string; path: string }>) => void;
   onChange: (event: {
     target: {
       name: string;
       value?: Array<{
         id: string;
         path: string;
-        alt?: string;
-        thumbnail?: string;
-        thumbnailTimestamp?: number;
       }>;
     };
   }) => void;
@@ -777,20 +665,14 @@ export const MultiMediaComponent: FC<{
   const {
     name,
     error,
-    text,
     onChange,
     value,
-    allData,
-    dummy,
     toolBar,
     toolBarEnd,
     toolsClassName,
     toolsStyle,
     information,
-    mediaNotAvailable,
-    insertInContent,
   } = props;
-  const user = useUser();
   const modals = useModals();
   const t = useT();
   useEffect(() => {
@@ -800,7 +682,6 @@ export const MultiMediaComponent: FC<{
   }, [value]);
 
   const [currentMedia, setCurrentMedia] = useState(value);
-  const mediaDirectory = useMediaDirectory();
   const changeMedia = useCallback(
     (
       m:
@@ -814,11 +695,6 @@ export const MultiMediaComponent: FC<{
           }[]
     ) => {
       const mediaArray = Array.isArray(m) ? m : [m];
-      if (insertInContent) {
-        insertInContent(mediaArray);
-        return;
-      }
-
       const newMedia = [...(currentMedia || []), ...mediaArray];
       setCurrentMedia(newMedia);
       onChange({
@@ -828,25 +704,21 @@ export const MultiMediaComponent: FC<{
         },
       });
     },
-    [currentMedia, insertInContent]
+    [currentMedia]
   );
   const showModal = useCallback(() => {
     modals.openModal({
-      title: t('media_library', 'Media Library'),
+      title: t('media_library'),
       askClose: false,
       closeOnEscape: true,
       fullScreen: true,
       size: mediaLibrarySize(),
       height: mediaLibrarySize(),
       children: (close) => (
-        <MediaBox
-          setMedia={changeMedia}
-          closeModal={close}
-          type={insertInContent ? 'image' : undefined}
-        />
+        <MediaBox setMedia={changeMedia} closeModal={close} />
       ),
     });
-  }, [changeMedia, insertInContent, t]);
+  }, [changeMedia, t]);
 
   const clearMedia = useCallback(
     (topIndex: number) => () => {
@@ -861,19 +733,6 @@ export const MultiMediaComponent: FC<{
     },
     [currentMedia]
   );
-
-  const designMedia = useCallback(() => {
-    if (!!user?.tier?.ai && !dummy) {
-      modals.openModal({
-        askClose: false,
-        title: t('design_media', 'Design Media'),
-        size: '80%',
-        children: (close) => (
-          <Polonto setMedia={changeMedia} closeModal={close} />
-        ),
-      });
-    }
-  }, [changeMedia, t]);
 
   return (
     <>
@@ -891,58 +750,28 @@ export const MultiMediaComponent: FC<{
               handle=".dragging"
             >
               {currentMedia.map((media, index) => (
-                  <div key={media.id} className="cursor-pointer rounded-[5px] w-[40px] h-[40px] mobile:w-[60px] mobile:h-[60px] mobile:rounded-[8px] border-2 mobile:border-0 border-tableBorder relative flex transition-all">
-                    <DragHandleIcon className="z-[20] dragging absolute pe-[1px] pb-[3px] -start-[4px] -top-[4px] cursor-move" />
+                <div
+                  key={media.id}
+                  className="cursor-pointer rounded-[5px] w-[40px] h-[40px] mobile:w-[60px] mobile:h-[60px] mobile:rounded-[8px] border-2 mobile:border-0 border-tableBorder relative flex transition-all"
+                >
+                  <DragHandleIcon className="z-[20] dragging absolute pe-[1px] pb-[3px] -start-[4px] -top-[4px] cursor-move" />
 
-                    <div className="w-full h-full relative group">
-                      <div
-                        onClick={async () => {
-                          modals.openModal({
-                            title: t('media_settings', 'Media Settings'),
-                            size: '720px',
-                            children: (close) => (
-                              <MediaComponentInner
-                                media={media as any}
-                                onClose={close}
-                                onSelect={(value: any) => {
-                                  onChange({
-                                    target: {
-                                      name: 'upload',
-                                      value: currentMedia.map((p) => {
-                                        if (p.id === media.id) {
-                                          return {
-                                            ...p,
-                                            ...value,
-                                          };
-                                        }
-                                        return p;
-                                      }),
-                                    },
-                                  });
-                                }}
-                              />
-                            ),
-                          });
-                        }}
-                        className="absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] bg-black/80 rounded-[10px] opacity-0 group-hover:opacity-100 transition-opacity z-[9]"
-                      >
-                        <MediaSettingsIcon className="cursor-pointer relative z-[200]" />
-                      </div>
-                      {hasExtension(media?.path, 'mp4') ? (
-                        <VideoFrame url={mediaDirectory.set(media?.path)} />
-                      ) : (
-                        <img
-                          className="w-full h-full object-cover rounded-[4px] mobile:rounded-[8px]"
-                          src={mediaDirectory.set(media?.path)}
-                        />
-                      )}
-                    </div>
-
-                    <CloseCircleIcon
-                      onClick={clearMedia(index)}
-                      className="absolute -end-[4px] -top-[4px] mobile:-end-[8px] mobile:-top-[8px] mobile:w-[24px] mobile:h-[24px] z-[20] rounded-full bg-white"
-                    />
+                  <div className="w-full h-full relative group">
+                    {hasExtension(media?.path, 'mp4') ? (
+                      <VideoFrame url={media?.path} />
+                    ) : (
+                      <img
+                        className="w-full h-full object-cover rounded-[4px] mobile:rounded-[8px]"
+                        src={media?.path}
+                      />
+                    )}
                   </div>
+
+                  <CloseCircleIcon
+                    onClick={clearMedia(index)}
+                    className="absolute -end-[4px] -top-[4px] mobile:-end-[8px] mobile:-top-[8px] mobile:w-[24px] mobile:h-[24px] z-[20] rounded-full bg-white"
+                  />
+                </div>
               ))}
             </ReactSortable>
           )}
@@ -959,66 +788,33 @@ export const MultiMediaComponent: FC<{
           style={toolsStyle}
         >
           <div className="flex gap-[8px] mobile:gap-[4px] mobile:flex-1 mobile:min-w-0 mobile:overflow-x-auto mobile:scrollbar-none b1">
-            {!mediaNotAvailable && (
-              <div className="flex py-[10px] mobile:py-0 mobile:shrink-0 b2 items-center gap-[4px]">
-                <div
-                  onClick={showModal}
-                  className="cursor-pointer h-[30px] mobile:h-[40px] mobile:min-w-[40px] rounded-[6px] mobile:rounded-[8px] justify-center items-center flex bg-newColColor mobile:bg-newSettings px-[8px]"
-                >
-                  <div className="flex gap-[8px] items-center">
-                    <div>
-                      <InsertMediaIcon className="mobile:w-[20px] mobile:h-[20px]" />
-                    </div>
-                    <div className="text-[10px] font-[600] maxMedia:hidden block">
-                      {t('insert_media', 'Insert Media')}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  onClick={designMedia}
-                  className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px] mobile:hidden"
-                >
-                  <div className="flex gap-[5px] items-center">
-                    <div>
-                      <DesignMediaIcon />
-                    </div>
-                    <div className="text-[10px] font-[600] iconBreak:hidden block">
-                      {t('design_media', 'Design Media')}
-                    </div>
-                  </div>
-                </div>
-
-                {!insertInContent && (
-                  <ThirdPartyMedia allData={allData} onChange={changeMedia} />
-                )}
-
-                {!!user?.tier?.ai && (
-                  <>
-                    <AiImage value={text} onChange={changeMedia} />
-                    {!insertInContent && (
-                      <AiVideo value={text} onChange={changeMedia} />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-            {!mediaNotAvailable && (
+            <div className="flex py-[10px] mobile:py-0 mobile:shrink-0 b2 items-center gap-[4px]">
               <div
-                className={clsx(
-                  'text-newColColor h-full flex items-center mobile:shrink-0 mobile:px-[4px]',
-                  !toolBar && 'mobile:hidden'
-                )}
+                onClick={showModal}
+                className="cursor-pointer h-[30px] mobile:h-[40px] mobile:min-w-[40px] rounded-[6px] mobile:rounded-[8px] justify-center items-center flex bg-newColColor mobile:bg-newSettings px-[8px]"
               >
-                <VerticalDividerIcon />
+                <div className="flex gap-[8px] items-center">
+                  <div>
+                    <InsertMediaIcon className="mobile:w-[20px] mobile:h-[20px]" />
+                  </div>
+                  <div className="text-[10px] font-[600] maxMedia:hidden block">
+                    {t('insert_media')}
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
+            <div
+              className={clsx(
+                'text-newColColor h-full flex items-center mobile:shrink-0 mobile:px-[4px]',
+                !toolBar && 'mobile:hidden'
+              )}
+            >
+              <VerticalDividerIcon />
+            </div>
             {!!toolBar && (
               <div className="flex py-[10px] mobile:py-0 mobile:shrink-0 b2 items-center gap-[4px]">
                 {toolBar}
               </div>
-            )}
-            {!!toolBar && (
-              <div className="hidden mobile:block sticky end-0 shrink-0 w-[40px] pointer-events-none bg-gradient-to-l rtl:bg-gradient-to-r from-newBgColorInner" />
             )}
           </div>
           {toolBarEnd}
@@ -1029,121 +825,7 @@ export const MultiMediaComponent: FC<{
           )}
         </div>
       </div>
-      <div className="text-[12px] text-red-400">{error}</div>
+      <div className="text-[12px] text-error">{error}</div>
     </>
-  );
-};
-export const MediaComponent: FC<{
-  label: string;
-  description: string;
-  value?: {
-    path: string;
-    id: string;
-  };
-  name: string;
-  onChange: (event: {
-    target: {
-      name: string;
-      value?: {
-        id: string;
-        path: string;
-      };
-    };
-  }) => void;
-  type?: 'image' | 'video';
-  width?: number;
-  height?: number;
-}> = (props) => {
-  const t = useT();
-
-  const { name, type, label, description, onChange, value, width, height } =
-    props;
-  const { getValues } = useSettings();
-  const user = useUser();
-  useEffect(() => {
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentMedia(settings);
-    }
-  }, []);
-  const [currentMedia, setCurrentMedia] = useState(value);
-  const modals = useModals();
-  const mediaDirectory = useMediaDirectory();
-
-  const showDesignModal = useCallback(() => {
-    modals.openModal({
-      title: t('media_editor', 'Media Editor'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: 'calc(100% - 80px)',
-      height: 'calc(100% - 80px)',
-      children: (close) => (
-        <Polonto
-          width={width}
-          height={height}
-          setMedia={changeMedia}
-          closeModal={close}
-        />
-      ),
-    });
-  }, [t]);
-  const changeMedia = useCallback((m: { path: string; id: string }[]) => {
-    setCurrentMedia(m[0]);
-    onChange({
-      target: {
-        name,
-        value: m[0],
-      },
-    });
-  }, []);
-  const showModal = useCallback(() => {
-    modals.openModal({
-      title: t('media_library', 'Media Library'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: mediaLibrarySize(),
-      height: mediaLibrarySize(),
-      children: (close) => (
-        <MediaBox setMedia={changeMedia} closeModal={close} type={type} />
-      ),
-    });
-  }, [t]);
-  const clearMedia = useCallback(() => {
-    setCurrentMedia(undefined);
-    onChange({
-      target: {
-        name,
-        value: undefined,
-      },
-    });
-  }, [value]);
-  return (
-    <div className="flex flex-col gap-[8px]">
-      <div className="text-[14px]">{label}</div>
-      <div className="text-[12px]">{description}</div>
-      {!!currentMedia && (
-        <div className="my-[20px] cursor-pointer w-[200px] h-[200px] border-2 border-tableBorder">
-          <img
-            className="w-full h-full object-cover"
-            src={currentMedia.path}
-            onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
-          />
-        </div>
-      )}
-      <div className="flex gap-[5px]">
-        <Button onClick={showModal}>{t('select', 'Select')}</Button>
-        <Button
-          onClick={showDesignModal}
-          className="!bg-customColor45 mobile:hidden"
-        >
-          {t('editor', 'Editor')}
-        </Button>
-        <Button secondary={true} onClick={clearMedia}>
-          {t('clear', 'Clear')}
-        </Button>
-      </div>
-    </div>
   );
 };

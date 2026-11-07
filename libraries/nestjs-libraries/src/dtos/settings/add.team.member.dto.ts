@@ -1,23 +1,17 @@
-import {
-  IsBoolean,
-  IsDefined,
-  IsEmail,
-  IsIn,
-  IsString,
-  ValidateIf,
-} from 'class-validator';
+import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
 
 export class AddTeamMemberDto {
-  @IsDefined()
   @IsEmail()
-  @ValidateIf((o) => o.sendEmail)
   email: string;
 
   @IsString()
-  @IsIn(['USER', 'ADMIN'])
-  role: string;
+  @MinLength(1)
+  name: string;
 
-  @IsDefined()
-  @IsBoolean()
-  sendEmail: boolean;
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @IsIn(['USER', 'ADMIN'])
+  role: 'USER' | 'ADMIN';
 }

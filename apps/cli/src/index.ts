@@ -1,545 +1,289 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { createPost, listPosts, deletePost, getMissingContent, connectPost, changePostStatus, updatePostSettings } from './commands/posts';
-import { listIntegrations, listGroups, getIntegrationSettings, triggerIntegrationTool } from './commands/integrations';
-import { getAnalytics, getPostAnalytics } from './commands/analytics';
-import { uploadFile, listMedia, getMediaStatus } from './commands/upload';
-import { createClipping, listClippings, getClipping } from './commands/clipping';
-import { authLogin, authLogout, authStatus } from './commands/auth';
-import type { Argv } from 'yargs';
+import { apiUrl, request, uploadFile } from './api';
+import { buildPost } from './posts';
+
+const print = (data: unknown) => console.log(JSON.stringify(data, null, 2));
+const enc = encodeURIComponent;
 
 yargs(hideBin(process.argv))
-  .scriptName('postiz')
-  .usage('$0 <command> [options]')
+  .scriptName('vibeschedule')
+  .locale('de')
+  .usage('$0 <befehl> [optionen]')
+  .command('auth:check', 'API-Schlüssel und API-URL prüfen', {}, async () => {
+    const integrations = await request('/integrations');
+    print({ ok: true, apiUrl: apiUrl(), integrations: integrations.length });
+  })
+  .command(
+    'integrations:list',
+    'Verbundene Kanäle auflisten',
+    (y) =>
+      y.option('customer', {
+        describe: 'Nur Kanäle dieses Kunden (Kunden-ID)',
+        type: 'string',
+      }),
+    async (argv) => {
+      print(
+        await request(
+          `/integrations${argv.customer ? `?group=${enc(argv.customer)}` : ''}`
+        )
+      );
+    }
+  )
+  .command(
+    'integrations:settings <id>',
+    'Einstellungen und Limits eines Kanals anzeigen',
+    (y) =>
+      y.positional('id', {
+        describe: 'Kanal-ID',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(await request(`/integration-settings/${enc(argv.id)}`));
+    }
+  )
+  .command(
+    'upload <source>',
+    'Datei oder URL in die Mediathek hochladen',
+    (y) =>
+      y
+        .positional('source', {
+          describe: 'Dateipfad oder öffentliche https-URL',
+          type: 'string',
+          demandOption: true,
+        })
+        .example('$0 upload ./video.mp4', 'Lokale Datei hochladen')
+        .example(
+          '$0 upload https://example.com/bild.jpg',
+          'Datei von einer URL übernehmen'
+        ),
+    async (argv) => {
+      print(
+        /^https?:\/\//.test(argv.source)
+          ? await request('/upload-from-url', {
+              method: 'POST',
+              body: { url: argv.source },
+            })
+          : await uploadFile(argv.source)
+      );
+    }
+  )
+  .command(
+    'media:list',
+    'Mediathek auflisten (neueste zuerst)',
+    (y) =>
+      y
+        .option('search', {
+          alias: 's',
+          describe: 'Nach Dateiname filtern',
+          type: 'string',
+        })
+        .option('page', {
+          alias: 'p',
+          describe: 'Seite, beginnt bei 1',
+          type: 'number',
+          default: 1,
+        }),
+    async (argv) => {
+      const query = new URLSearchParams({ page: String(argv.page) });
+      if (argv.search) query.set('search', argv.search);
+      print(await request(`/media?${query}`));
+    }
+  )
   .command(
     'posts:create',
-    'Create a new post',
-    (yargs: Argv) => {
-      return yargs
+    'Post anlegen, einplanen oder sofort veröffentlichen',
+    (y) =>
+      y
         .option('content', {
           alias: 'c',
-          describe: 'Post/comment content (can be used multiple times)',
+          describe: 'Text des Posts',
           type: 'string',
         })
         .option('media', {
           alias: 'm',
-          describe: 'Comma-separated media URLs for the corresponding -c (can be used multiple times)',
-          type: 'string',
-        })
-        .option('alt', {
-          describe: 'Comma-separated alt texts for the media of the corresponding -m, same order (can be used multiple times, use --json for alt texts containing commas)',
+          describe: 'Medien-URLs aus der Mediathek, kommagetrennt',
           type: 'string',
         })
         .option('integrations', {
           alias: 'i',
-          describe: 'Comma-separated list of integration IDs',
+          describe: 'Kanal-IDs, kommagetrennt',
           type: 'string',
         })
         .option('date', {
           alias: 's',
-          describe: 'Schedule date (ISO 8601 format) - REQUIRED',
+          describe: 'Zeitpunkt (ISO 8601), bei --type now optional',
           type: 'string',
         })
         .option('type', {
           alias: 't',
-          describe: 'Post type: "schedule" or "draft"',
-          type: 'string',
-          choices: ['schedule', 'draft'],
-          default: 'schedule',
+          describe: 'draft: Entwurf, schedule: einplanen, now: sofort posten',
+          choices: ['draft', 'schedule', 'now'] as const,
+          default: 'schedule' as const,
         })
-        .option('delay', {
-          alias: 'd',
-          describe: 'Delay in minutes between comments (default: 0)',
-          type: 'number',
-          default: 0,
+        .option('settings', {
+          describe:
+            'Plattform-Einstellungen als JSON, gilt für alle Kanäle (siehe PLATFORM_SETTINGS.md)',
+          type: 'string',
         })
         .option('json', {
           alias: 'j',
-          describe: 'Path to JSON file with full post structure',
-          type: 'string',
-        })
-        .option('shortLink', {
-          describe: 'Use short links',
-          type: 'boolean',
-          default: true,
-        })
-        .option('settings', {
-          describe: 'Platform-specific settings as JSON string',
+          describe:
+            'JSON-Datei mit dem kompletten Request, ersetzt alle anderen Optionen',
           type: 'string',
         })
         .check((argv) => {
-          if (!argv.json && !argv.content) {
-            throw new Error('Either --content or --json is required');
+          if (argv.json) return true;
+          if (Array.isArray(argv.content)) {
+            throw new Error('Pro Post ist nur ein --content erlaubt.');
           }
-          if (!argv.json && !argv.integrations) {
-            throw new Error('--integrations is required when not using --json');
+          if (!argv.content && !argv.media) {
+            throw new Error('--content oder --media fehlt.');
           }
-          if (!argv.json && !argv.date) {
-            throw new Error('--date is required when not using --json');
+          if (!argv.integrations) {
+            throw new Error('--integrations fehlt.');
+          }
+          if (!argv.date && argv.type !== 'now') {
+            throw new Error('--date fehlt (nur bei --type now optional).');
           }
           return true;
         })
         .example(
-          '$0 posts:create -c "Hello World!" -s "2024-12-31T12:00:00Z" -i "twitter-123"',
-          'Simple scheduled post'
+          '$0 posts:create -c "Hallo" -i abc123 -s 2026-12-01T09:00:00Z',
+          'Post einplanen'
         )
         .example(
-          '$0 posts:create -c "Draft post" -s "2024-12-31T12:00:00Z" -t draft -i "twitter-123"',
-          'Create draft post'
+          '$0 posts:create -c "Entwurf" -i abc123,def456 -s 2026-12-01T09:00:00Z -t draft',
+          'Entwurf für zwei Kanäle'
         )
-        .example(
-          '$0 posts:create -c "Main post" -m "img1.jpg,img2.jpg" -s "2024-12-31T12:00:00Z" -i "twitter-123"',
-          'Post with multiple images'
-        )
-        .example(
-          '$0 posts:create -c "Main post" -m "img1.jpg,img2.jpg" --alt "first alt,second alt" -s "2024-12-31T12:00:00Z" -i "instagram-123"',
-          'Post with alt text per image (same order as -m)'
-        )
-        .example(
-          '$0 posts:create -c "Main post" -m "img1.jpg" -c "First comment" -m "img2.jpg" -c "Second comment" -m "img3.jpg,img4.jpg" -s "2024-12-31T12:00:00Z" -i "twitter-123"',
-          'Post with comments, each having their own media'
-        )
-        .example(
-          '$0 posts:create -c "Main" -c "Comment with semicolon; see?" -c "Another!" -s "2024-12-31T12:00:00Z" -i "twitter-123"',
-          'Comments can contain semicolons'
-        )
-        .example(
-          '$0 posts:create -c "Thread 1/3" -c "Thread 2/3" -c "Thread 3/3" -d 5 -s "2024-12-31T12:00:00Z" -i "twitter-123"',
-          'Twitter thread with 5 minute delay'
-        )
-        .example(
-          '$0 posts:create --json ./post.json',
-          'Complex post from JSON file'
-        )
-        .example(
-          '$0 posts:create -c "Post to subreddit" -s "2024-12-31T12:00:00Z" --settings \'{"subreddit":[{"value":{"subreddit":"programming","title":"My Title","type":"text","url":"","is_flair_required":false}}]}\' -i "reddit-123"',
-          'Reddit post with specific subreddit settings'
-        )
-        .example(
-          '$0 posts:create -c "Video description" -s "2024-12-31T12:00:00Z" --settings \'{"title":"My Video","type":"public","tags":[{"value":"tech","label":"Tech"}]}\' -i "youtube-123"',
-          'YouTube post with title and tags'
-        )
-        .example(
-          '$0 posts:create -c "Tweet content" -s "2024-12-31T12:00:00Z" --settings \'{"who_can_reply_post":"everyone"}\' -i "twitter-123"',
-          'X (Twitter) post with reply settings'
-        );
-    },
-    createPost as any
+        .example('$0 posts:create -j ./post.json', 'Request aus JSON-Datei'),
+    async (argv) => {
+      print(
+        await request('/posts', {
+          method: 'POST',
+          body: buildPost(argv),
+        })
+      );
+    }
   )
   .command(
     'posts:list',
-    'List all posts',
-    (yargs: Argv) => {
-      return yargs
-        .option('startDate', {
-          describe: 'Start date (ISO 8601 format). Default: 30 days ago',
+    'Posts in einem Zeitraum auflisten',
+    (y) =>
+      y
+        .option('start', {
+          describe: 'Beginn (ISO 8601), Standard: vor 30 Tagen',
           type: 'string',
         })
-        .option('endDate', {
-          describe: 'End date (ISO 8601 format). Default: 30 days from now',
+        .option('end', {
+          describe: 'Ende (ISO 8601), Standard: in 30 Tagen',
           type: 'string',
         })
         .option('customer', {
-          describe: 'Customer ID (optional)',
+          describe: 'Nur Posts dieses Kunden (Kunden-ID)',
           type: 'string',
-        })
-        .example('$0 posts:list', 'List all posts (last 30 days to next 30 days)')
-        .example(
-          '$0 posts:list --startDate "2024-01-01T00:00:00Z" --endDate "2024-12-31T23:59:59Z"',
-          'List posts for a specific date range'
-        )
-        .example(
-          '$0 posts:list --customer "customer-id"',
-          'List posts for a specific customer'
-        );
-    },
-    listPosts as any
+        }),
+    async (argv) => {
+      const day = 24 * 60 * 60 * 1000;
+      const query = new URLSearchParams({
+        startDate: argv.start || new Date(Date.now() - 30 * day).toISOString(),
+        endDate: argv.end || new Date(Date.now() + 30 * day).toISOString(),
+      });
+      if (argv.customer) query.set('customer', argv.customer);
+      print(await request(`/posts?${query}`));
+    }
   )
   .command(
     'posts:delete <id>',
-    'Delete a post',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Post ID to delete',
-          type: 'string',
-        })
-        .example('$0 posts:delete abc123', 'Delete post with ID abc123');
-    },
-    deletePost as any
+    'Post löschen (mit allen Kanälen seiner Gruppe)',
+    (y) =>
+      y.positional('id', {
+        describe: 'Post-ID',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(await request(`/posts/${enc(argv.id)}`, { method: 'DELETE' }));
+    }
   )
   .command(
-    'posts:missing <id>',
-    'List available content from the provider for a post with missing release ID',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Post ID',
-          type: 'string',
-        })
-        .example(
-          '$0 posts:missing post-123',
-          'Get available content to connect to a post'
-        );
-    },
-    getMissingContent as any
+    'posts:delete-group <group>',
+    'Alle Posts einer Gruppe löschen',
+    (y) =>
+      y.positional('group', {
+        describe: 'Gruppen-ID (Feld group eines Posts)',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(
+        await request(`/posts/group/${enc(argv.group)}`, { method: 'DELETE' })
+      );
+    }
   )
   .command(
-    'posts:status <id>',
-    'Change a post status between draft and schedule',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Post ID',
-          type: 'string',
-        })
-        .option('status', {
-          alias: 's',
-          describe: 'New status: "draft" or "schedule"',
-          type: 'string',
-          choices: ['draft', 'schedule'],
-          demandOption: true,
-        })
-        .example(
-          '$0 posts:status post-123 --status draft',
-          'Move a scheduled post back to draft (stops the running workflow)'
-        )
-        .example(
-          '$0 posts:status post-123 --status schedule',
-          'Schedule a draft post so it is queued for publishing'
-        );
-    },
-    changePostStatus as any
+    'posts:find-slot <id>',
+    'Nächsten freien Zeitslot eines Kanals finden',
+    (y) =>
+      y.positional('id', {
+        describe: 'Kanal-ID',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(await request(`/find-slot/${enc(argv.id)}`));
+    }
   )
   .command(
-    'posts:settings <id>',
-    'Update a post\'s provider-specific settings (merged; only unpublished draft/scheduled posts)',
-    (yargs: Argv) => {
-      return yargs
+    'analytics:channel <id>',
+    'Statistiken eines Kanals',
+    (y) =>
+      y
         .positional('id', {
-          describe: 'Post ID',
-          type: 'string',
-        })
-        .option('settings', {
-          describe: 'Partial settings as a JSON string — only the keys you pass change; do not include __type',
+          describe: 'Kanal-ID',
           type: 'string',
           demandOption: true,
         })
-        .example(
-          '$0 posts:settings post-123 --settings \'{"content_posting_method":"DIRECT_POST"}\'',
-          'Switch a TikTok draft to direct publishing'
-        )
-        .example(
-          '$0 posts:settings post-123 --settings \'{"subreddit":[{"value":{"subreddit":"/r/selfhosted","title":"My title","type":"self","is_flair_required":true}}]}\'',
-          'Set a Reddit post\'s subreddit'
-        );
-    },
-    updatePostSettings as any
-  )
-  .command(
-    'posts:connect <id>',
-    'Connect a post to its published content by updating the release ID',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Post ID',
-          type: 'string',
-        })
-        .option('release-id', {
-          describe: 'The platform-specific content ID to connect',
-          type: 'string',
-          demandOption: true,
-        })
-        .example(
-          '$0 posts:connect post-123 --release-id "7321456789012345678"',
-          'Connect a post to its published content'
-        );
-    },
-    connectPost as any
-  )
-  .command(
-    'integrations:list',
-    'List all connected integrations',
-    (yargs: Argv) => {
-      return yargs
-        .option('group', {
-          describe: 'Filter integrations by group (customer) ID',
-          type: 'string',
-        })
-        .example('$0 integrations:list', 'List all connected integrations')
-        .example(
-          '$0 integrations:list --group "customer-id"',
-          'List integrations for a specific group'
-        );
-    },
-    listIntegrations as any
-  )
-  .command(
-    'integrations:groups',
-    'List all groups (customers)',
-    {},
-    listGroups as any
-  )
-  .command(
-    'integrations:settings <id>',
-    'Get settings schema for a specific integration',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Integration ID',
-          type: 'string',
-        })
-        .example(
-          '$0 integrations:settings reddit-123',
-          'Get settings schema for Reddit integration'
-        )
-        .example(
-          '$0 integrations:settings youtube-456',
-          'Get settings schema for YouTube integration'
-        );
-    },
-    getIntegrationSettings as any
-  )
-  .command(
-    'integrations:trigger <id> <method>',
-    'Trigger an integration tool to fetch additional data',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Integration ID',
-          type: 'string',
-        })
-        .positional('method', {
-          describe: 'Method name from the integration tools',
-          type: 'string',
-        })
-        .option('data', {
+        .option('days', {
           alias: 'd',
-          describe: 'Data to pass to the tool as JSON string',
-          type: 'string',
-        })
-        .example(
-          '$0 integrations:trigger reddit-123 getSubreddits',
-          'Get list of subreddits'
-        )
-        .example(
-          '$0 integrations:trigger reddit-123 searchSubreddits -d \'{"query":"programming"}\'',
-          'Search for subreddits'
-        )
-        .example(
-          '$0 integrations:trigger youtube-123 getPlaylists',
-          'Get YouTube playlists'
-        );
-    },
-    triggerIntegrationTool as any
-  )
-  .command(
-    'analytics:platform <id>',
-    'Get analytics for a specific integration/channel',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Integration ID',
-          type: 'string',
-        })
-        .option('date', {
-          alias: 'd',
-          describe: 'Number of days to look back (default: 7)',
-          type: 'string',
-          default: '7',
-        })
-        .example(
-          '$0 analytics:platform integration-123',
-          'Get last 7 days of analytics'
-        )
-        .example(
-          '$0 analytics:platform integration-123 -d 30',
-          'Get last 30 days of analytics'
-        );
-    },
-    getAnalytics as any
+          describe: 'Zeitraum in Tagen',
+          type: 'number',
+          default: 7,
+        }),
+    async (argv) => {
+      print(await request(`/analytics/${enc(argv.id)}?date=${argv.days}`));
+    }
   )
   .command(
     'analytics:post <id>',
-    'Get analytics for a specific post',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Post ID',
-          type: 'string',
-        })
-        .option('date', {
-          alias: 'd',
-          describe: 'Number of days to look back (default: 7)',
-          type: 'string',
-          default: '7',
-        })
-        .example(
-          '$0 analytics:post post-123',
-          'Get last 7 days of post analytics'
-        )
-        .example(
-          '$0 analytics:post post-123 -d 30',
-          'Get last 30 days of post analytics'
-        );
-    },
-    getPostAnalytics as any
+    'Statistiken eines veröffentlichten Posts',
+    (y) =>
+      y.positional('id', {
+        describe: 'Post-ID',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(await request(`/analytics/post/${enc(argv.id)}`));
+    }
   )
-  .command(
-    'upload <file>',
-    'Upload a file',
-    (yargs: Argv) => {
-      return yargs
-        .positional('file', {
-          describe: 'File path to upload',
-          type: 'string',
-        })
-        .option('adjust', {
-          type: 'boolean',
-          default: false,
-          describe:
-            "Adjust the file to the platforms' limits after the upload: videos are scaled to 1080p and re-encoded to MP4, oversized images are scaled down. Wait until media:status returns ready before publishing a post with the returned path, or the post uses the original file",
-        })
-        .example('$0 upload ./image.png', 'Upload an image')
-        .example('$0 upload ./video.mp4 --adjust', 'Upload a video and adjust it to the platforms\' limits');
-    },
-    uploadFile as any
-  )
-  .command(
-    'media:status <id>',
-    'Check whether a file uploaded with --adjust finished adjusting',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Media ID returned by upload',
-          type: 'string',
-        })
-        .example('$0 media:status media-123', 'Poll while the status is "processing"');
-    },
-    getMediaStatus as any
-  )
-  .command(
-    'media:list',
-    'List media already uploaded to the media library (newest first, 18 per page)',
-    (yargs: Argv) => {
-      return yargs
-        .option('search', {
-          alias: 's',
-          type: 'string',
-          describe: 'Filter by original file name (case-insensitive)',
-        })
-        .option('page', {
-          alias: 'p',
-          type: 'number',
-          describe: 'Page number, starting at 1',
-          default: 1,
-        })
-        .example('$0 media:list', 'List the most recent uploads')
-        .example('$0 media:list -s banner', 'Find uploads whose name contains "banner"');
-    },
-    listMedia as any
-  )
-  .command(
-    'clipping:create <url>',
-    'Turn a long YouTube video into short vertical clips with captions',
-    (yargs: Argv) => {
-      return yargs
-        .positional('url', {
-          describe: 'URL of the YouTube video',
-          type: 'string',
-        })
-        .option('integrations', {
-          alias: 'i',
-          describe: 'Comma-separated list of integration IDs to create a draft post for every clip (without it the clips only land in the media library)',
-          type: 'string',
-        })
-        .option('clips', {
-          alias: 'n',
-          describe: 'Maximum number of clips, 1-10 (default: 5)',
-          type: 'number',
-        })
-        .option('fit', {
-          alias: 'f',
-          describe: 'How the horizontal video fills the vertical clip: "blur" keeps the whole picture over a blurred copy of itself, "crop" fills the clip and cuts the sides (default: blur)',
-          type: 'string',
-          choices: ['blur', 'crop'],
-        })
-        .example(
-          '$0 clipping:create "https://www.youtube.com/watch?v=VIDEO_ID"',
-          'Clip a video into the media library'
-        )
-        .example(
-          '$0 clipping:create "https://www.youtube.com/watch?v=VIDEO_ID" -n 3 -f crop -i "tiktok-123,instagram-456"',
-          'Make up to 3 cropped clips and draft them on two channels'
-        );
-    },
-    createClipping as any
-  )
-  .command(
-    'clipping:list',
-    'List all clippings',
-    (yargs: Argv) => {
-      return yargs
-        .option('page', {
-          alias: 'p',
-          describe: 'Page number, 20 clippings per page (default: 1)',
-          type: 'number',
-        })
-        .example('$0 clipping:list', 'List the latest clippings')
-        .example('$0 clipping:list --page 2', 'List the second page');
-    },
-    listClippings as any
-  )
-  .command(
-    'clipping:status <id>',
-    'Get the status of a clipping and its clips',
-    (yargs: Argv) => {
-      return yargs
-        .positional('id', {
-          describe: 'Clipping ID returned by clipping:create',
-          type: 'string',
-        })
-        .example(
-          '$0 clipping:status clipping-123',
-          'Check the progress and get the clip URLs'
-        );
-    },
-    getClipping as any
-  )
-  .command(
-    'auth:login',
-    'Authenticate using OAuth2 (device flow)',
-    (yargs: Argv) => {
-      return yargs
-        .option('auth-server', {
-          describe: 'Auth server URL (default: https://cli-auth.postiz.com)',
-          type: 'string',
-        })
-        .example(
-          '$0 auth:login',
-          'Login via OAuth2 device flow'
-        );
-    },
-    authLogin as any
-  )
-  .command(
-    'auth:logout',
-    'Remove stored OAuth2 credentials',
-    {},
-    authLogout as any
-  )
-  .command(
-    'auth:status',
-    'Show current authentication status',
-    {},
-    authStatus as any
-  )
-  .demandCommand(1, 'You need at least one command')
+  .demandCommand(1)
+  .strict()
+  .fail((msg, err, y) => {
+    if (err) {
+      console.error(err.message);
+    } else {
+      y.showHelp();
+      console.error(`\n${msg}`);
+    }
+    process.exit(1);
+  })
   .help()
   .alias('h', 'help')
   .version()
   .alias('v', 'version')
   .epilogue(
-    'For more information, visit: https://postiz.com\n\nAuthentication:\n  OAuth2: postiz auth:login\n  API Key: export POSTIZ_API_KEY=your_api_key\n\n📽️  Recommendation: Use agent-media to generate AI videos & images (Kling, Veo, Sora, Seedance, Flux, Grok) and post them directly with Postiz.\n   Install: npm install -g agent-media-cli\n   Learn more: https://agent-media.ai'
+    'Konfiguration: VIBESCHEDULE_API_KEY (Pflicht), VIBESCHEDULE_API_URL (Standard: https://vibeschedule.vibelabs.to/api)'
   )
   .parse();

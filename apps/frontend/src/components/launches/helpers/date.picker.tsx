@@ -3,19 +3,18 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import { Calendar, TimeInput } from '@mantine/dates';
 import { useClickOutside } from '@mantine/hooks';
-import { Button } from '@gitroom/react/form/button';
-import { isUSCitizen } from './isuscitizen.utils';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { Button } from '@vibeschedule/react/form/button';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
   newDayjs,
   toPickerDate,
-} from '@gitroom/frontend/components/layout/set.timezone';
+} from '@vibeschedule/frontend/components/layout/set.timezone';
 import {
   CalendarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DropdownArrowIcon,
-} from '@gitroom/frontend/components/ui/icons';
+} from '@vibeschedule/frontend/components/ui/icons';
 
 // one part of the time in the mobile sheet, typed or stepped with the arrows
 const TimeField: FC<{
@@ -100,14 +99,10 @@ export const DatePickerPanel: FC<{
   );
 
   if (sheet) {
-    const twelveHours = isUSCitizen();
-    const pm = date.hour() >= 12;
     return (
       <div className="flex flex-col">
         <div className="flex items-center gap-[16px] mb-[12px]">
-          <div className="w-[55px] text-[15px] font-[600]">
-            {t('date', 'Date')}
-          </div>
+          <div className="w-[55px] text-[15px] font-[600]">{t('date')}</div>
           <div className="flex-1 h-[52px] px-[16px] flex items-center rounded-[10px] border border-newColColor bg-newBgColorInner text-[14px]">
             {date.format('ddd, D MMMM')}
           </div>
@@ -123,21 +118,13 @@ export const DatePickerPanel: FC<{
               }
               className="w-[32px] h-[32px] flex justify-center items-center cursor-pointer text-textItemBlur"
             >
-              <ChevronLeftIcon
-                size={20}
-                strokeWidth={1.8}
-                className="rtl:rotate-180"
-              />
+              <ChevronLeftIcon size={20} strokeWidth={1.8} className="" />
             </div>
             <div
               onClick={() => setMonth(dayjs(month).add(1, 'month').toDate())}
               className="w-[32px] h-[32px] flex justify-center items-center cursor-pointer text-textItemBlur"
             >
-              <ChevronRightIcon
-                size={20}
-                strokeWidth={1.8}
-                className="rtl:rotate-180"
-              />
+              <ChevronRightIcon size={20} strokeWidth={1.8} className="" />
             </div>
           </div>
           <Calendar
@@ -158,7 +145,7 @@ export const DatePickerPanel: FC<{
                   : modifiers.outside
                   ? '!text-newTextColor/20 !font-[400]'
                   : dayjs(day).isSame(toPickerDate(newDayjs()), 'day')
-                  ? '!text-[#FC69FF] !font-[600]'
+                  ? '!text-teal !font-[600]'
                   : '!text-textItemBlur !font-[400]'
               )
             }
@@ -172,29 +159,16 @@ export const DatePickerPanel: FC<{
           />
         </div>
         <div className="flex items-center gap-[16px]">
-          <div className="w-[55px] text-[15px] font-[600]">
-            {t('time', 'Time')}
-          </div>
+          <div className="w-[55px] text-[15px] font-[600]">{t('time')}</div>
           <div className="flex items-center gap-[12px] min-w-0">
-            <div className="flex rtl:flex-row-reverse items-center gap-[4px] min-w-0">
-              {twelveHours ? (
-                <TimeField
-                  value={date.hour() % 12 || 12}
-                  min={1}
-                  max={12}
-                  onChange={(hour) =>
-                    changeTime((hour % 12) + (pm ? 12 : 0), date.minute())
-                  }
-                />
-              ) : (
-                <TimeField
-                  value={date.hour()}
-                  min={0}
-                  max={23}
-                  pad={true}
-                  onChange={(hour) => changeTime(hour, date.minute())}
-                />
-              )}
+            <div className="flex items-center gap-[4px] min-w-0">
+              <TimeField
+                value={date.hour()}
+                min={0}
+                max={23}
+                pad={true}
+                onChange={(hour) => changeTime(hour, date.minute())}
+              />
               <div className="text-[14px] font-[600]">:</div>
               <TimeField
                 value={date.minute()}
@@ -204,29 +178,6 @@ export const DatePickerPanel: FC<{
                 onChange={(minute) => changeTime(date.hour(), minute)}
               />
             </div>
-            {twelveHours && (
-              <div className="h-[52px] flex gap-[3px] p-[4px] rounded-[8px] border border-newColColor bg-newBgColorInner">
-                {[false, true].map((isPm) => (
-                  <div
-                    key={String(isPm)}
-                    onClick={() =>
-                      changeTime(
-                        (date.hour() % 12) + (isPm ? 12 : 0),
-                        date.minute()
-                      )
-                    }
-                    className={clsx(
-                      'w-[44px] h-[44px] flex justify-center items-center rounded-[6px] text-[14px] cursor-pointer select-none',
-                      isPm === pm
-                        ? 'bg-boxFocused text-textItemFocused'
-                        : 'text-textItemBlur'
-                    )}
-                  >
-                    {isPm ? 'pm' : 'am'}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -258,8 +209,8 @@ export const DatePickerPanel: FC<{
       />
       <TimeInput
         onChange={changeDate('time')}
-        format={isUSCitizen() ? '12' : '24'}
-        label="Pick time"
+        format="24"
+        label={t('time')}
         classNames={{
           label: 'text-textColor py-[12px]',
           input:
@@ -297,10 +248,10 @@ export const DatePicker: FC<{
         <CalendarIcon />
       </div>
       <div className="cursor-pointer mobile:hidden">
-        {date.format(isUSCitizen() ? 'MM/DD/YYYY hh:mm A' : 'DD/MM/YYYY HH:mm')}
+        {date.format('DD.MM.YYYY HH:mm')}
       </div>
       <div className="cursor-pointer hidden mobile:block truncate">
-        {date.format(isUSCitizen() ? 'MMM D, h:mm A' : 'D MMM, HH:mm')}
+        {date.format('D. MMM, HH:mm')}
       </div>
       {open && (
         <div
@@ -309,7 +260,7 @@ export const DatePicker: FC<{
         >
           <DatePickerPanel date={date} onChange={onChange} />
           <Button className="mt-[12px]" onClick={changeShow}>
-            {t('close', 'Close')}
+            {t('close')}
           </Button>
         </div>
       )}

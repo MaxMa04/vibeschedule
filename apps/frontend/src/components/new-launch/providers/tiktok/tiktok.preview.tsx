@@ -1,11 +1,7 @@
-import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
-import { textSlicer } from '@gitroom/helpers/utils/count.length';
+import { useIntegration } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
+import { usePreviewHtml } from '@vibeschedule/frontend/components/launches/general.preview.component';
 import { FC, ReactNode } from 'react';
-import { SliderComponent } from '@gitroom/frontend/components/third-parties/slider.component';
-import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
+import { VideoOrImage } from '@vibeschedule/react/helpers/video.or.image';
 
 const TikTokItem: FC<{ icon: ReactNode; num: string }> = ({ icon, num }) => {
   return (
@@ -20,62 +16,27 @@ const TikTokItem: FC<{ icon: ReactNode; num: string }> = ({ icon, num }) => {
 export const TiktokPreview: FC<{
   maximumCharacters?: number;
 }> = (props) => {
-  const { value: topValue, integration } = useIntegration();
-  const current = useLaunchStore((state) => state.current);
-  const mediaDir = useMediaDirectory();
+  const { value, integration } = useIntegration();
 
-  const renderContent = topValue.map((p) => {
-    const newContent = stripHtmlValidation(
-      'normal',
-      p.content.replace(
-        /<span.*?data-mention-id="([.\s\S]*?)"[.\s\S]*?>([.\s\S]*?)<\/span>/gi,
-        (match, match1, match2) => {
-          return `[[[${match2}]]]`;
-        }
-      ),
-      true
-    );
-
-    const { start, end } = textSlicer(
-      integration?.identifier || '',
-      props.maximumCharacters || 10000,
-      newContent
-    );
-
-    const finalValue =
-      newContent
-        .slice(start, end)
-        .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-          return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-        }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
-      newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-        return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-      }) +
-      `</mark>`;
-
-    return { text: finalValue, images: p.image };
-  });
+  const post = value[0];
+  const text = usePreviewHtml(props.maximumCharacters);
+  const images = post.image || [];
   return (
     <div className="p-[15px] absolute left-0 top-0 w-full h-full flex justify-center bg-newBgColorInner">
       <div className="relative">
-        <SliderComponent
-          list={renderContent?.[0]?.images.map((image, index) => (
-            <a
-              key={`image_${index}`}
-              className="flex-1"
-              href={mediaDir.set(image.path)}
-              target="_blank"
-            >
-              <VideoOrImage autoplay={true} src={mediaDir.set(image.path)} />
+        <div className="h-full bg-black aspect-[calc(9/16)] rounded-[3px] overflow-hidden flex">
+          {!!images.length && (
+            <a className="flex-1" href={images[0].path} target="_blank">
+              <VideoOrImage autoplay={true} src={images[0].path} />
             </a>
-          ))}
-          className="h-full bg-black aspect-[calc(9/16)] rounded-[3px] overflow-hidden"
-        />
+          )}
+        </div>
         <div className="absolute pointer-events-none w-full h-full start-0 top-0 px-[12px] py-[25px] justify-end items-start text-white flex flex-col">
           <div className="text-[14px] font-[500]">@{integration?.name}</div>
-          <div dir="auto" className="text-[13px] font-[400] whitespace-pre-line line-clamp-6 w-full"
-            dangerouslySetInnerHTML={{ __html: renderContent?.[0]?.text || '' }}
+          <div
+            dir="auto"
+            className="text-[13px] font-[400] whitespace-pre-line line-clamp-6 w-full"
+            dangerouslySetInnerHTML={{ __html: text }}
           />
         </div>
       </div>

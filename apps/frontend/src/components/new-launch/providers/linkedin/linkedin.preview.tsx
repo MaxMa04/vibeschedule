@@ -1,10 +1,7 @@
-import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
-import { textSlicer } from '@gitroom/helpers/utils/count.length';
+import { useIntegration } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
+import { usePreviewHtml } from '@vibeschedule/frontend/components/launches/general.preview.component';
 import { FC } from 'react';
-import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
+import { VideoOrImage } from '@vibeschedule/react/helpers/video.or.image';
 
 const Icons = () => {
   return (
@@ -214,75 +211,14 @@ const Icons = () => {
   );
 };
 
-const LinkedinIconSmall = () => {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect width="16" height="16" rx="2.77787" fill="#E9A53F" />
-      <g clipPath="url(#clip0_2511_140522)">
-        <path
-          d="M3.33203 4.5751C3.33203 4.27479 3.43714 4.02704 3.64735 3.83186C3.85755 3.63666 4.13083 3.53906 4.46717 3.53906C4.7975 3.53906 5.06476 3.63515 5.26897 3.82735C5.47918 4.02555 5.58428 4.2838 5.58428 4.60213C5.58428 4.89041 5.48218 5.13065 5.27798 5.32285C5.06777 5.52104 4.79149 5.62014 4.44915 5.62014H4.44014C4.10981 5.62014 3.84254 5.52104 3.63834 5.32285C3.43413 5.12465 3.33203 4.8754 3.33203 4.5751ZM3.44915 12.458L3.44915 6.43996H5.44915L5.44915 12.458H3.44915ZM6.55726 12.458H8.55726V9.09762C8.55726 8.8874 8.58128 8.72524 8.62933 8.61113C8.71341 8.40693 8.84104 8.23425 9.01221 8.09312C9.18338 7.95197 9.39809 7.8814 9.65635 7.8814C10.329 7.8814 10.6654 8.33485 10.6654 9.24176V12.458H12.6654L12.6654 9.00753C12.6654 8.11864 12.4552 7.44447 12.0347 6.98501C11.6143 6.52555 11.0588 6.29582 10.3681 6.29582C9.59329 6.29582 8.98969 6.62915 8.55726 7.29582V7.31384H8.54825L8.55726 7.29582V6.43996H6.55726C6.56926 6.63215 6.57527 7.22975 6.57527 8.23276C6.57527 9.23575 6.56926 10.6442 6.55726 12.458Z"
-          fill="white"
-        />
-      </g>
-      <defs>
-        <clipPath id="clip0_2511_140522">
-          <rect
-            x="3.33203"
-            y="3.33203"
-            width="9.33333"
-            height="9.33333"
-            fill="white"
-          />
-        </clipPath>
-      </defs>
-    </svg>
-  );
-};
 export const LinkedinPreview: FC<{
   maximumCharacters?: number;
 }> = (props) => {
-  const { value: topValue, integration } = useIntegration();
-  const current = useLaunchStore((state) => state.current);
-  const mediaDir = useMediaDirectory();
+  const { value, integration } = useIntegration();
 
-  const renderContent = topValue.map((p) => {
-    const newContent = stripHtmlValidation(
-      'normal',
-      p.content.replace(
-        /<span.*?data-mention-id="([.\s\S]*?)"[.\s\S]*?>([.\s\S]*?)<\/span>/gi,
-        (match, match1, match2) => {
-          return `[[[${match2}]]]`;
-        }
-      ),
-      true
-    );
-
-    const { start, end } = textSlicer(
-      integration?.identifier || '',
-      props.maximumCharacters || 10000,
-      newContent
-    );
-
-    const finalValue =
-      newContent
-        .slice(start, end)
-        .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-          return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-        }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
-      newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-        return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-      }) +
-      `</mark>`;
-
-    return { text: finalValue, images: p.image };
-  });
+  const post = value[0];
+  const text = usePreviewHtml(props.maximumCharacters);
+  const images = post.image || [];
   return (
     <div className="py-[15px] flex flex-col px-[15px] w-full gap-[20px] bg-bgLinkedin rounded-[12px]">
       <div className="flex gap-[8px]">
@@ -295,10 +231,10 @@ export const LinkedinPreview: FC<{
         </div>
         <div className="flex flex-col leading-[16px]">
           <div className="text-[14px] font-[500]">{integration?.name}</div>
-          <div className="text-[12px] font-[400] text-[#A3A3A3]">
+          <div className="text-[12px] font-[400] text-textItemBlur">
             2,871 followers
           </div>
-          <div className="text-[12px] font-[400] text-[#A3A3A3] flex gap-[4px] items-center">
+          <div className="text-[12px] font-[400] text-textItemBlur flex gap-[4px] items-center">
             <span>30m •</span>
             <span>
               <svg
@@ -321,19 +257,19 @@ export const LinkedinPreview: FC<{
         dir="auto"
         className="text-[14px] font-[400] whitespace-pre-line"
         dangerouslySetInnerHTML={{
-          __html: renderContent?.[0]?.text,
+          __html: text,
         }}
       />
-      {!!renderContent?.[0]?.images?.length && (
+      {!!images.length && (
         <div className="h-[280px] -mx-[15px] overflow-hidden flex">
-          {renderContent?.[0]?.images.map((image, index) => (
+          {images.map((image, index) => (
             <a
               key={`image_${index}`}
               className="flex-1"
-              href={mediaDir.set(image.path)}
+              href={image.path}
               target="_blank"
             >
-              <VideoOrImage autoplay={true} src={mediaDir.set(image.path)} />
+              <VideoOrImage autoplay={true} src={image.path} />
             </a>
           ))}
         </div>
@@ -425,91 +361,6 @@ export const LinkedinPreview: FC<{
           <div>Send</div>
         </div>
       </div>
-      {renderContent.length > 1 && (
-        <>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
-              <div className="flex gap-[6px] leading-[17px]">
-                <div className="h-[34px]">
-                  <img
-                    src={integration?.picture || '/no-picture.jpg'}
-                    alt="social"
-                    className="rounded-full relative z-[2] h-[34px] w-[34px]"
-                  />
-                </div>
-                <div className="flex flex-col gap-[12px]">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-[6px]">
-                      <div className="text-[13px] font-[500]">
-                        {integration?.name}
-                      </div>
-                      <div>
-                        <LinkedinIconSmall />
-                      </div>
-                      <div className="text-[12px] font-[400]">• 1st</div>
-                    </div>
-                    <div className="text-[12px] font-[400] text-textLinkedin">
-                      Founder
-                    </div>
-                  </div>
-                  <div
-                    dir="auto"
-                    className="whitespace-pre-line text-[14px] font-[400]"
-                    dangerouslySetInnerHTML={{
-                      __html: value.text,
-                    }}
-                  />
-                  <div className="flex gap-[6px] font-[400] text-[12px] text-textLinkedin items-center">
-                    <div className="font-[700]">Like</div>
-                    <div>•</div>
-                    <div>
-                      <svg
-                        width="21"
-                        height="22"
-                        viewBox="0 0 21 22"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <rect
-                          x="1.0625"
-                          y="1.27734"
-                          width="18.7109"
-                          height="18.7109"
-                          rx="9.35544"
-                          stroke="white"
-                          strokeWidth="2.12624"
-                        />
-                        <path
-                          d="M10.4444 19.7547C15.682 19.7547 19.9279 15.6053 19.9279 10.4867C19.9279 5.36816 15.682 1.21875 10.4444 1.21875C5.20684 1.21875 0.960938 5.36816 0.960938 10.4867C0.960938 15.6053 5.20684 19.7547 10.4444 19.7547Z"
-                          fill="#1485BD"
-                        />
-                        <path
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                          d="M15.7769 9.49337H15.0318C14.964 9.49337 14.8286 9.24182 14.4899 8.88434C13.9886 8.35474 13.4331 7.6795 13.0402 7.30878C12.0654 6.48197 11.2686 5.4738 10.6965 4.34304C10.3713 3.6678 10.3442 3.36328 9.68038 3.36328C9.41819 3.39637 9.17864 3.5255 9.01014 3.72458C8.84164 3.92366 8.75676 4.17783 8.77267 4.43572C8.77267 4.62108 8.86751 5.26983 8.90815 5.49491C9.19833 6.53009 9.65567 7.51338 10.2629 8.4077H10.9945H5.19604C5.03181 8.40533 4.86888 8.43654 4.71771 8.49931C4.56654 8.56209 4.43047 8.65505 4.31821 8.77223C4.20596 8.88941 4.12001 9.02823 4.06587 9.17978C4.01173 9.33132 3.9906 9.49226 4.00383 9.65225C4.02471 9.96246 4.16748 10.2528 4.40229 10.4625C4.63709 10.6722 4.94577 10.7852 5.26378 10.7776H5.48055C5.34176 10.7811 5.20503 10.8112 5.07816 10.8663C4.95129 10.9214 4.83678 11.0004 4.74116 11.0988C4.64554 11.1971 4.57069 11.3129 4.52089 11.4396C4.47108 11.5662 4.44731 11.7012 4.45091 11.8368C4.45326 12.1036 4.55728 12.36 4.74266 12.5558C4.92804 12.7517 5.18147 12.873 5.45345 12.896C5.28789 13.0198 5.16238 13.1876 5.09194 13.3794C5.0215 13.5711 5.00913 13.7786 5.05632 13.977C5.10351 14.1755 5.20824 14.3564 5.35797 14.4981C5.50771 14.6398 5.69609 14.7364 5.90053 14.7761C5.77072 14.9963 5.72737 15.2552 5.7786 15.5043C5.84797 15.7489 5.99897 15.9638 6.2076 16.1149C6.41624 16.266 6.67055 16.3447 6.93017 16.3384H10.0326C10.4391 16.3384 10.8441 16.2881 11.2384 16.1928L13.1622 15.6367H15.7363C17.1181 15.5837 17.4839 9.49337 15.7769 9.49337Z"
-                          fill="#E6F7FF"
-                        />
-                        <path
-                          d="M9.66218 8.40793H5.16429C4.99306 8.40636 4.82349 8.44086 4.66712 8.50909C4.51076 8.57731 4.37127 8.67765 4.25814 8.80328C4.14501 8.92891 4.06091 9.07689 4.01154 9.23713C3.96218 9.39738 3.94872 9.56613 3.97208 9.73192C3.99629 10.0398 4.14049 10.3268 4.37495 10.5337C4.6094 10.7407 4.9162 10.8518 5.23203 10.8441H5.4488C5.31001 10.8475 5.17328 10.8776 5.04641 10.9327C4.91954 10.9878 4.80503 11.0668 4.70941 11.1652C4.61379 11.2635 4.53894 11.3794 4.48914 11.506C4.43933 11.6326 4.41556 11.7676 4.41916 11.9033C4.42415 12.1706 4.52871 12.427 4.71326 12.6245C4.89781 12.8219 5.14969 12.9468 5.4217 12.9757C5.29214 13.075 5.18712 13.2016 5.11442 13.346C5.04172 13.4904 5.0032 13.6489 5.00172 13.8098C5.0024 14.0582 5.09018 14.2988 5.25043 14.4915C5.41069 14.6843 5.63372 14.8175 5.88233 14.869C5.75158 15.0937 5.70828 15.357 5.7604 15.6105C5.83228 15.8526 5.98435 16.0645 6.19275 16.2131C6.40116 16.3616 6.65411 16.4384 6.91196 16.4313H10.0144C10.4209 16.4313 10.8259 16.381 11.2202 16.2857L13.144 15.6634H15.7181C17.0728 15.6634 17.4386 9.52008 15.7181 9.52008C15.4699 9.53344 15.2211 9.53344 14.9729 9.52008C14.9052 9.52008 14.7697 9.26852 14.431 8.91104C13.9297 8.38145 13.3743 7.70621 12.9814 7.33549C12.0197 6.50104 11.2369 5.48852 10.6783 4.3565C10.5707 4.10668 10.4244 3.87448 10.2447 3.66803C10.0191 3.48258 9.72796 3.39116 9.43402 3.41345C9.14008 3.43574 8.86686 3.56995 8.67318 3.78719C8.53278 3.93558 8.41835 4.10556 8.33449 4.2903C8.27968 4.41815 8.23881 4.55128 8.21256 4.6875C8.17621 5.06078 8.20832 5.43741 8.30739 5.79966C8.3941 6.18097 8.51738 6.55301 8.67318 6.91181C8.92788 7.37918 9.22865 7.82272 9.56734 8.23581C9.60914 8.26098 9.6422 8.29789 9.66218 8.34173"
-                          stroke="#004B7C"
-                          strokeWidth="0.847356"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-                    <div>19</div>
-                    <div>|</div>
-                    <div className="font-[700]">Reply</div>
-                    <div>•</div>
-                    <div>1 reply</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 };

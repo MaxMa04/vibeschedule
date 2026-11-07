@@ -3,66 +3,43 @@
 import React, {
   FC,
   forwardRef,
-  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
 } from 'react';
-import { useForm, useWatch, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form';
 import { IsOptional } from 'class-validator';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
-import { GeneralPreviewComponent } from '@gitroom/frontend/components/launches/general.preview.component';
-import { IntegrationContext } from '@gitroom/frontend/components/launches/helpers/use.integration';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import useSWR from 'swr';
-import { InternalChannels } from '@gitroom/frontend/components/launches/internal.channels';
+import { GeneralPreviewComponent } from '@vibeschedule/frontend/components/launches/general.preview.component';
+import { IntegrationContext } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import SafeImage from '@gitroom/react/helpers/safe.image';
-import { useMediaSettingsValues } from '@gitroom/frontend/components/new-launch/media.settings.section';
+import SafeImage from '@vibeschedule/react/helpers/safe.image';
 
 class Empty {
   @IsOptional()
   empty: string;
 }
 
-export { PostComment } from '@gitroom/frontend/components/new-launch/providers/post-comment.enum';
-import { PostComment } from '@gitroom/frontend/components/new-launch/providers/post-comment.enum';
-
-interface CharacterCondition {
-  format: 'no-pictures' | 'with-pictures';
-  type: 'post' | 'comment';
-  maximumCharacters: number;
-}
-
-export const withProvider = function <T extends object>(params: {
-  comments?: boolean | 'no-media';
-  postComment: PostComment;
-  minimumCharacters: CharacterCondition[];
-  SettingsComponent: FC<{
-    values?: any;
-  }> | null;
+// The settings form values are stored as the channel's `settings` and the
+// backend passes them unchanged as PfM platform_configurations[platform],
+// so form field names must be PfM's snake_case keys.
+export const withProvider = function (params: {
+  SettingsComponent: FC | null;
   CustomPreviewComponent?: FC<{
     maximumCharacters?: number;
   }>;
   dto?: any;
-  maximumCharacters?: number | ((settings: any) => number);
-  inlineImages?: boolean | ((values: any) => boolean);
+  maximumCharacters: number;
 }) {
-  const {
-    postComment,
-    SettingsComponent,
-    CustomPreviewComponent,
-    dto,
-    maximumCharacters,
-  } = params;
+  const { SettingsComponent, CustomPreviewComponent, dto, maximumCharacters } =
+    params;
 
   const Wrapped = forwardRef((props: { id: string }, ref) => {
     const t = useT();
-    const fetch = useFetch();
     const {
       current,
       selectedIntegration,
@@ -71,103 +48,37 @@ export const withProvider = function <T extends object>(params: {
       global,
       date,
       isGlobal,
-      tab,
       setTotalChars,
-      justCurrent,
       allIntegrations,
-      setPostComment,
-      setEditor,
-      setInlineImages,
-      dummy,
       setChars,
-      setComments,
       setHide,
     } = useLaunchStore(
       useShallow((state) => ({
         date: state.channelDates[props.id] || state.date,
-        tab: state.tab,
         global: state.global,
-        dummy: state.dummy,
         internal: state.internal.find((p) => p.integration.id === props.id),
-        integrations: state.selectedIntegrations,
         setHide: state.setHide,
         allIntegrations: state.integrations,
-        justCurrent: state.current,
         current: state.current === props.id,
         isGlobal: state.current === 'global',
         setCurrent: state.setCurrent,
-        setComments: state.setComments,
         setTotalChars: state.setTotalChars,
-        setPostComment: state.setPostComment,
-        setEditor: state.setEditor,
-        setInlineImages: state.setInlineImages,
         setChars: state.setChars,
         selectedIntegration: state.selectedIntegrations.find(
           (p) => p.integration.id === props.id
-        ),
+        )!,
       }))
     );
 
     useEffect(() => {
-      if (!setTotalChars) {
-        return;
-      }
-
-      setChars(
-        props.id,
-        typeof maximumCharacters === 'number'
-          ? maximumCharacters
-          : maximumCharacters(
-              JSON.parse(
-                selectedIntegration.integration.additionalSettings || '[]'
-              )
-            )
-      );
-
+      setChars(props.id, maximumCharacters);
       if (isGlobal) {
-        setComments(true);
-        setPostComment(PostComment.ALL);
         setTotalChars(0);
-        setEditor('normal');
-        setInlineImages(false);
       }
-
       if (current) {
-        setComments(
-          typeof params.comments === 'undefined' ? true : params.comments
-        );
-        setEditor(selectedIntegration?.integration.editor);
-        setPostComment(postComment);
-        setTotalChars(
-          typeof maximumCharacters === 'number'
-            ? maximumCharacters
-            : maximumCharacters(
-                JSON.parse(
-                  selectedIntegration.integration.additionalSettings || '[]'
-                )
-              )
-        );
+        setTotalChars(maximumCharacters);
       }
-    }, [justCurrent, current, isGlobal, setTotalChars]);
-
-    const hasMediaSettings = useMediaSettingsValues().some(
-      (p) => p.media?.length
-    );
-
-    const getInternalPlugs = useCallback(async () => {
-      return (
-        await fetch(
-          `/integrations/${selectedIntegration.integration.identifier}/internal-plugs`
-        )
-      ).json();
-    }, [selectedIntegration.integration.identifier]);
-    const { data, isLoading } = useSWR(
-      `internal-${selectedIntegration.integration.identifier}`,
-      getInternalPlugs,
-      {
-        revalidateOnReconnect: true,
-      }
-    );
+    }, [current, isGlobal]);
 
     const value = useMemo(() => {
       if (internal?.integrationValue?.length) {
@@ -175,11 +86,11 @@ export const withProvider = function <T extends object>(params: {
       }
 
       return global;
-    }, [internal, global, isGlobal]);
+    }, [internal, global]);
 
     const form = useForm({
       resolver: classValidatorResolver(dto || Empty),
-      ...(Object.keys(selectedIntegration.settings).length > 0
+      ...(Object.keys(selectedIntegration.settings || {}).length > 0
         ? { values: { ...selectedIntegration.settings } }
         : {}),
       mode: 'all',
@@ -187,42 +98,19 @@ export const withProvider = function <T extends object>(params: {
       reValidateMode: 'onChange',
     });
 
-    // the post settings can turn inline images on, like an X article
-    const values = useWatch({
-      control: form.control,
-      disabled: typeof params.inlineImages !== 'function',
-    });
-    const inlineImages =
-      typeof params.inlineImages === 'function'
-        ? params.inlineImages(values)
-        : !!params.inlineImages;
-    useEffect(() => {
-      if (current) {
-        setInlineImages(inlineImages);
-      }
-    }, [current, inlineImages]);
-
     useImperativeHandle(
       ref,
       () => ({
         isValid: async () => {
-          const settings = form.getValues();
           return {
             id: props.id,
             identifier: selectedIntegration.integration.identifier,
             integration: selectedIntegration.integration,
             valid: await form.trigger(),
             err: form.formState.errors,
-            settings,
+            settings: form.getValues(),
             values: value,
-            maximumCharacters:
-              typeof maximumCharacters === 'number'
-                ? maximumCharacters
-                : maximumCharacters(
-                    JSON.parse(
-                      selectedIntegration.integration.additionalSettings || '[]'
-                    )
-                  ),
+            maximumCharacters,
           };
         },
         getValues: () => {
@@ -251,6 +139,8 @@ export const withProvider = function <T extends object>(params: {
       [value]
     );
 
+    const Preview = CustomPreviewComponent || GeneralPreviewComponent;
+
     return (
       <IntegrationContext.Provider
         value={{
@@ -267,55 +157,28 @@ export const withProvider = function <T extends object>(params: {
         <FormProvider {...form}>
           <div
             className={clsx(
-              'border border-borderPreview rounded-[12px] shadow-previewShadow',
+              'border border-borderPreview rounded-[20px] shadow-previewShadow',
               !current && 'hidden'
             )}
           >
-            {current &&
-              (tab === 0 ||
-                (!SettingsComponent && !data?.internalPlugs?.length)) &&
-              !value?.[0]?.content?.length && (
-                <div>
-                  {t(
-                    'start_writing_your_post',
-                    'Start writing your post for a preview'
-                  )}
-                </div>
-              )}
-            {current &&
-              (tab === 0 ||
-                (!SettingsComponent && !data?.internalPlugs?.length)) &&
-              !!value?.[0]?.content?.length &&
-              (CustomPreviewComponent ? (
-                <CustomPreviewComponent
-                  maximumCharacters={
-                    typeof maximumCharacters === 'number'
-                      ? maximumCharacters
-                      : maximumCharacters(
-                          JSON.parse(
-                            selectedIntegration.integration
-                              .additionalSettings || '[]'
-                          )
-                        )
-                  }
-                />
-              ) : (
-                <GeneralPreviewComponent
-                  maximumCharacters={
-                    typeof maximumCharacters === 'number'
-                      ? maximumCharacters
-                      : maximumCharacters(
-                          JSON.parse(
-                            selectedIntegration.integration
-                              .additionalSettings || '[]'
-                          )
-                        )
-                  }
-                />
-              ))}
-            {(SettingsComponent || !!data?.internalPlugs?.length) &&
+            {current && !value?.[0]?.content?.length && (
+              <div className="p-[16px] text-textItemBlur">
+                {t('start_writing_your_post')}
+              </div>
+            )}
+            {current && !!value?.[0]?.content?.length && (
+              <Preview maximumCharacters={maximumCharacters} />
+            )}
+            {SettingsComponent &&
               createPortal(
-                <div data-id={props.id} className={isGlobal ? 'bg-newSettings pb-[12px] px-[12px] mobile:bg-transparent mobile:px-[16px]' : 'hidden bg-newSettings px-[12px] pb-[12px] mobile:bg-transparent mobile:px-[16px]'}>
+                <div
+                  data-id={props.id}
+                  className={
+                    isGlobal
+                      ? 'bg-newSettings pb-[12px] px-[12px] mobile:bg-transparent mobile:px-[16px]'
+                      : 'hidden bg-newSettings px-[12px] pb-[12px] mobile:bg-transparent mobile:px-[16px]'
+                  }
+                >
                   {isGlobal && (
                     <style>{`#wrapper-settings {display: flex !important} #social-empty {display: block !important;}`}</style>
                   )}
@@ -323,34 +186,35 @@ export const withProvider = function <T extends object>(params: {
                     <div className="flex py-[20px] items-center gap-[15px]">
                       <div className="relative">
                         <SafeImage
-                          alt={selectedIntegration?.integration.name!}
+                          alt={selectedIntegration.integration.name}
                           width={42}
                           height={42}
                           className="min-w-[42px] min-h-[42px] w-[42px] h-[42px] rounded-full"
-                          src={selectedIntegration?.integration.picture}
+                          src={
+                            selectedIntegration.integration.picture ||
+                            '/no-picture.jpg'
+                          }
                         />
                         <SafeImage
-                          alt={selectedIntegration?.integration.identifier}
+                          alt={selectedIntegration.integration.identifier}
                           width={16}
                           height={16}
                           className="rounded-[16px] min-w-[16px] min-h-[16px] w-[16px] h-[16px] absolute bottom-0 end-0"
-                          src={`/icons/platforms/${selectedIntegration?.integration.identifier}.png`}
+                          src={`/icons/platforms/${selectedIntegration.integration.identifier}.png`}
                         />
                       </div>
-                      <div className="text-[20px]">{selectedIntegration?.integration.name}</div>
+                      <div className="text-[20px]">
+                        {selectedIntegration.integration.name}
+                      </div>
                     </div>
                   )}
                   <SettingsComponent />
-                  {!!data?.internalPlugs?.length && !dummy && (
-                    <InternalChannels plugs={data?.internalPlugs} />
-                  )}
                 </div>,
                 document.querySelector('#social-settings') ||
                   document.createElement('div')
               )}
             {current &&
               !SettingsComponent &&
-              !hasMediaSettings &&
               createPortal(
                 <style>{`#wrapper-settings {display: none !important;} #social-empty {display: block !important;}`}</style>,
                 document.querySelector('#social-settings') ||
@@ -362,29 +226,5 @@ export const withProvider = function <T extends object>(params: {
     );
   });
 
-  // Expose the settings configuration as static metadata so the preview /
-  // mobile settings page can render <SettingsComponent /> in isolation
-  // without pulling the launch store + DOM portals.
-  (Wrapped as any).__settings = {
-    SettingsComponent,
-    CustomPreviewComponent,
-    dto,
-    postComment,
-    maximumCharacters,
-  };
-
-  return Wrapped;
-};
-
-/** Pulls the settings metadata off a withProvider-wrapped component. */
-export const getProviderSettingsMeta = (component: unknown) => {
-  return (component as any)?.__settings as
-    | {
-        SettingsComponent: FC<{ values?: any }> | null;
-        CustomPreviewComponent?: FC<{ maximumCharacters?: number }>;
-        dto?: any;
-        postComment: PostComment;
-        maximumCharacters?: number | ((settings: any) => number);
-      }
-    | undefined;
+  return Object.assign(Wrapped, { hasSettings: !!SettingsComponent });
 };

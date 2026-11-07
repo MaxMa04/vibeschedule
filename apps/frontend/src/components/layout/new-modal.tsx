@@ -1,5 +1,6 @@
+import i18next from '@vibeschedule/react/translation/i18next';
 import { create } from 'zustand';
-import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { makeId } from '@vibeschedule/nestjs-libraries/services/make.is';
 import { useShallow } from 'zustand/react/shallow';
 import React, {
   createContext,
@@ -11,7 +12,7 @@ import React, {
   useEffect,
   useMemo,
 } from 'react';
-import { Button } from '@gitroom/react/form/button';
+import { Button } from '@vibeschedule/react/form/button';
 import { useHotkeys } from 'react-hotkeys-hook';
 import clsx from 'clsx';
 import { EventEmitter } from 'events';
@@ -207,7 +208,7 @@ export const Component: FC<{
                 !modal.removeLayout &&
                   'gap-[40px] p-[32px] mobile:gap-[24px] mobile:p-[16px]',
                 'bg-newBgColorInner mx-auto flex flex-col w-fit rounded-[24px] mobile:rounded-[16px] relative mobile:!max-w-full',
-                modal.destructive && 'border-2 border-red-700',
+                modal.destructive && 'border-2 border-error',
                 modal.size ? '' : 'min-w-[600px] mobile:min-w-0 mobile:w-full',
                 modal.fullScreen && 'h-full'
               )}
@@ -362,7 +363,7 @@ export const DecisionModal: FC<{
       <div className="max-w-[600px]">{description}</div>
       <div className="flex gap-[12px] mt-[16px]">
         <Button
-          className={destructive ? '!bg-red-800' : undefined}
+          className={destructive ? '!bg-error' : undefined}
           onClick={() => {
             resolution(true);
             closeCurrent();
@@ -388,10 +389,10 @@ export const DecisionModal: FC<{
 export const decisionModalEmitter = new EventEmitter();
 
 export const areYouSure = ({
-  title = 'Are you sure?',
-  description = 'Are you sure you want to close this modal?' as any,
-  approveLabel = 'Yes',
-  cancelLabel = 'No',
+  title = i18next.t('are_you_sure'),
+  description = i18next.t('are_you_sure_you_want_to_close_the_window') as any,
+  approveLabel = i18next.t('yes'),
+  cancelLabel = i18next.t('no'),
   destructive = false,
 } = {}): Promise<boolean> => {
   return new Promise<boolean>((newRes) => {
@@ -418,11 +419,13 @@ export const useDecisionModal = () => {
   const modals = useModals();
   const open = useCallback(
     ({
-      title = 'Are you sure?',
-      description = 'Are you sure you want to close this modal?' as any,
+      title = i18next.t('are_you_sure'),
+      description = i18next.t(
+        'are_you_sure_you_want_to_close_the_window'
+      ) as any,
       onlyApprove = false,
-      approveLabel = 'Yes',
-      cancelLabel = 'No',
+      approveLabel = i18next.t('yes'),
+      cancelLabel = i18next.t('no'),
       destructive = false,
       newRes = undefined as any,
     } = {}) => {

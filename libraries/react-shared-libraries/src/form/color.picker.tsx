@@ -2,8 +2,7 @@ import { FC, useCallback, useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { useFormContext } from 'react-hook-form';
 import { Button } from './button';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { TranslatedLabel } from '../translation/translated-label';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 
 export const ColorPicker: FC<{
   name: string;
@@ -17,19 +16,8 @@ export const ColorPicker: FC<{
   }) => void;
   value?: string;
   canBeCancelled: boolean;
-  translationKey?: string;
-  translationParams?: Record<string, string | number>;
 }> = (props) => {
-  const {
-    name,
-    label,
-    enabled,
-    value,
-    canBeCancelled,
-    onChange,
-    translationKey,
-    translationParams,
-  } = props;
+  const { name, label, enabled, value, canBeCancelled, onChange } = props;
   const form = useFormContext();
   const color = onChange
     ? {
@@ -62,30 +50,16 @@ export const ColorPicker: FC<{
   if (!enabledState) {
     return (
       <div>
-        <Button onClick={enable}>
-          {t('enable_color_picker', 'Enable color picker')}
-        </Button>
+        <Button onClick={enable}>{t('enable_color_picker')}</Button>
       </div>
     );
   }
   return (
     <div className="flex flex-col gap-[6px]">
-      <div>
-        {!!label && (
-          <div className={`text-[14px]`}>
-            <TranslatedLabel
-              label={label}
-              translationKey={translationKey}
-              translationParams={translationParams}
-            />
-          </div>
-        )}
-      </div>
+      <div>{!!label && <div className={`text-[14px]`}>{label}</div>}</div>
       {canBeCancelled && (
         <div>
-          <Button onClick={cancel}>
-            {t('cancel_the_color_picker', 'Cancel the color picker')}
-          </Button>
+          <Button onClick={cancel}>{t('cancel_the_color_picker')}</Button>
         </div>
       )}
       <div className="flex items-end gap-[20px]">

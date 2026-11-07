@@ -1,53 +1,18 @@
-import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
-import { textSlicer } from '@gitroom/helpers/utils/count.length';
+import { useIntegration } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
+import { usePreviewHtml } from '@vibeschedule/frontend/components/launches/general.preview.component';
 import { FC } from 'react';
-import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
-import { SliderComponent } from '@gitroom/frontend/components/third-parties/slider.component';
+import { VideoOrImage } from '@vibeschedule/react/helpers/video.or.image';
 
 export const InstagramPreview: FC<{
   maximumCharacters?: number;
 }> = (props) => {
-  const { value: topValue, integration } = useIntegration();
-  const current = useLaunchStore((state) => state.current);
-  const mediaDir = useMediaDirectory();
+  const { value, integration } = useIntegration();
 
-  const renderContent = topValue.map((p) => {
-    const newContent = stripHtmlValidation(
-      'normal',
-      p.content.replace(
-        /<span.*?data-mention-id="([.\s\S]*?)"[.\s\S]*?>([.\s\S]*?)<\/span>/gi,
-        (match, match1, match2) => {
-          return `[[[${match2}]]]`;
-        }
-      ),
-      true
-    );
-
-    const { start, end } = textSlicer(
-      integration?.identifier || '',
-      props.maximumCharacters || 10000,
-      newContent
-    );
-
-    const finalValue =
-      `<strong class="text-[15px] font-[600]">${integration?.name} </strong>` +
-      `<span dir="auto">` +
-      newContent
-        .slice(start, end)
-        .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-          return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-        }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
-      newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-        return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-      }) +
-      `</mark></span>`;
-
-    return { text: finalValue, images: p.image };
-  });
+  const post = value[0];
+  const text =
+    `<strong class="text-[15px] font-[600]">${integration?.name} </strong>` +
+    `<span dir="auto">${usePreviewHtml(props.maximumCharacters)}</span>`;
+  const images = post.image || [];
   return (
     <div className="py-[10px] flex flex-col px-[15px] w-full gap-[10px] bg-bgInstagram rounded-[12px]">
       <div className="flex gap-[10px] items-center">
@@ -62,20 +27,14 @@ export const InstagramPreview: FC<{
           <div className="text-[15px] font-[600]">{integration?.name}</div>
         </div>
       </div>
-      {!!renderContent?.[0]?.images?.length ? (
-        <SliderComponent
-          className="h-[585px] rounded-[8px] overflow-hidden"
-          list={renderContent?.[0]?.images.map((image, index) => (
-            <a
-              key={`image_${index}`}
-              className="flex-1"
-              href={mediaDir.set(image.path)}
-              target="_blank"
-            >
-              <VideoOrImage autoplay={true} src={mediaDir.set(image.path)} />
-            </a>
-          ))}
-        />
+      {!!images.length ? (
+        <a
+          className="h-[585px] rounded-[8px] overflow-hidden flex"
+          href={images[0].path}
+          target="_blank"
+        >
+          <VideoOrImage autoplay={true} src={images[0].path} />
+        </a>
       ) : (
         <div
           style={{ background: 'url(/no-video-youtube.png)' }}
@@ -86,7 +45,7 @@ export const InstagramPreview: FC<{
         dir="auto"
         className="text-[14px] font-[400] whitespace-pre-line"
         dangerouslySetInnerHTML={{
-          __html: renderContent?.[0]?.text,
+          __html: text,
         }}
       />
       <div className="py-[8px] text-textColor flex text-[14px] font-[700] gap-[10.5px]">
@@ -168,58 +127,6 @@ export const InstagramPreview: FC<{
           </svg>
         </div>
       </div>
-      {renderContent.length > 1 && (
-        <>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
-              <div className="flex gap-[10px] leading-[17px]">
-                <div className="h-[34px]">
-                  <img
-                    src={integration?.picture || '/no-picture.jpg'}
-                    alt="social"
-                    className="rounded-full relative z-[2] h-[34px] w-[34px]"
-                  />
-                </div>
-                <div className="flex flex-col gap-[6px] flex-1">
-                  <div className="flex gap-[4px] py-[8px]">
-                    <div
-                      dir="auto"
-                      className="whitespace-pre-line text-[14px] font-[400] flex-1"
-                      dangerouslySetInnerHTML={{
-                        __html: value.text,
-                      }}
-                    />
-                    <div>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                      >
-                        <path
-                          d="M10 16.875C10 16.875 2.1875 12.5 2.1875 7.18751C2.1875 6.24836 2.51289 5.33821 3.1083 4.61193C3.70371 3.88564 4.53236 3.38808 5.45328 3.2039C6.37419 3.01971 7.33047 3.16029 8.15943 3.6017C8.98838 4.04311 9.63879 4.7581 10 5.62501V5.62501C10.3612 4.7581 11.0116 4.04311 11.8406 3.6017C12.6695 3.16029 13.6258 3.01971 14.5467 3.2039C15.4676 3.38808 16.2963 3.88564 16.8917 4.61193C17.4871 5.33821 17.8125 6.24836 17.8125 7.18751C17.8125 12.5 10 16.875 10 16.875Z"
-                          stroke="currentColor"
-                          strokeWidth="1.58884"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex font-[400] text-[12px] text-textLinkedin items-center">
-                    <div className="flex gap-[16px] flex-1">
-                      <div className="font-[700]">30m</div>
-                      <div className="font-[700]">8 Likes</div>
-                      <div className="font-[700]">Reply</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 };

@@ -1,26 +1,21 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
   IsDefined,
   IsIn,
-  IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Validate,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
-import {
-  allProviders,
-  type AllProvidersSettings,
-  EmptySettings,
-} from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/all.providers.settings';
-import { ValidContent } from '@gitroom/helpers/utils/valid.images';
-import { sanitizePostContent } from '@gitroom/helpers/utils/sanitize.post.content';
+import { MediaDto } from '@vibeschedule/nestjs-libraries/dtos/media/media.dto';
+import { ValidContent } from '@vibeschedule/helpers/utils/valid.images';
+import { sanitizePostContent } from '@vibeschedule/helpers/utils/sanitize.post.content';
 
 export class Integration {
   @IsDefined()
@@ -37,11 +32,7 @@ export class PostContent {
 
   @IsOptional()
   @IsString()
-  id: string;
-
-  @IsOptional()
-  @IsNumber()
-  delay: number;
+  id?: string;
 
   @IsArray()
   @Type(() => MediaDto)
@@ -50,39 +41,39 @@ export class PostContent {
 }
 
 export class Post {
-  type?: string;
-
   @IsDefined()
   @Type(() => Integration)
   @ValidateNested()
   integration: Integration;
 
-  @IsDefined()
-  @ArrayMinSize(1)
+  // one value per channel, there are no threads
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1)
   @Type(() => PostContent)
   @ValidateNested({ each: true })
   value: PostContent[];
 
   @IsOptional()
   @IsString()
-  group: string;
+  group?: string;
 
   // a channel that keeps a date of its own, the others use the post date
   @IsOptional()
   @IsDateString()
   date?: string;
 
-  @ValidateIf((o) => o.type !== 'draft')
-  @ValidateNested()
-  @Type(() => EmptySettings, {
-    keepDiscriminatorProperty: true,
-    discriminator: {
-      property: '__type',
-      subTypes: allProviders(EmptySettings),
-    },
-  })
-  settings: AllProvidersSettings;
+  // validated against the platform settings class in PostsService.validatePosts
+  @IsOptional()
+  @IsObject()
+  settings?: Record<string, any>;
+}
+
+export class ValidatePostsDto {
+  @IsArray()
+  @Type(() => Post)
+  @ValidateNested({ each: true })
+  posts: Post[];
 }
 
 class Tags {
@@ -96,41 +87,26 @@ class Tags {
 }
 
 export class CreatePostDto {
-  @IsDefined()
+  // update keeps the state of an existing post, e.g. a published one
   @IsIn(['draft', 'schedule', 'now', 'update'])
   type: 'draft' | 'schedule' | 'now' | 'update';
 
-  @IsOptional()
-  @IsString()
-  order?: string;
-
-  @IsDefined()
-  @IsBoolean()
-  shortLink: boolean;
-
-  @IsOptional()
-  @IsNumber()
-  inter?: number;
-
-  // explicit opt-in to publish an already-PUBLISHED post again; without it a
-  // schedule/now save targeting a published post is rejected
+  // explicit opt-in to publish an already published post again
   @IsOptional()
   @IsBoolean()
   republish?: boolean;
 
-  @IsDefined()
   @IsDateString()
   date: string;
 
   @IsArray()
-  @IsDefined()
   @ValidateNested({ each: true })
+  @Type(() => Tags)
   tags: Tags[];
 
-  @IsDefined()
-  @Type(() => Post)
   @IsArray()
-  @ValidateNested({ each: true })
   @ArrayMinSize(1)
+  @Type(() => Post)
+  @ValidateNested({ each: true })
   posts: Post[];
 }

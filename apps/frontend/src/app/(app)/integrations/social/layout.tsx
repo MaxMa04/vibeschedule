@@ -1,12 +1,12 @@
 import { ReactNode } from 'react';
 
-export default async function IntegrationLayout({
+export default function IntegrationLayout({
   children,
 }: {
   children: ReactNode;
 }) {
   return (
-    <div className="bg-[#0B0A0A] flex flex-1 min-h-screen w-screen">
+    <div className="bg-newBgColor text-newTextColor flex flex-1 items-center justify-center min-h-screen w-screen">
       {children}
     </div>
   );

@@ -1,94 +1,31 @@
 'use client';
 
-import {
-  AddProviderButton,
-  CustomVariables,
-} from '@gitroom/frontend/components/launches/add.provider.component';
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import SafeImage from '@gitroom/react/helpers/safe.image';
-import { capitalize, groupBy, orderBy } from 'lodash';
-import { CalendarWeekProvider } from '@gitroom/frontend/components/launches/calendar.context';
-import { Filters } from '@gitroom/frontend/components/launches/filters';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+import { AddProviderButton } from '@vibeschedule/frontend/components/launches/add.provider.component';
+import { FC, useCallback, useMemo, useState } from 'react';
+import SafeImage from '@vibeschedule/react/helpers/safe.image';
+import { groupBy, orderBy } from 'lodash';
+import { CalendarWeekProvider } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { Filters } from '@vibeschedule/frontend/components/launches/filters';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { LoadingComponent } from '@vibeschedule/frontend/components/layout/loading';
 import clsx from 'clsx';
-import { useUser } from '../layout/user.context';
-import { Menu } from '@gitroom/frontend/components/launches/menu/menu';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Menu } from '@vibeschedule/frontend/components/launches/menu/menu';
 import { Integration } from '@prisma/client';
-import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
-import { useToaster } from '@gitroom/react/toaster/toaster';
-import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
+import ImageWithFallback from '@vibeschedule/react/helpers/image.with.fallback';
+import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { Calendar } from './calendar';
 import { useDrag, useDrop } from 'react-dnd';
-import { DNDProvider } from '@gitroom/frontend/components/launches/helpers/dnd.provider';
-import { GeneratorComponent } from './generator/generator';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
-import { NewPost } from '@gitroom/frontend/components/launches/new.post';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
+import { DNDProvider } from '@vibeschedule/frontend/components/launches/helpers/dnd.provider';
+import { NewPost } from '@vibeschedule/frontend/components/launches/new.post';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { useIntegrationList } from '@vibeschedule/frontend/components/launches/helpers/use.integration.list';
 import useCookie from 'react-use-cookie';
-import { Onboarding } from '@gitroom/frontend/components/onboarding/onboarding';
-import { ChannelsAfterPayment } from '@gitroom/frontend/components/layout/check.payment';
-import { HubspotInstalled } from '@gitroom/frontend/components/launches/hubspot.installed';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { Input } from '@gitroom/react/form/input';
-import { Button } from '@gitroom/react/form/button';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
+import { Input } from '@vibeschedule/react/form/input';
+import { Button } from '@vibeschedule/react/form/button';
 
-export const SVGLine = () => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="5"
-      height="52"
-      viewBox="0 0 5 52"
-      fill="none"
-      className="rtl:rotate-180"
-    >
-      <path
-        d="M0.5 4C0.5 1.79086 2.29086 0 4.5 0V52C2.29086 52 0.5 50.2091 0.5 48V4Z"
-        fill="url(#paint0_linear_1930_1119)"
-      />
-      <path
-        d="M0.5 4C0.5 1.79086 2.29086 0 4.5 0V52C2.29086 52 0.5 50.2091 0.5 48V4Z"
-        fill="url(#paint1_radial_1930_1119)"
-      />
-      <defs>
-        <linearGradient
-          id="paint0_linear_1930_1119"
-          x1="-7"
-          y1="-27.7727"
-          x2="-2.58929"
-          y2="-28.6843"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#662FDA" />
-          <stop offset="1" stopColor="#5720CB" />
-        </linearGradient>
-        <radialGradient
-          id="paint1_radial_1930_1119"
-          cx="0"
-          cy="0"
-          r="1"
-          gradientUnits="userSpaceOnUse"
-          gradientTransform="translate(1.19333 7.45342) rotate(21.2064) scale(16.1503 188.627)"
-        >
-          <stop stopColor="#8C66FF" />
-          <stop offset="1" stopColor="#8C66FF" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-    </svg>
-  );
-};
 interface MenuComponentInterface {
-  refreshChannel: (
-    integration: Integration & {
-      identifier: string;
-    }
-  ) => () => void;
   collapsed: boolean;
-  continueIntegration: (integration: Integration) => () => void;
-  totalNonDisabledChannels: number;
   mutate: (shouldReload?: boolean) => void;
   update: (shouldReload: boolean) => void;
 }
@@ -135,7 +72,7 @@ const EditGroupNameModal: FC<{
       const { message } = await response.json().catch(() => ({} as any));
       toaster.show(
         (Array.isArray(message) ? message[0] : message) ||
-          t('could_not_save_group', 'Could not save the group.'),
+          t('could_not_save_group'),
         'warning'
       );
       return;
@@ -148,12 +85,12 @@ const EditGroupNameModal: FC<{
       <Input
         name="name"
         disableForm={true}
-        label={t('group_name', 'Name')}
+        label={t('group_name')}
         value={groupName}
         onChange={(e) => setGroupName(e.target.value)}
       />
       <Button onClick={save} className="mt-[16px]">
-        {t('save', 'Save')}
+        {t('save')}
       </Button>
     </div>
   );
@@ -188,23 +125,12 @@ export const MenuGroupComponent: FC<
       values: Array<
         Integration & {
           identifier: string;
-          changeProfilePicture: boolean;
-          changeNickName: boolean;
         }
       >;
     };
   }
 > = (props) => {
-  const {
-    group,
-    mutate,
-    update,
-    continueIntegration,
-    totalNonDisabledChannels,
-    refreshChannel,
-    changeItemGroup,
-    collapsed,
-  } = props;
+  const { group, mutate, update, changeItemGroup, collapsed } = props;
   const t = useT();
   const modals = useModals();
   const toaster = useToaster();
@@ -216,7 +142,7 @@ export const MenuGroupComponent: FC<
       e.stopPropagation();
       const val: string | undefined = await new Promise((resolve) => {
         modals.openModal({
-          title: t('edit_group_name', 'Edit group name'),
+          title: t('edit_group_name'),
           onClose: () => resolve(undefined),
           children: (close) => (
             <EditGroupNameModal
@@ -232,7 +158,7 @@ export const MenuGroupComponent: FC<
         return;
       }
       await mutate();
-      toaster.show(t('group_updated', 'Group Updated'), 'success');
+      toaster.show(t('group_updated'), 'success');
     },
     [group.name, group.id, mutate, modals, t]
   );
@@ -312,10 +238,7 @@ export const MenuGroupComponent: FC<
             key={integration.id}
             integration={integration}
             mutate={mutate}
-            continueIntegration={continueIntegration}
             update={update}
-            refreshChannel={refreshChannel}
-            totalNonDisabledChannels={totalNonDisabledChannels}
           />
         ))}
       </div>
@@ -326,23 +249,10 @@ export const MenuComponent: FC<
   MenuComponentInterface & {
     integration: Integration & {
       identifier: string;
-      changeProfilePicture: boolean;
-      changeNickName: boolean;
-      refreshNeeded?: boolean;
     };
   }
 > = (props) => {
-  const {
-    totalNonDisabledChannels,
-    continueIntegration,
-    refreshChannel,
-    mutate,
-    update,
-    integration,
-    collapsed,
-  } = props;
-  const user = useUser();
-  const t = useT();
+  const { mutate, update, integration, collapsed } = props;
   const [collected, drag, dragPreview] = useDrag(() => ({
     type: 'menu',
     item: {
@@ -353,24 +263,13 @@ export const MenuComponent: FC<
     <div
       // @ts-ignore
       ref={dragPreview}
-      {...(integration.refreshNeeded && {
-        onClick: refreshChannel(integration),
-        'data-tooltip-id': 'tooltip',
-        'data-tooltip-content': t(
-          'channel_disconnected_click_to_reconnect',
-          'Channel disconnected, click to reconnect.'
-        ),
-      })}
       {...(collapsed
         ? {
             'data-tooltip-id': 'tooltip',
             'data-tooltip-content': integration.name,
           }
         : {})}
-      className={clsx(
-        'flex gap-[12px] items-center bg-newBgColorInner hover:bg-boxHover group/profile transition-all rounded-e-[8px]',
-        integration.refreshNeeded && 'cursor-pointer'
-      )}
+      className="flex gap-[12px] items-center bg-newBgColorInner hover:bg-boxHover group/profile transition-all rounded-[12px]"
     >
       <div
         className={clsx(
@@ -378,24 +277,6 @@ export const MenuComponent: FC<
           integration.disabled && 'opacity-50'
         )}
       >
-        <div className="h-full w-[4px] -ms-[12px] rounded-s-[3px] opacity-0 group-hover/profile:opacity-100 transition-opacity">
-          <SVGLine />
-        </div>
-        {(integration.inBetweenSteps || integration.refreshNeeded) && (
-          <div
-            className="absolute start-0 top-0 w-[39px] h-[46px] cursor-pointer"
-            onClick={
-              integration.refreshNeeded
-                ? refreshChannel(integration)
-                : continueIntegration(integration)
-            }
-          >
-            <div className="bg-red-500 w-[15px] h-[15px] rounded-full start-[5px] top-[5px] absolute z-[200] text-[10px] flex justify-center items-center">
-              !
-            </div>
-            <div className="bg-primary/60 w-[39px] h-[46px] start-0 top-0 absolute rounded-full z-[199]" />
-          </div>
-        )}
         <ImageWithFallback
           fallbackSrc={'/no-picture.jpg'}
           src={integration.picture || '/no-picture.jpg'}
@@ -404,35 +285,17 @@ export const MenuComponent: FC<
           width={36}
           height={36}
         />
-        {integration.identifier === 'youtube' ? (
-          <img
-            src="/icons/platforms/youtube.svg"
-            className="absolute z-10 bottom-[5px] -end-[5px]"
-            width={20}
-          />
-        ) : (
-          <SafeImage
-            src={`/icons/platforms/${integration.identifier}.png`}
-            className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
-            alt={integration.identifier}
-            width={18.41}
-            height={18.41}
-          />
-        )}
+        <SafeImage
+          src={`/icons/platforms/${integration.identifier}.png`}
+          className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
+          alt={integration.identifier}
+          width={18.41}
+          height={18.41}
+        />
       </div>
       <div
         // @ts-ignore
         ref={drag}
-        {...(integration.disabled &&
-        totalNonDisabledChannels === user?.totalChannels
-          ? {
-              'data-tooltip-id': 'tooltip',
-              'data-tooltip-content': t(
-                'channel_disabled_upgrade_plan',
-                'This channel is disabled, please upgrade your plan to enable it.'
-              ),
-            }
-          : {})}
         role="Handle"
         className={clsx(
           'group-[.sidebar]:hidden flex-1 whitespace-nowrap text-ellipsis overflow-hidden cursor-move',
@@ -442,16 +305,10 @@ export const MenuComponent: FC<
         {integration.name}
       </div>
       <Menu
-        canChangeProfilePicture={integration.changeProfilePicture}
-        canChangeNickName={integration.changeNickName}
-        refreshChannel={refreshChannel}
         mutate={mutate}
         onChange={update}
         id={integration.id}
-        canEnable={
-          user?.totalChannels! > totalNonDisabledChannels &&
-          integration.disabled
-        }
+        canEnable={integration.disabled}
         canDisable={!integration.disabled}
       />
     </div>
@@ -459,26 +316,13 @@ export const MenuComponent: FC<
 };
 export const LaunchesComponent = () => {
   const fetch = useFetch();
-  const user = useUser();
-  const { billingEnabled } = useVariables();
-  const router = useRouter();
-  const search = useSearchParams();
-  const toast = useToaster();
-  const fireEvents = useFireEvents();
   const t = useT();
-  const modal = useModals();
   const [reload, setReload] = useState(false);
   const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
   const [channelsOpen, setChannelsOpen] = useState(false);
-  const [mode] = useCookie('mode', 'dark');
+  const [mode] = useCookie('mode', 'light');
   const { isLoading, data: integrations, mutate } = useIntegrationList();
 
-  const totalNonDisabledChannels = useMemo(() => {
-    return (
-      integrations?.filter((integration: any) => !integration.disabled)
-        ?.length || 0
-    );
-  }, [integrations]);
   const changeItemGroup = useCallback(
     async (id: string, group: string) => {
       mutate(
@@ -539,83 +383,6 @@ export const LaunchesComponent = () => {
       setReload(false);
     }
   }, []);
-  const continueIntegration = useCallback(
-    (integration: any) => async () => {
-      router.push(
-        `/launches?added=${integration.identifier}&continue=${integration.id}`
-      );
-    },
-    []
-  );
-  const refreshChannel = useCallback(
-    (
-        integration: Integration & {
-          identifier: string;
-          isCustomFields?: boolean;
-          customFields?: any[];
-        }
-      ) =>
-      async () => {
-        // Custom-fields providers (Bluesky, etc.) have no OAuth URL to redirect
-        // to: reconnect by re-entering the credentials, like the menu does.
-        if (integration.isCustomFields) {
-          modal.openModal({
-            title: t('custom_url', 'Custom URL'),
-            withCloseButton: false,
-            classNames: {
-              modal: 'md',
-            },
-            children: (
-              <CustomVariables
-                identifier={integration.identifier}
-                gotoUrl={(url: string) => router.push(url)}
-                variables={integration.customFields || []}
-              />
-            ),
-          });
-          return;
-        }
-
-        const { url } = await (
-          await fetch(
-            `/integrations/social/${integration.identifier}?refresh=${integration.internalId}`,
-            {
-              method: 'GET',
-            }
-          )
-        ).json();
-        window.location.href = url;
-      },
-    []
-  );
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    if (search.get('msg')) {
-      toast.show(search.get('msg')!, 'success');
-      window?.opener?.postMessage(
-        {
-          msg: search.get('msg')!,
-          success: false,
-        },
-        '*'
-      );
-    }
-    if (search.get('added')) {
-      fireEvents('channel_added');
-      window?.opener?.postMessage(
-        {
-          msg: t('channel_added', 'Channel added'),
-          success: true,
-        },
-        '*'
-      );
-    }
-    if (window.opener) {
-      window.close();
-    }
-  }, []);
   if (isLoading || reload) {
     return (
       <div className="bg-newBgColorInner p-[20px] flex flex-1 flex-col gap-[15px] transition-all items-center justify-center">
@@ -624,12 +391,8 @@ export const LaunchesComponent = () => {
     );
   }
 
-  // @ts-ignore
   return (
     <DNDProvider>
-      <Onboarding />
-      <ChannelsAfterPayment integrations={integrations} />
-      <HubspotInstalled />
       <CalendarWeekProvider integrations={sortedIntegrations}>
         {channelsOpen && (
           <div
@@ -700,13 +463,12 @@ export const LaunchesComponent = () => {
               </div>
             </div>
             <div className="flex flex-col gap-[8px] group-[.sidebar]:mx-auto group-[.sidebar]:w-[44px]">
-              <AddProviderButton update={() => update(true)} />
-              <div className="flex gap-[8px] group-[.sidebar]:flex-col mobile:hidden">
-                {sortedIntegrations?.length > 0 && <NewPost />}
-                {sortedIntegrations?.length > 0 &&
-                  user?.tier?.ai &&
-                  billingEnabled && <GeneratorComponent />}
-              </div>
+              <AddProviderButton update={() => update(false)} />
+              {sortedIntegrations?.length > 0 && (
+                <div className="flex gap-[8px] group-[.sidebar]:flex-col mobile:hidden">
+                  <NewPost />
+                </div>
+              )}
             </div>
             <div className="gap-[32px] flex flex-col select-none flex-1">
               {sortedIntegrations.length === 0 &&
@@ -719,11 +481,11 @@ export const LaunchesComponent = () => {
                             ? '/no-channels.svg'
                             : '/no-channels-colors.svg'
                         }
-                        alt="No channels"
+                        alt=""
                         className="mx-auto min-w-[100%]"
                       />
                       <div className="font-[600] text-[20px]">
-                        {t('no_channels', 'No channels yet')}
+                        {t('no_channels')}
                       </div>
                       <div className="text-[14px]">
                         {t('connect_your_accounts')}
@@ -738,22 +500,9 @@ export const LaunchesComponent = () => {
                   key={menu.name}
                   group={menu}
                   mutate={mutate}
-                  continueIntegration={continueIntegration}
                   update={update}
-                  refreshChannel={refreshChannel}
-                  totalNonDisabledChannels={totalNonDisabledChannels}
                 />
               ))}
-            </div>
-            <div className="mt-[5px] text-center flex flex-col mobile:hidden">
-              {billingEnabled && user?.isLifetime && (
-                <div>{capitalize(user?.tier?.current || '')} tier</div>
-              )}
-              <div>
-                {process.env.NEXT_PUBLIC_VERSION
-                  ? process.env.NEXT_PUBLIC_VERSION
-                  : ''}
-              </div>
             </div>
           </div>
         </div>
@@ -763,7 +512,7 @@ export const LaunchesComponent = () => {
               onClick={() => setChannelsOpen(true)}
               className="cursor-pointer h-[44px] px-[12px] bg-btnSimple text-btnText rounded-[8px] flex items-center gap-[8px] select-none"
             >
-              <div className="flex -space-x-[10px] rtl:space-x-reverse">
+              <div className="flex -space-x-[10px]">
                 {sortedIntegrations.slice(0, 3).map((integration: any) => (
                   <ImageWithFallback
                     key={integration.id}
@@ -781,13 +530,10 @@ export const LaunchesComponent = () => {
               </div>
             </div>
             {sortedIntegrations?.length > 0 ? (
-              <>
-                <NewPost />
-                {user?.tier?.ai && billingEnabled && <GeneratorComponent />}
-              </>
+              <NewPost />
             ) : (
               <div className="flex-1">
-                <AddProviderButton update={() => update(true)} />
+                <AddProviderButton update={() => update(false)} />
               </div>
             )}
           </div>

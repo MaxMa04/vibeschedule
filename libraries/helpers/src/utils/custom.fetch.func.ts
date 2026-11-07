@@ -27,31 +27,11 @@ export const customFetch = (
             .find((p) => p.includes('auth='))
             ?.split('=')[1];
 
-    const authNonSecuredOrg =
-      typeof document === 'undefined'
-        ? null
-        : document.cookie
-            .split(';')
-            .find((p) => p.includes('showorg='))
-            ?.split('=')[1];
-
-    const authNonSecuredImpersonate =
-      typeof document === 'undefined'
-        ? null
-        : document.cookie
-            .split(';')
-            .find((p) => p.includes('impersonate='))
-            ?.split('=')[1];
-
     const fetchRequest = await fetch(params.baseUrl + url, {
       ...(secured ? { credentials: 'include' } : {}),
       ...(newRequestObject || options),
       headers: {
-        ...(showorg
-          ? { showorg }
-          : authNonSecuredOrg
-          ? { showorg: authNonSecuredOrg }
-          : {}),
+        ...(showorg ? { showorg } : {}),
         ...(options.body instanceof FormData
           ? {}
           : { 'Content-Type': 'application/json' }),
@@ -62,9 +42,6 @@ export const customFetch = (
           ? { auth }
           : authNonSecuredCookie
           ? { auth: authNonSecuredCookie }
-          : {}),
-        ...(authNonSecuredImpersonate
-          ? { impersonate: authNonSecuredImpersonate }
           : {}),
       },
       // @ts-ignore
@@ -84,9 +61,3 @@ export const customFetch = (
     return new Promise((res) => {}) as Response;
   };
 };
-
-export const fetchBackend = customFetch({
-  get baseUrl() {
-    return process.env.BACKEND_URL!;
-  },
-});

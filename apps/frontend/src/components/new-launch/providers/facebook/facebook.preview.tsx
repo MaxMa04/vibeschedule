@@ -1,13 +1,7 @@
-import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
-import { textSlicer } from '@gitroom/helpers/utils/count.length';
-import { FACEBOOK_PRESET_MAX_CHARS } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/facebook.dto';
-import { getPresetBackground } from '@gitroom/frontend/components/new-launch/providers/facebook/facebook.background';
+import { useIntegration } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
+import { usePreviewHtml } from '@vibeschedule/frontend/components/launches/general.preview.component';
 import { FC } from 'react';
-import { useFormContext, useWatch } from 'react-hook-form';
-import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
+import { VideoOrImage } from '@vibeschedule/react/helpers/video.or.image';
 
 const Icons = () => {
   return (
@@ -65,61 +59,11 @@ const Icons = () => {
 export const FacebookPreview: FC<{
   maximumCharacters?: number;
 }> = (props) => {
-  const { value: topValue, integration } = useIntegration();
-  const current = useLaunchStore((state) => state.current);
-  const mediaDir = useMediaDirectory();
+  const { value, integration } = useIntegration();
 
-  // Facebook only renders the background on text-only posts up to 130 chars, so
-  // reflect the real outcome here: the background shows when it will actually be
-  // applied, and disappears (plain text) when it would be dropped.
-  const control = useFormContext()?.control;
-  const preset = useWatch({ control, name: 'text_format_preset_id' }) as
-    | string
-    | undefined;
-  const firstText = stripHtmlValidation(
-    'normal',
-    topValue?.[0]?.content || '',
-    true
-  );
-  const background =
-    !!preset &&
-    !topValue?.[0]?.image?.length &&
-    firstText.length <= FACEBOOK_PRESET_MAX_CHARS
-      ? getPresetBackground(preset)
-      : undefined;
-
-  const renderContent = topValue.map((p) => {
-    const newContent = stripHtmlValidation(
-      'normal',
-      p.content.replace(
-        /<span.*?data-mention-id="([.\s\S]*?)"[.\s\S]*?>([.\s\S]*?)<\/span>/gi,
-        (match, match1, match2) => {
-          return `[[[${match2}]]]`;
-        }
-      ),
-      true
-    );
-
-    const { start, end } = textSlicer(
-      integration?.identifier || '',
-      props.maximumCharacters || 10000,
-      newContent
-    );
-
-    const finalValue =
-      newContent
-        .slice(start, end)
-        .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-          return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-        }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
-      newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
-        return `<span class="font-bold font-[arial]" style="color: #ae8afc">${match1}</span>`;
-      }) +
-      `</mark>`;
-
-    return { text: finalValue, images: p.image };
-  });
+  const post = value[0];
+  const text = usePreviewHtml(props.maximumCharacters);
+  const images = post.image || [];
   return (
     <div className="py-[15px] flex flex-col px-[15px] w-full gap-[20px] bg-bgFacebook rounded-[12px]">
       <div className="flex gap-[8px]">
@@ -132,7 +76,7 @@ export const FacebookPreview: FC<{
         </div>
         <div className="flex flex-col leading-[18px]">
           <div className="text-[14px] font-[500]">{integration?.name}</div>
-          <div className="text-[12px] font-[400] text-[#A3A3A3] flex gap-[4px] items-center">
+          <div className="text-[12px] font-[400] text-textItemBlur flex gap-[4px] items-center">
             <span>30m •</span>
             <span>
               <svg
@@ -151,34 +95,23 @@ export const FacebookPreview: FC<{
           </div>
         </div>
       </div>
-      {background ? (
-        <div
-          dir="auto"
-          className="-mx-[15px] min-h-[320px] flex items-center justify-center text-center px-[32px] py-[32px] text-[28px] font-[700] leading-[36px] whitespace-pre-line break-words"
-          style={{ background: background.background, color: background.text }}
-          dangerouslySetInnerHTML={{
-            __html: renderContent?.[0]?.text,
-          }}
-        />
-      ) : (
-        <div
-          dir="auto"
-          className="text-[14px] font-[400] whitespace-pre-line"
-          dangerouslySetInnerHTML={{
-            __html: renderContent?.[0]?.text,
-          }}
-        />
-      )}
-      {!!renderContent?.[0]?.images?.length && (
+      <div
+        dir="auto"
+        className="text-[14px] font-[400] whitespace-pre-line"
+        dangerouslySetInnerHTML={{
+          __html: text,
+        }}
+      />
+      {!!images.length && (
         <div className="h-[280px] -mx-[15px] overflow-hidden flex">
-          {renderContent?.[0]?.images.map((image, index) => (
+          {images.map((image, index) => (
             <a
               key={`image_${index}`}
               className="flex-1"
-              href={mediaDir.set(image.path)}
+              href={image.path}
               target="_blank"
             >
-              <VideoOrImage autoplay={true} src={mediaDir.set(image.path)} />
+              <VideoOrImage autoplay={true} src={image.path} />
             </a>
           ))}
         </div>
@@ -258,116 +191,6 @@ export const FacebookPreview: FC<{
           <div>Share</div>
         </div>
       </div>
-      {renderContent.length > 1 && (
-        <>
-          <div className="flex items-center">
-            <div className="text-[14px] font-[700]">Most relevant</div>
-            <div>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12.5437 8L7.4563 8C7.05059 8 6.84741 8.56798 7.13429 8.90016L9.67799 11.8456C9.85583 12.0515 10.1442 12.0515 10.322 11.8456L12.8657 8.90016C13.1526 8.56798 12.9494 8 12.5437 8Z"
-                  fill="#A3A3A3"
-                />
-              </svg>
-            </div>
-          </div>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
-              <div className="flex gap-[6px] leading-[17px]">
-                <div className="h-[34px]">
-                  <img
-                    src={integration?.picture || '/no-picture.jpg'}
-                    alt="social"
-                    className="rounded-full relative z-[2] h-[34px] w-[34px]"
-                  />
-                </div>
-                <div className="flex flex-col gap-[6px] min-w-[150px]">
-                  <div className="flex flex-col gap-[4px] bg-bgCommentFacebook py-[8px] px-[12px] rounded-[12px]">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-[6px]">
-                        <div className="text-[13px] font-[500]">
-                          {integration?.name}
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      dir="auto"
-                      className="whitespace-pre-line text-[14px] font-[400]"
-                      dangerouslySetInnerHTML={{
-                        __html: value.text,
-                      }}
-                    />
-                    {!!value.images?.length && (
-                      <div className="h-[100px] mt-[12px] -mx-[15px] overflow-hidden flex">
-                        {value.images.map((image, index) => (
-                          <a
-                            key={`image_${index}`}
-                            className="flex-1"
-                            href={mediaDir.set(image.path)}
-                            target="_blank"
-                          >
-                            <VideoOrImage
-                              autoplay={true}
-                              src={mediaDir.set(image.path)}
-                            />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex font-[400] text-[12px] text-textLinkedin items-center">
-                    <div className="flex gap-[16px] flex-1">
-                      <div className="font-[700]">9h</div>
-                      <div className="font-[700]">Like</div>
-                      <div className="font-[700]">Reply</div>
-                    </div>
-                    <div className="flex gap-[4px]">
-                      <div>2</div>
-                      <div>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                        >
-                          <path
-                            d="M8 0C5.87827 0 3.84344 0.842855 2.34315 2.34315C0.842855 3.84344 0 5.87827 0 8C0 10.1217 0.842855 12.1566 2.34315 13.6569C3.84344 15.1571 5.87827 16 8 16C10.1217 16 12.1566 15.1571 13.6569 13.6569C15.1571 12.1566 16 10.1217 16 8C16 5.87827 15.1571 3.84344 13.6569 2.34315C12.1566 0.842855 10.1217 0 8 0Z"
-                            fill="url(#paint0_linear_2511_139920)"
-                          />
-                          <path
-                            d="M10.473 4C8.275 4 8 5.824 8 5.824C8 5.824 7.726 4 5.528 4C3.414 4 2.798 6.222 3.056 7.41C3.736 10.55 8 12.75 8 12.75C8 12.75 12.265 10.55 12.945 7.41C13.202 6.222 12.585 4 10.473 4Z"
-                            fill="white"
-                          />
-                          <defs>
-                            <linearGradient
-                              id="paint0_linear_2511_139920"
-                              x1="8"
-                              y1="0"
-                              x2="8"
-                              y2="16"
-                              gradientUnits="userSpaceOnUse"
-                            >
-                              <stop stopColor="#FF6680" />
-                              <stop offset="1" stopColor="#E61739" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 };

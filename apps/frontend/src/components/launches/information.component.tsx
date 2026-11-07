@@ -1,14 +1,13 @@
 'use client';
 
 import React, { FC, Fragment, useCallback, useMemo } from 'react';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
-import SafeImage from '@gitroom/react/helpers/safe.image';
+import SafeImage from '@vibeschedule/react/helpers/safe.image';
 import { capitalize } from 'lodash';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { hasLinks } from '@gitroom/helpers/utils/strip.links';
-import { countLength } from '@gitroom/helpers/utils/count.length';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { countLength } from '@vibeschedule/helpers/utils/count.length';
 
 const Valid: FC = () => {
   return (
@@ -21,7 +20,7 @@ const Valid: FC = () => {
     >
       <path
         d="M6 7.33333L8 9.33333L14.6667 2.66667M10.6667 2H5.2C4.0799 2 3.51984 2 3.09202 2.21799C2.71569 2.40973 2.40973 2.71569 2.21799 3.09202C2 3.51984 2 4.07989 2 5.2V10.8C2 11.9201 2 12.4802 2.21799 12.908C2.40973 13.2843 2.71569 13.5903 3.09202 13.782C3.51984 14 4.07989 14 5.2 14H10.8C11.9201 14 12.4802 14 12.908 13.782C13.2843 13.5903 13.5903 13.2843 13.782 12.908C14 12.4802 14 11.9201 14 10.8V8"
-        stroke="#00EB75"
+        stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -77,22 +76,6 @@ export const InformationComponent: FC<{
       }))
     );
 
-  const stripLinkNames = useMemo(() => {
-    if (!hasLinks(text)) {
-      return [] as string[];
-    }
-
-    if (!isGlobal) {
-      return currentIntegration?.stripLinks ? [currentIntegration.name] : [];
-    }
-
-    return selectedIntegrations
-      .filter((p) => p.integration.stripLinks)
-      .map((p) => p.integration.name);
-  }, [text, isGlobal, currentIntegration, selectedIntegrations]);
-
-  const showStripLinkWarning = stripLinkNames.length > 0;
-
   const countFor = useCallback(
     (identifier?: string) => countLength(identifier || '', text || ''),
     [text]
@@ -114,10 +97,6 @@ export const InformationComponent: FC<{
   }, [isGlobal, internal, selectedIntegrations]);
 
   const isValid = useMemo(() => {
-    if (showStripLinkWarning) {
-      return false;
-    }
-
     if (!isPicture && !totalChars) {
       return false;
     }
@@ -137,8 +116,7 @@ export const InformationComponent: FC<{
         }
 
         return (
-          countFor(p.integration.identifier) >
-          (chars?.[p.integration.id] || 0)
+          countFor(p.integration.identifier) > (chars?.[p.integration.id] || 0)
         );
       })
     ) {
@@ -154,7 +132,6 @@ export const InformationComponent: FC<{
     isInternal,
     isPicture,
     chars,
-    showStripLinkWarning,
   ]);
 
   const globalDisplayLimit = useMemo(() => {
@@ -188,14 +165,14 @@ export const InformationComponent: FC<{
         'group rounded-[6px] gap-[4px] mobile:gap-[6px] h-[30px] px-[6px] mobile:px-0 flex justify-center items-center relative',
         isValid
           ? 'border border-newColColor mobile:border-0'
-          : 'bg-[#FF3F3F] mobile:bg-transparent',
+          : 'bg-error mobile:bg-transparent',
         !selectedIntegrations.length && 'mobile:hidden'
       )}
     >
       {isValid ? (
         <Valid />
       ) : (
-        <Invalid className="text-white mobile:text-[#FF3F3F]" />
+        <Invalid className="text-white mobile:text-error" />
       )}
 
       {!isGlobal && (
@@ -204,7 +181,7 @@ export const InformationComponent: FC<{
             'text-[10px] mobile:text-[12px] font-[600] mobile:font-[500] flex justify-center items-center',
             isValid
               ? 'mobile:text-newTextColor/40'
-              : 'text-white mobile:text-[#FF3F3F]'
+              : 'text-white mobile:text-error'
           )}
         >
           {currentChars}/{totalAllowedChars}
@@ -216,7 +193,7 @@ export const InformationComponent: FC<{
             'text-[10px] mobile:text-[12px] font-[600] mobile:font-[500] flex justify-center items-center',
             isValid
               ? 'mobile:text-newTextColor/40'
-              : 'text-white mobile:text-[#FF3F3F]'
+              : 'text-white mobile:text-error'
           )}
         >
           {globalDisplayLimit.count}/{globalDisplayLimit.limit}
@@ -228,7 +205,7 @@ export const InformationComponent: FC<{
             'group-hover:rotate-180',
             isValid
               ? 'mobile:text-newTextColor/40'
-              : 'text-white mobile:text-[#FF3F3F]'
+              : 'text-white mobile:text-error'
           )}
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -246,17 +223,17 @@ export const InformationComponent: FC<{
         <div
           className={clsx(
             'z-[300] hidden rounded-[12px] bg-newBgColorInner group-hover:flex absolute end-0 bottom-[100%] mb-[5px] p-[12px] flex-col',
-            isValid ? 'border border-newColColor' : 'border border-[#FF3F3F]'
+            isValid ? 'border border-newColColor' : 'border border-error'
           )}
         >
           {!isPicture && !totalChars && (
             <div
               className={clsx(
-                'text-sm text-[#FF3F3F] whitespace-nowrap',
+                'text-sm text-error whitespace-nowrap',
                 isGlobal && selectedIntegrations.length && 'mb-[12px]'
               )}
             >
-              {t('your_post_should_have_at_least_one_character_or_one_image', 'Your post should have at least one character or one image.')}
+              {t('your_post_should_have_at_least_one_character_or_one_image')}
             </div>
           )}
           {isGlobal && (
@@ -279,7 +256,7 @@ export const InformationComponent: FC<{
                         ? ''
                         : countFor(p.integration.identifier) >
                           (chars?.[p.integration.id] || 0)
-                        ? 'text-[#FF3F3F]'
+                        ? 'text-error'
                         : ''
                     )}
                   >
@@ -293,31 +270,18 @@ export const InformationComponent: FC<{
                         ? ''
                         : countFor(p.integration.identifier) >
                           (chars?.[p.integration.id] || 0)
-                        ? 'text-[#FF3F3F]'
+                        ? 'text-error'
                         : ''
                     )}
                   >
                     {isInternal?.[index]
-                      ? t('internal_edit', 'Internal Edit')
+                      ? t('internal_edit')
                       : `${countFor(p.integration.identifier)}/${
                           chars?.[p.integration.id] || 0
                         }`}
                   </div>
                 </Fragment>
               ))}
-            </div>
-          )}
-          {showStripLinkWarning && (
-            <div
-              className={clsx(
-                'text-sm text-[#FF3F3F] whitespace-nowrap',
-                ((isGlobal && selectedIntegrations.length) ||
-                  (!isPicture && !totalChars)) &&
-                  'mt-[12px]'
-              )}
-            >
-              {t('links_will_be_removed_from', 'Links will be removed from')}:{' '}
-              {stripLinkNames.join(', ')}
             </div>
           )}
         </div>

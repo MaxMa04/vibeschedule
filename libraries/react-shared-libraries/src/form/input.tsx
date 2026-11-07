@@ -10,7 +10,6 @@ import {
 } from 'react';
 import { clsx } from 'clsx';
 import { useFormContext, useWatch } from 'react-hook-form';
-import { TranslatedLabel } from '../translation/translated-label';
 
 export const Input: FC<
   DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement> & {
@@ -21,8 +20,6 @@ export const Input: FC<
     label: string;
     name: string;
     icon?: ReactNode;
-    translationKey?: string;
-    translationParams?: Record<string, string | number>;
   }
 > = (props) => {
   const {
@@ -33,8 +30,6 @@ export const Input: FC<
     className,
     disableForm,
     error,
-    translationKey,
-    translationParams,
     ...rest
   } = props;
   const form = useFormContext();
@@ -51,15 +46,7 @@ export const Input: FC<
   }, [watch]);
   return (
     <div className="flex flex-col gap-[6px]">
-      {!!label && (
-        <div className={`text-[14px]`}>
-          <TranslatedLabel
-            label={label}
-            translationKey={translationKey}
-            translationParams={translationParams}
-          />
-        </div>
-      )}
+      {!!label && <div className={`text-[14px]`}>{label}</div>}
       <div
         className={clsx(
           'bg-newBgColorInner h-[42px] border-newTableBorder border rounded-[8px] text-textColor placeholder-textColor flex items-center justify-center',
@@ -77,7 +64,7 @@ export const Input: FC<
         />
       </div>
       {!removeError && (
-        <div className="text-red-400 text-[12px]">{err || <>&nbsp;</>}</div>
+        <div className="text-error text-[12px]">{err || <>&nbsp;</>}</div>
       )}
     </div>
   );

@@ -1,10 +1,21 @@
-const { join } = require('path');
 module.exports = {
   darkMode: 'class',
   content: ['./src/**/*.{ts,tsx,html}', '../../libraries/**/*.{ts,tsx,html}'],
   theme: {
     extend: {
       colors: {
+        coral: { DEFAULT: 'var(--coral)', hover: 'var(--coral-hover)' },
+        teal: { DEFAULT: 'var(--teal)', hover: 'var(--teal-hover)' },
+        amber: 'var(--amber)',
+        error: 'var(--error)',
+        bg: 'var(--bg)',
+        surface: { DEFAULT: 'var(--surface)', 2: 'var(--surface-2)' },
+        border: 'var(--border)',
+        ink: {
+          DEFAULT: 'var(--ink)',
+          2: 'var(--ink-2)',
+          3: 'var(--ink-3)',
+        },
         primary: 'var(--color-primary)',
         secondary: 'var(--color-secondary)',
         textColor: 'var(--new-btn-text)',
@@ -17,62 +28,6 @@ module.exports = {
         input: 'var(--color-input)',
         inputText: 'var(--color-input-text)',
         tableBorder: 'var(--color-table-border)',
-        customColor1: 'var(--color-custom1)',
-        customColor2: 'var(--color-custom2)',
-        customColor3: 'var(--color-custom3)',
-        customColor4: 'var(--color-custom4)',
-        customColor5: 'var(--color-custom5)',
-        customColor6: 'var(--color-custom6)',
-        customColor7: 'var(--color-custom7)',
-        customColor8: 'var(--color-custom8)',
-        customColor9: 'var(--color-custom9)',
-        customColor10: 'var(--color-custom10)',
-        customColor11: 'var(--color-custom11)',
-        customColor12: 'var(--color-custom12)',
-        customColor13: 'var(--color-custom13)',
-        customColor14: 'var(--color-custom14)',
-        customColor15: 'var(--color-custom15)',
-        customColor16: 'var(--color-custom16)',
-        customColor17: 'var(--color-custom17)',
-        customColor18: 'var(--color-custom18)',
-        customColor19: 'var(--color-custom19)',
-        customColor20: 'var(--color-custom20)',
-        customColor21: 'var(--color-custom21)',
-        customColor22: 'var(--color-custom22)',
-        customColor23: 'var(--color-custom23)',
-        customColor24: 'var(--color-custom24)',
-        customColor25: 'var(--color-custom25)',
-        customColor26: 'var(--color-custom26)',
-        customColor27: 'var(--color-custom27)',
-        customColor28: 'var(--color-custom28)',
-        customColor29: 'var(--color-custom29)',
-        customColor30: 'var(--color-custom30)',
-        customColor31: 'var(--color-custom31)',
-        customColor32: 'var(--color-custom32)',
-        customColor33: 'var(--color-custom33)',
-        customColor34: 'var(--color-custom34)',
-        customColor35: 'var(--color-custom35)',
-        customColor36: 'var(--color-custom36)',
-        customColor37: 'var(--color-custom37)',
-        customColor38: 'var(--color-custom38)',
-        customColor39: 'var(--color-custom39)',
-        customColor40: 'var(--color-custom40)',
-        customColor41: 'var(--color-custom41)',
-        customColor42: 'var(--color-custom42)',
-        customColor43: 'var(--color-custom43)',
-        customColor44: 'var(--color-custom44)',
-        customColor45: 'var(--color-custom45)',
-        customColor46: 'var(--color-custom46)',
-        customColor47: 'var(--color-custom47)',
-        customColor48: 'var(--color-custom48)',
-        customColor49: 'var(--color-custom49)',
-        customColor50: 'var(--color-custom50)',
-        customColor51: 'var(--color-custom51)',
-        customColor52: 'var(--color-custom52)',
-        customColor53: 'var(--color-custom53)',
-        customColor54: 'var(--color-custom54)',
-        customColor55: 'var(--color-custom55)',
-        modalCustom: 'var(--color-modalCustom)',
 
         newBgColor: 'var(--new-bgColor)',
         newBackdrop: 'var(--new-back-drop)',
@@ -88,7 +43,6 @@ module.exports = {
         btnSimple: 'var(--new-btn-simple)',
         btnText: 'var(--new-btn-text)',
         btnPrimary: 'var(--new-btn-primary)',
-        ai: 'var(--new-ai-btn)',
         boxHover: 'var(--new-box-hover)',
         newTableBorder: 'var(--new-table-border)',
         newTableHeader: 'var(--new-table-header)',
@@ -117,12 +71,13 @@ module.exports = {
       gridTemplateColumns: {
         13: 'repeat(13, minmax(0, 1fr));',
       },
-      backgroundImage: {
-        loginBox: 'url(/auth/login-box.png)',
-        loginBg: 'url(/auth/bg-login.png)',
-      },
       fontFamily: {
-        sans: ['Helvetica Neue'],
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-space-grotesk)', 'var(--font-inter)', 'sans-serif'],
+      },
+      borderRadius: {
+        button: '12px',
+        card: '20px',
       },
       animation: {
         fade: 'fadeOut 0.5s ease-in-out',
@@ -134,24 +89,11 @@ module.exports = {
         fadeDown: 'fadeDown 4s ease-in-out forwards',
         normalFadeDown: 'normalFadeDown 0.5s ease-in-out forwards',
         newMessages: 'newMessages 1s ease-in-out 4s forwards',
-        marqueeUp: 'marquee-up 100s linear infinite',
-        marqueeDown: 'marquee-down 100s linear infinite',
       },
       boxShadow: {
-        yellow: '0 0 60px 20px #6b6237',
-        yellowToast: '0px 0px 50px rgba(252, 186, 3, 0.3)',
-        greenToast: '0px 0px 50px rgba(60, 124, 90, 0.3)',
         menu: 'var(--menu-shadow)',
         previewShadow: 'var(--preview-box-shadow)',
       },
-      dropShadow: {
-        glow: [
-          '0 0 6px rgba(250,204,21,0.6)',
-          '0 0 12px rgba(250,204,21,0.5)',
-          '0 0 24px rgba(250,204,21,0.4)',
-        ],
-      },
-      // that is actual animation
       keyframes: (theme) => ({
         fadeOut: {
           '0%': {
@@ -235,7 +177,7 @@ module.exports = {
         },
         newMessages: {
           '0%': {
-            backgroundColor: 'var(--color-seventh)',
+            backgroundColor: 'var(--teal)',
             fontWeight: 'bold',
           },
           '99%': {
@@ -275,7 +217,6 @@ module.exports = {
   },
   plugins: [
     require('tailwind-scrollbar'),
-    require('tailwindcss-rtl'),
     function ({ addVariant }) {
       addVariant('child', '& > *');
       addVariant('child-hover', '& > *:hover');

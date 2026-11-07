@@ -1,251 +1,73 @@
-import fetch, { FormData } from 'node-fetch';
+import { readFileSync } from 'fs';
+import { basename, extname } from 'path';
 
-export interface PostizConfig {
-  apiKey: string;
-  apiUrl?: string;
+const DEFAULT_API_URL = 'https://vibeschedule.vibelabs.to/api';
+
+const MIME_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.m4v': 'video/x-m4v',
+  '.webm': 'video/webm',
+};
+
+export function apiUrl() {
+  return (process.env.VIBESCHEDULE_API_URL || DEFAULT_API_URL).replace(
+    /\/+$/,
+    ''
+  );
 }
 
-export class PostizAPI {
-  private apiKey: string;
-  private apiUrl: string;
-
-  constructor(config: PostizConfig) {
-    this.apiKey = config.apiKey;
-    this.apiUrl = config.apiUrl || 'https://api.postiz.com';
-  }
-
-  private async request(endpoint: string, options: any = {}) {
-    const url = `${this.apiUrl}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      Authorization: this.apiKey,
-      ...options.headers,
-    };
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`API Error (${response.status}): ${error}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      throw new Error(`Request failed: ${error.message}`);
-    }
-  }
-
-  async createPost(data: any) {
-    return this.request('/public/v1/posts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async listPosts(filters: any = {}) {
-    const queryString = new URLSearchParams(
-      Object.entries(filters).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== null) {
-          acc[key] = String(value);
-        }
-        return acc;
-      }, {} as Record<string, string>)
-    ).toString();
-
-    const endpoint = queryString
-      ? `/public/v1/posts?${queryString}`
-      : '/public/v1/posts';
-
-    return this.request(endpoint, {
-      method: 'GET',
-    });
-  }
-
-  async deletePost(id: string) {
-    return this.request(`/public/v1/posts/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async listMedia(page?: number, search?: string) {
-    const params = new URLSearchParams();
-    if (page) params.append('page', String(page));
-    if (search) params.append('search', search);
-    const queryString = params.toString();
-    return this.request(
-      queryString ? `/public/v1/media?${queryString}` : '/public/v1/media',
-      { method: 'GET' }
+export async function request(
+  path: string,
+  init: { method?: string; body?: unknown } = {}
+) {
+  const apiKey = process.env.VIBESCHEDULE_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'VIBESCHEDULE_API_KEY fehlt. Den Schlüssel findest du in vibeschedule unter Einstellungen > API-Schlüssel.'
     );
   }
 
-  async getMediaStatus(id: string) {
-    return this.request(`/public/v1/media/${id}/status`, {
-      method: 'GET',
-    });
+  const url = `${apiUrl()}/public/v1${path}`;
+  const isForm = init.body instanceof FormData;
+  const response = await fetch(url, {
+    method: init.method || 'GET',
+    headers: {
+      Authorization: apiKey,
+      ...(init.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: isForm
+      ? (init.body as FormData)
+      : init.body
+      ? JSON.stringify(init.body)
+      : undefined,
+  }).catch((err: Error & { cause?: { code?: string } }) => {
+    throw new Error(
+      `Keine Verbindung zu ${url} (${err.cause?.code || err.message})`
+    );
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`API-Fehler ${response.status}: ${text.trim()}`);
   }
+  return text ? JSON.parse(text) : null;
+}
 
-  async upload(file: Buffer, filename: string, adjust?: boolean) {
-    const formData = new FormData();
-    const extension = filename.split('.').pop()?.toLowerCase() || '';
-
-    // Determine MIME type based on file extension
-    const mimeTypes: Record<string, string> = {
-      // Images
-      'png': 'image/png',
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'gif': 'image/gif',
-      'webp': 'image/webp',
-      'svg': 'image/svg+xml',
-      'bmp': 'image/bmp',
-      'ico': 'image/x-icon',
-
-      // Videos
-      'mp4': 'video/mp4',
-      'mov': 'video/quicktime',
-      'avi': 'video/x-msvideo',
-      'mkv': 'video/x-matroska',
-      'webm': 'video/webm',
-      'flv': 'video/x-flv',
-      'wmv': 'video/x-ms-wmv',
-      'm4v': 'video/x-m4v',
-      'mpeg': 'video/mpeg',
-      'mpg': 'video/mpeg',
-      '3gp': 'video/3gpp',
-
-      // Audio
-      'mp3': 'audio/mpeg',
-      'wav': 'audio/wav',
-      'ogg': 'audio/ogg',
-      'aac': 'audio/aac',
-      'flac': 'audio/flac',
-      'm4a': 'audio/mp4',
-
-      // Documents
-      'pdf': 'application/pdf',
-      'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    };
-
-    const type = mimeTypes[extension] || 'application/octet-stream';
-
-    const blob = new Blob([file], { type });
-    if (adjust) formData.append('adjust', 'true');
-    formData.append('file', blob, filename);
-
-    const url = `${this.apiUrl}/public/v1/upload`;
-    const response = await fetch(url, {
-      method: 'POST',
-      // @ts-ignore
-      body: formData,
-      headers: {
-        Authorization: this.apiKey,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Upload failed (${response.status}): ${error}`);
-    }
-
-    return await response.json();
-  }
-
-  async getMissingContent(postId: string) {
-    return this.request(`/public/v1/posts/${postId}/missing`, {
-      method: 'GET',
-    });
-  }
-
-  async updateReleaseId(postId: string, releaseId: string) {
-    return this.request(`/public/v1/posts/${postId}/release-id`, {
-      method: 'PUT',
-      body: JSON.stringify({ releaseId }),
-    });
-  }
-
-  async changePostStatus(postId: string, status: 'draft' | 'schedule') {
-    return this.request(`/public/v1/posts/${postId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  async updatePostSettings(postId: string, settings: Record<string, any>) {
-    return this.request(`/public/v1/posts/${postId}/settings`, {
-      method: 'PUT',
-      body: JSON.stringify({ settings }),
-    });
-  }
-
-  async getAnalytics(integrationId: string, date: string) {
-    return this.request(`/public/v1/analytics/${integrationId}?date=${encodeURIComponent(date)}`, {
-      method: 'GET',
-    });
-  }
-
-  async getPostAnalytics(postId: string, date: string) {
-    return this.request(`/public/v1/analytics/post/${postId}?date=${encodeURIComponent(date)}`, {
-      method: 'GET',
-    });
-  }
-
-  async listIntegrations(group?: string) {
-    const query = group ? `?group=${encodeURIComponent(group)}` : '';
-    return this.request(`/public/v1/integrations${query}`, {
-      method: 'GET',
-    });
-  }
-
-  async listGroups() {
-    return this.request('/public/v1/groups', {
-      method: 'GET',
-    });
-  }
-
-  async getIntegrationSettings(integrationId: string) {
-    return this.request(`/public/v1/integration-settings/${integrationId}`, {
-      method: 'GET',
-    });
-  }
-
-  async triggerIntegrationTool(
-    integrationId: string,
-    methodName: string,
-    data: Record<string, string>
-  ) {
-    return this.request(`/public/v1/integration-trigger/${integrationId}`, {
-      method: 'POST',
-      body: JSON.stringify({ methodName, data }),
-    });
-  }
-
-  async createClipping(data: {
-    url: string;
-    integrations?: string[];
-    clips?: number;
-    fit?: 'crop' | 'blur';
-  }) {
-    return this.request('/public/v1/clipping', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async listClippings(page?: number) {
-    const query = page ? `?page=${encodeURIComponent(String(page))}` : '';
-    return this.request(`/public/v1/clipping${query}`, {
-      method: 'GET',
-    });
-  }
-
-  async getClipping(id: string) {
-    return this.request(`/public/v1/clipping/${id}`, {
-      method: 'GET',
-    });
-  }
+export function uploadFile(file: string) {
+  const form = new FormData();
+  form.append(
+    'file',
+    new Blob([readFileSync(file)], {
+      type:
+        MIME_TYPES[extname(file).toLowerCase()] || 'application/octet-stream',
+    }),
+    basename(file)
+  );
+  return request('/upload', { method: 'POST', body: form });
 }

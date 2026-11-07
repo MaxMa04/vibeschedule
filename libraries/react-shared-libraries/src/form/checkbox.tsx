@@ -17,10 +17,9 @@ export const Checkbox = forwardRef<
         value: boolean;
       };
     }) => void;
-    variant?: 'default' | 'hollow';
   }
 >((props, ref: any) => {
-  const { checked, className, label, disableForm, variant } = props;
+  const { checked, className, label, disableForm } = props;
   const form = useFormContext();
   const register = disableForm ? {} : form.register(props.name!);
   const watch = disableForm ? false : form.watch(props.name!);
@@ -47,13 +46,11 @@ export const Checkbox = forwardRef<
     <div className="flex gap-[10px]">
       <div
         ref={ref}
-        {...disableForm ? {} : form.register(props.name!)}
+        {...(disableForm ? {} : form.register(props.name!))}
         onClick={changeStatus}
         className={clsx(
-          'cursor-pointer rounded-[4px] select-none w-[24px] h-[24px] justify-center items-center flex text-white',
-          variant === 'default' || !variant
-            ? 'bg-forth'
-            : 'border-customColor1 border-2 bg-customColor2',
+          'cursor-pointer rounded-[6px] select-none w-[24px] h-[24px] justify-center items-center flex',
+          val ? 'bg-teal text-white' : 'border-2 border-border bg-surface',
           className
         )}
       >

@@ -1,28 +1,21 @@
 'use client';
 
 import { FC, ReactNode } from 'react';
-import { useUser } from '@gitroom/frontend/components/layout/user.context';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { MenuItem } from '@vibeschedule/frontend/components/new-layout/menu-item';
 
 interface MenuItemInterface {
   name: string;
   icon: ReactNode;
   path: string;
-  role?: string[];
-  hide?: boolean;
-  requireBilling?: boolean;
-  onClick?: () => void;
 }
 
 export const useMenuItem = () => {
-  const { isGeneral } = useVariables();
   const t = useT();
 
-  const firstMenu = [
+  const firstMenu: MenuItemInterface[] = [
     {
-      name: isGeneral ? t('calendar', 'Calendar') : t('launches', 'Launches'),
+      name: t('calendar'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -43,46 +36,7 @@ export const useMenuItem = () => {
       path: '/launches',
     },
     {
-      name: 'Agent',
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="23"
-          height="23"
-          viewBox="0 0 32 32"
-          fill="none"
-        >
-          <path
-            d="M21.1963 9.07375C20.2913 6.95494 18.6824 5.21364 16.6416 4.14422C14.6009 3.0748 12.2534 2.74287 9.99616 3.20455C7.73891 3.66623 5.71031 4.8932 4.25334 6.67802C2.79637 8.46284 2.0004 10.696 2 13V21.25C2 21.7141 2.18437 22.1592 2.51256 22.4874C2.84075 22.8156 3.28587 23 3.75 23H10.8337C11.6141 24.7821 12.8964 26.2984 14.5241 27.3638C16.1519 28.4293 18.0546 28.9978 20 29H28.25C28.7141 29 29.1592 28.8156 29.4874 28.4874C29.8156 28.1592 30 27.7141 30 27.25V19C29.9995 16.5553 29.1036 14.1955 27.4814 12.3666C25.8593 10.5376 23.6234 9.36619 21.1963 9.07375ZM4 13C4 11.4177 4.46919 9.87103 5.34824 8.55544C6.22729 7.23984 7.47672 6.21446 8.93853 5.60896C10.4003 5.00346 12.0089 4.84504 13.5607 5.15372C15.1126 5.4624 16.538 6.22432 17.6569 7.34314C18.7757 8.46197 19.5376 9.88743 19.8463 11.4393C20.155 12.9911 19.9965 14.5997 19.391 16.0615C18.7855 17.5233 17.7602 18.7727 16.4446 19.6518C15.129 20.5308 13.5823 21 12 21H4V13ZM28 27H20C18.5854 26.9984 17.1964 26.6225 15.974 25.9106C14.7516 25.1986 13.7394 24.1759 13.04 22.9463C14.4096 22.8041 15.7351 22.3804 16.9333 21.7017C18.1314 21.023 19.1763 20.104 20.0024 19.0023C20.8284 17.9006 21.4179 16.6401 21.7337 15.2998C22.0495 13.9595 22.0848 12.5684 21.8375 11.2137C23.5916 11.6277 25.1545 12.6218 26.273 14.035C27.3915 15.4482 28 17.1977 28 19V27Z"
-            fill="currentColor"
-          />
-        </svg>
-      ),
-      path: '/agents',
-    },
-    {
-      name: t('analytics', 'Analytics'),
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="19"
-          viewBox="0 0 20 19"
-          fill="none"
-        >
-          <path
-            d="M18.5 18H3.01111C2.48217 18 2.2177 18 2.01568 17.8971C1.83797 17.8065 1.69349 17.662 1.60294 17.4843C1.5 17.2823 1.5 17.0178 1.5 16.4889V1M18.5 4.77778L13.3676 9.91019C13.1806 10.0972 13.0871 10.1907 12.9793 10.2257C12.8844 10.2565 12.7823 10.2565 12.6874 10.2257C12.5796 10.1907 12.4861 10.0972 12.2991 9.91019L10.5343 8.14537C10.3472 7.95836 10.2537 7.86486 10.1459 7.82982C10.0511 7.79901 9.94892 7.79901 9.85407 7.82982C9.74625 7.86486 9.65275 7.95836 9.46574 8.14537L5.27778 12.3333M18.5 4.77778H14.7222M18.5 4.77778V8.55556"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      path: '/analytics',
-    },
-    {
-      name: t('media', 'Media'),
+      name: t('media'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -102,92 +56,32 @@ export const useMenuItem = () => {
       ),
       path: '/media',
     },
-  ] satisfies MenuItemInterface[] as MenuItemInterface[];
+    {
+      name: t('analytics'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="19"
+          viewBox="0 0 20 19"
+          fill="none"
+        >
+          <path
+            d="M18.5 18H3.01111C2.48217 18 2.2177 18 2.01568 17.8971C1.83797 17.8065 1.69349 17.662 1.60294 17.4843C1.5 17.2823 1.5 17.0178 1.5 16.4889V1M18.5 4.77778L13.3676 9.91019C13.1806 10.0972 13.0871 10.1907 12.9793 10.2257C12.8844 10.2565 12.7823 10.2565 12.6874 10.2257C12.5796 10.1907 12.4861 10.0972 12.2991 9.91019L10.5343 8.14537C10.3472 7.95836 10.2537 7.86486 10.1459 7.82982C10.0511 7.79901 9.94892 7.79901 9.85407 7.82982C9.74625 7.86486 9.65275 7.95836 9.46574 8.14537L5.27778 12.3333M18.5 4.77778H14.7222M18.5 4.77778V8.55556"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: '/analytics',
+    },
+  ];
 
-  const secondMenu = [
+  const secondMenu: MenuItemInterface[] = [
     {
-      name: t('affiliate', 'Affiliate'),
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="21"
-          viewBox="0 0 20 21"
-          fill="none"
-        >
-          <path
-            d="M15.0004 6.467C14.9504 6.45866 14.8921 6.45866 14.8421 6.467C13.6921 6.42533 12.7754 5.48366 12.7754 4.31699C12.7754 3.12533 13.7337 2.16699 14.9254 2.16699C16.1171 2.16699 17.0754 3.13366 17.0754 4.31699C17.0671 5.48366 16.1504 6.42533 15.0004 6.467Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M14.1419 12.5338C15.2836 12.7255 16.5419 12.5255 17.4253 11.9338C18.6003 11.1505 18.6003 9.86713 17.4253 9.08379C16.5336 8.49213 15.2586 8.29212 14.1169 8.49212"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4.97466 6.467C5.02466 6.45866 5.08299 6.45866 5.13299 6.467C6.28299 6.42533 7.19966 5.48366 7.19966 4.31699C7.19966 3.12533 6.24133 2.16699 5.04966 2.16699C3.85799 2.16699 2.89966 3.13366 2.89966 4.31699C2.90799 5.48366 3.82466 6.42533 4.97466 6.467Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5.83304 12.5338C4.69137 12.7255 3.43304 12.5255 2.54971 11.9338C1.37471 11.1505 1.37471 9.86713 2.54971 9.08379C3.44137 8.49213 4.71637 8.29212 5.85804 8.49212"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M10.0001 12.6916C9.95014 12.6833 9.89181 12.6833 9.84181 12.6916C8.69181 12.6499 7.77515 11.7083 7.77515 10.5416C7.77515 9.34994 8.73348 8.3916 9.92514 8.3916C11.1168 8.3916 12.0751 9.35827 12.0751 10.5416C12.0668 11.7083 11.1501 12.6583 10.0001 12.6916Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M7.5751 15.3158C6.4001 16.0992 6.4001 17.3825 7.5751 18.1658C8.90843 19.0575 11.0918 19.0575 12.4251 18.1658C13.6001 17.3825 13.6001 16.0992 12.4251 15.3158C11.1001 14.4325 8.90843 14.4325 7.5751 15.3158Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      path: 'https://affiliate.postiz.com',
-      role: ['ADMIN', 'SUPERADMIN', 'USER'],
-      requireBilling: true,
-    },
-    {
-      name: t('billing', 'Billing'),
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="21"
-          viewBox="0 0 20 21"
-          fill="none"
-        >
-          <path
-            d="M7.08341 12.7225C7.08341 13.7964 7.95397 14.667 9.02786 14.667H10.8334C11.984 14.667 12.9167 13.7343 12.9167 12.5837C12.9167 11.4331 11.984 10.5003 10.8334 10.5003H9.16675C8.01615 10.5003 7.08341 9.56759 7.08341 8.41699C7.08341 7.2664 8.01615 6.33366 9.16675 6.33366H10.9723C12.0462 6.33366 12.9167 7.20422 12.9167 8.2781M10.0001 5.08366V6.33366M10.0001 14.667V15.917M18.3334 10.5003C18.3334 15.1027 14.6025 18.8337 10.0001 18.8337C5.39771 18.8337 1.66675 15.1027 1.66675 10.5003C1.66675 5.89795 5.39771 2.16699 10.0001 2.16699C14.6025 2.16699 18.3334 5.89795 18.3334 10.5003Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      path: '/billing',
-      role: ['ADMIN', 'SUPERADMIN'],
-      requireBilling: true,
-    },
-    {
-      name: t('settings', 'Settings'),
+      name: t('settings'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -213,9 +107,8 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/settings',
-      role: ['ADMIN', 'USER', 'SUPERADMIN'],
     },
-  ] satisfies MenuItemInterface[] as MenuItemInterface[];
+  ];
 
   return {
     all: [...firstMenu, ...secondMenu],
@@ -225,70 +118,28 @@ export const useMenuItem = () => {
 };
 
 export const TopMenu: FC = () => {
-  const user = useUser();
   const { firstMenu, secondMenu } = useMenuItem();
-  const { isGeneral, billingEnabled } = useVariables();
   return (
     <>
-      <div className="flex flex-1 flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
-        {
-          // @ts-ignore
-          user?.orgId &&
-            // @ts-ignore
-            (user.tier !== 'FREE' || !isGeneral || !billingEnabled) &&
-            firstMenu
-              .filter((f) => {
-                if (f.hide) {
-                  return false;
-                }
-                if (f.requireBilling && !billingEnabled) {
-                  return false;
-                }
-                if (f.name === 'Billing' && user?.isLifetime) {
-                  return false;
-                }
-                if (f.role) {
-                  return f.role.includes(user?.role!);
-                }
-                return true;
-              })
-              .map((item, index) => (
-                <MenuItem
-                  path={item.path}
-                  label={item.name}
-                  icon={item.icon}
-                  key={item.name}
-                  onClick={item.onClick}
-                />
-              ))
-        }
+      <div className="flex flex-1 flex-col minCustom:gap-[20px] custom:gap-[8px]">
+        {firstMenu.map((item) => (
+          <MenuItem
+            path={item.path}
+            label={item.name}
+            icon={item.icon}
+            key={item.path}
+          />
+        ))}
       </div>
-      <div className="flex flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
-        {secondMenu
-          .filter((f) => {
-            if (f.hide) {
-              return false;
-            }
-            if (f.requireBilling && !billingEnabled) {
-              return false;
-            }
-            if (f.name === 'Billing' && user?.isLifetime) {
-              return false;
-            }
-            if (f.role) {
-              return f.role.includes(user?.role!);
-            }
-            return true;
-          })
-          .map((item, index) => (
-            <MenuItem
-              path={item.path}
-              label={item.name}
-              icon={item.icon}
-              key={item.name}
-              onClick={item.onClick}
-            />
-          ))}
+      <div className="flex flex-col minCustom:gap-[20px] custom:gap-[8px]">
+        {secondMenu.map((item) => (
+          <MenuItem
+            path={item.path}
+            label={item.name}
+            icon={item.icon}
+            key={item.path}
+          />
+        ))}
       </div>
     </>
   );

@@ -2,13 +2,13 @@
 
 import { FC } from 'react';
 import clsx from 'clsx';
-import SafeImage from '@gitroom/react/helpers/safe.image';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import SafeImage from '@vibeschedule/react/helpers/safe.image';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
-import { useExistingData } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
-import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
-import { Check } from '@gitroom/frontend/components/launches/tags.component';
-import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
+import ImageWithFallback from '@vibeschedule/react/helpers/image.with.fallback';
+import { Check } from '@vibeschedule/frontend/components/launches/tags.component';
+import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
 
 const PlatformBadge: FC<{ integration: Integrations }> = ({ integration }) => {
   return integration.identifier === 'youtube' ? (
@@ -85,7 +85,7 @@ export const PicksSocialsComponent: FC<{
         !!exising.siblings?.some((sibling) => sibling.integration === f.id)
       );
     }
-    return !f.inBetweenSteps && !f.disabled;
+    return !f.disabled;
   });
 
   const toggleIntegration = (integration: Integrations) => () => {
@@ -139,7 +139,7 @@ export const PicksSocialsComponent: FC<{
                       (p) => p.integration.id === integration.id
                     ) === -1
                       ? 'grayscale border-transparent'
-                      : 'border-[#622FF6]'
+                      : 'border-teal'
                   )}
                 >
                   <ImageWithFallback

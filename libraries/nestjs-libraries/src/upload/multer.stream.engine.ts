@@ -1,26 +1,22 @@
 import { Request } from 'express';
 import { StorageEngine } from 'multer';
 import { Readable } from 'stream';
-import { IUploadProvider } from './upload.interface';
-import { UploadFactory } from './upload.factory';
-import { getMaxSize, uploadStreamToStorage } from './custom.upload.validation';
+import { uploadStreamToStorage } from '@vibeschedule/nestjs-libraries/upload/custom.upload.validation';
+import {
+  MAX_VIDEO_SIZE,
+  removeFile,
+} from '@vibeschedule/nestjs-libraries/upload/r2.uploader';
 
-// Multer storage engine that streams each incoming file straight into
-// storage instead of multer's default of buffering it whole in memory.
-// `file.filename` / `file.path` end up as the stored key and public URL,
+// Streams each incoming file straight into R2 instead of buffering it.
+// `file.filename` / `file.path` become the stored key and public URL,
 // `file.originalname` keeps the sender's name with the detected extension
-export class MulterStreamEngine implements StorageEngine {
-  constructor(private storage: IUploadProvider) {}
-
+class MulterStreamEngine implements StorageEngine {
   _handleFile(
     req: Request,
     file: Express.Multer.File,
     cb: (error?: any, info?: Partial<Express.Multer.File>) => void
   ) {
-    uploadStreamToStorage(
-      this.storage,
-      Readable.toWeb(file.stream) as any
-    ).then(
+    uploadStreamToStorage(Readable.toWeb(file.stream) as any).then(
       (uploaded) => {
         const safeBase =
           (file.originalname || 'upload')
@@ -30,7 +26,6 @@ export class MulterStreamEngine implements StorageEngine {
         cb(null, {
           filename: uploaded.filename,
           path: uploaded.path,
-          mimetype: uploaded.mimetype,
           originalname: `${safeBase}.${uploaded.ext}`,
         });
       },
@@ -38,30 +33,22 @@ export class MulterStreamEngine implements StorageEngine {
     );
   }
 
-  // Multer calls this when the request fails after the file was already
-  // stored (e.g. another part hit a limit), so the orphan is dropped
+  // the request failed after the file was stored, so drop the orphan
   _removeFile(
     req: Request,
     file: Express.Multer.File,
     cb: (error: Error | null) => void
   ) {
-    this.storage.removeFile(file.path).then(
+    removeFile(file.path).then(
       () => cb(null),
       (err) => cb(err)
     );
   }
 }
 
-let engine: MulterStreamEngine;
-
-// Options for FileInterceptor on the multipart upload routes. Multer's own
-// limit sits one byte above the largest allowed type so the in-stream cap is
-// what rejects (a uniform 400 that aborts the upload) rather than multer
-// truncating the file, storing it whole and only then failing with a 413
-export function streamUploadOptions() {
-  engine = engine || new MulterStreamEngine(UploadFactory.createStorage());
-  return {
-    storage: engine,
-    limits: { fileSize: getMaxSize('video/mp4') + 1 },
-  };
-}
+// Multer's own limit sits one byte above the largest allowed type so the
+// in-stream cap rejects with a clean 400 instead of multer truncating
+export const streamUploadOptions = {
+  storage: new MulterStreamEngine(),
+  limits: { fileSize: MAX_VIDEO_SIZE + 1 },
+};

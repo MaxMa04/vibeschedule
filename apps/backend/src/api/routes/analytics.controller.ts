@@ -1,11 +1,9 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { Organization } from '@prisma/client';
-import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
-import { ApiTags } from '@nestjs/swagger';
-import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
-import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
+import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
+import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 
-@ApiTags('Analytics')
 @Controller('/analytics')
 export class AnalyticsController {
   constructor(
@@ -14,20 +12,23 @@ export class AnalyticsController {
   ) {}
 
   @Get('/:integration')
-  async getIntegration(
+  getIntegration(
     @GetOrgFromRequest() org: Organization,
     @Param('integration') integration: string,
     @Query('date') date: string
   ) {
-    return this._integrationService.checkAnalytics(org, integration, date);
+    return this._integrationService.analytics(
+      org.id,
+      integration,
+      Number(date) > 0 ? Math.min(Number(date), 365) : 7
+    );
   }
 
   @Get('/post/:postId')
-  async getPostAnalytics(
+  getPostAnalytics(
     @GetOrgFromRequest() org: Organization,
-    @Param('postId') postId: string,
-    @Query('date') date: string
+    @Param('postId') postId: string
   ) {
-    return this._postsService.checkPostAnalytics(org.id, postId, +date);
+    return this._postsService.postAnalytics(org.id, postId);
   }
 }
