@@ -81,29 +81,37 @@ const ChannelPicker: FC<{
     <div className="flex flex-col gap-[8px] mb-[16px]">
       <div className="text-[14px]">{t('clipper_channels')}</div>
       <div className="flex flex-col gap-[10px] max-h-[240px] overflow-y-auto p-[12px] rounded-[8px] border border-newTableBorder">
-        {(data || []).map((channel) => (
-          <div key={channel.id} className="flex items-center gap-[10px]">
-            <Checkbox
-              disableForm={true}
-              checked={selected.includes(channel.id)}
-              onChange={(e) =>
+        {(data || []).map((channel) => {
+          const checked = selected.includes(channel.id);
+          return (
+            <button
+              key={channel.id}
+              type="button"
+              role="checkbox"
+              aria-checked={checked}
+              onClick={() =>
                 onChange(
-                  e.target.value
-                    ? [...selected, channel.id]
-                    : selected.filter((id) => id !== channel.id)
+                  checked
+                    ? selected.filter((id) => id !== channel.id)
+                    : [...selected, channel.id]
                 )
               }
-            />
-            <img
-              src={`/icons/platforms/${channel.identifier}.png`}
-              className="w-[20px] h-[20px] rounded-[4px]"
-              alt={channel.identifier}
-            />
-            <div className="flex-1 min-w-0 truncate text-[14px]">
-              {channel.name}
-            </div>
-          </div>
-        ))}
+              className="flex items-center gap-[10px] text-start"
+            >
+              <div className="pointer-events-none">
+                <Checkbox disableForm={true} checked={checked} />
+              </div>
+              <img
+                src={`/icons/platforms/${channel.identifier}.png`}
+                className="w-[20px] h-[20px] rounded-[4px]"
+                alt=""
+              />
+              <div className="flex-1 min-w-0 truncate text-[14px]">
+                {channel.name}
+              </div>
+            </button>
+          );
+        })}
         {data && !data.length && (
           <div className="text-[14px] text-textItemBlur">
             {t('clipper_no_channels')}
