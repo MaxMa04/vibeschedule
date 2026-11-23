@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback } from 'react';
+import { FC, useCallback, useState } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { FormProvider, Resolver, useForm } from 'react-hook-form';
@@ -12,16 +12,27 @@ import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
 import { Input } from '@vibeschedule/react/form/input';
 import { Select } from '@vibeschedule/react/form/select';
 import { Button } from '@vibeschedule/react/form/button';
+import { Checkbox } from '@vibeschedule/react/form/checkbox';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 
-type Role = 'ADMIN' | 'USER';
+type Role = 'ADMIN' | 'USER' | 'CLIPPER';
 
 interface TeamUser {
   id: string;
   email: string;
   name: string | null;
   role: Role;
+  // the channels of a clipper
+  channels: string[];
   createdAt: string;
+}
+
+interface Channel {
+  id: string;
+  name: string;
+  identifier: string;
+  picture: string;
+  manualOnly: boolean;
 }
 
 interface CreateUserValues {
@@ -51,6 +62,109 @@ const useTeam = () => {
   });
 };
 
+const useChannels = () => {
+  const fetch = useFetch();
+  return useSWR('/integrations/list', async (url: string) => {
+    return (await (await fetch(url)).json()).integrations as Channel[];
+  });
+};
+
+// the accounts a clipper posts for, nothing else is visible to them
+const ChannelPicker: FC<{
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}> = ({ selected, onChange }) => {
+  const t = useT();
+  const { data } = useChannels();
+
+  return (
+    <div className="flex flex-col gap-[8px] mb-[16px]">
+      <div className="text-[14px]">{t('clipper_channels')}</div>
+      <div className="flex flex-col gap-[10px] max-h-[240px] overflow-y-auto p-[12px] rounded-[8px] border border-newTableBorder">
+        {(data || []).map((channel) => (
+          <div key={channel.id} className="flex items-center gap-[10px]">
+            <Checkbox
+              disableForm={true}
+              checked={selected.includes(channel.id)}
+              onChange={(e) =>
+                onChange(
+                  e.target.value
+                    ? [...selected, channel.id]
+                    : selected.filter((id) => id !== channel.id)
+                )
+              }
+            />
+            <img
+              src={`/icons/platforms/${channel.identifier}.png`}
+              className="w-[20px] h-[20px] rounded-[4px]"
+              alt={channel.identifier}
+            />
+            <div className="flex-1 min-w-0 truncate text-[14px]">
+              {channel.name}
+            </div>
+          </div>
+        ))}
+        {data && !data.length && (
+          <div className="text-[14px] text-textItemBlur">
+            {t('clipper_no_channels')}
+          </div>
+        )}
+      </div>
+      <div className="text-[13px] text-textItemBlur">
+        {t('clipper_channels_hint')}
+      </div>
+    </div>
+  );
+};
+
+const ChannelsModal: FC<{
+  user: TeamUser;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ user, onClose, onSaved }) => {
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const t = useT();
+  const [channels, setChannels] = useState(user.channels);
+  const [saving, setSaving] = useState(false);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    const response = await fetch(`/settings/team/users/${user.id}/channels`, {
+      method: 'PUT',
+      body: JSON.stringify({ channels }),
+    });
+    setSaving(false);
+    if (!response.ok) {
+      toaster.show(
+        (await responseMessage(response)) || t('clipper_channels_failed'),
+        'warning'
+      );
+      return;
+    }
+    toaster.show(t('clipper_channels_saved'));
+    onSaved();
+    onClose();
+  }, [channels, fetch, onClose, onSaved, t, toaster, user.id]);
+
+  return (
+    <div className="flex flex-col w-[420px] mobile:w-full">
+      <div className="text-[14px] text-textItemBlur mb-[12px]">
+        {user.name || user.email}
+      </div>
+      <ChannelPicker selected={channels} onChange={setChannels} />
+      <div className="flex gap-[8px] justify-end">
+        <Button secondary={true} onClick={onClose}>
+          {t('cancel')}
+        </Button>
+        <Button onClick={save} loading={saving}>
+          {t('save')}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const CreateUserModal: FC<{ onClose: () => void; onSaved: () => void }> = ({
   onClose,
   onSaved,
@@ -58,6 +172,7 @@ const CreateUserModal: FC<{ onClose: () => void; onSaved: () => void }> = ({
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
+  const [channels, setChannels] = useState<string[]>([]);
 
   const resolver = useCallback<Resolver<CreateUserValues>>(
     async (values) => {
@@ -94,6 +209,7 @@ const CreateUserModal: FC<{ onClose: () => void; onSaved: () => void }> = ({
           ...values,
           name: values.name.trim(),
           email: values.email.trim(),
+          ...(values.role === 'CLIPPER' ? { channels } : {}),
         }),
       });
       if (response.status === 409) {
@@ -111,8 +227,9 @@ const CreateUserModal: FC<{ onClose: () => void; onSaved: () => void }> = ({
       onSaved();
       onClose();
     },
-    [fetch, form, onClose, onSaved, t, toaster]
+    [channels, fetch, form, onClose, onSaved, t, toaster]
   );
+  const role = form.watch('role');
 
   return (
     <FormProvider {...form}>
@@ -136,7 +253,11 @@ const CreateUserModal: FC<{ onClose: () => void; onSaved: () => void }> = ({
         <Select label={t('label_role')} name="role">
           <option value="USER">{t('role_user')}</option>
           <option value="ADMIN">{t('admin')}</option>
+          <option value="CLIPPER">{t('role_clipper')}</option>
         </Select>
+        {role === 'CLIPPER' && (
+          <ChannelPicker selected={channels} onChange={setChannels} />
+        )}
         <div className="flex gap-[8px] justify-end">
           <Button secondary={true} onClick={onClose}>
             {t('cancel')}
@@ -233,6 +354,30 @@ export const UsersComponent = () => {
   const toaster = useToaster();
   const t = useT();
   const { data, isLoading, error, mutate } = useTeam();
+  const { data: allChannels } = useChannels();
+  const roleLabel = (role: Role) =>
+    role === 'ADMIN'
+      ? t('admin')
+      : role === 'CLIPPER'
+      ? t('role_clipper')
+      : t('role_user');
+  const channelNames = (user: TeamUser) =>
+    (allChannels || [])
+      .filter((channel) => user.channels.includes(channel.id))
+      .map((channel) => channel.name)
+      .join(', ');
+
+  const editChannels = useCallback(
+    (user: TeamUser) => () => {
+      modals.openModal({
+        title: t('clipper_channels'),
+        children: (close) => (
+          <ChannelsModal user={user} onClose={close} onSaved={() => mutate()} />
+        ),
+      });
+    },
+    [modals, mutate, t]
+  );
 
   const createUser = useCallback(() => {
     modals.openModal({
@@ -323,13 +468,27 @@ export const UsersComponent = () => {
                 </td>
                 <td className="px-[20px] py-[14px]">{p.email}</td>
                 <td className="px-[20px] py-[14px]">
-                  {p.role === 'ADMIN' ? t('admin') : t('role_user')}
+                  {roleLabel(p.role)}
+                  {p.role === 'CLIPPER' && (
+                    <div className="text-[12px] text-textItemBlur max-w-[240px] truncate">
+                      {channelNames(p) || t('clipper_no_channels_assigned')}
+                    </div>
+                  )}
                 </td>
                 <td className="px-[20px] py-[14px] whitespace-nowrap">
                   {dayjs(p.createdAt).format('DD.MM.YYYY')}
                 </td>
                 <td className="px-[20px] py-[14px]">
                   <div className="flex gap-[16px] justify-end whitespace-nowrap">
+                    {p.role === 'CLIPPER' && (
+                      <button
+                        type="button"
+                        className="text-textItemBlur hover:text-newTextColor"
+                        onClick={editChannels(p)}
+                      >
+                        {t('clipper_channels')}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="text-textItemBlur hover:text-newTextColor"

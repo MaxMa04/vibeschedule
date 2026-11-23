@@ -30,7 +30,9 @@ export const isTikTokUrl = (url: string) => {
 export const normalizeCaption = (caption: string) =>
   caption.toLowerCase().replace(/\s+/g, ' ').trim();
 
-// TikTok may cut a caption or people add hashtags, so a long common start counts
+// TikTok may cut a caption or people add hashtags in the app, so a long
+// common start counts. Nothing looser: accounts post series whose captions
+// differ in a few words only.
 const sameCaption = (a: string, b: string) => {
   if (!a || !b) {
     return false;
@@ -68,14 +70,8 @@ export const matchFeedPost = (
   const byCaption = candidates
     .filter((item) => sameCaption(caption, normalizeCaption(item.caption || '')))
     .sort((a, b) => distance(a) - distance(b));
-  if (byCaption.length) {
-    return byCaption[0];
-  }
-
-  // without a caption match only a single post right around the marking is safe
-  const around = candidates.filter((item) => {
-    const at = new Date(item.posted_at!).getTime();
-    return at >= marked - 3 * HOUR && at <= marked + HOUR / 4;
-  });
-  return around.length === 1 ? around[0] : undefined;
+  // No caption match, no link: a post that merely went out around the same
+  // time may be a different one, and a wrong link shows wrong numbers. The
+  // person can paste the link instead.
+  return byCaption[0];
 };

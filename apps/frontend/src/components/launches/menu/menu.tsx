@@ -24,6 +24,7 @@ import { useT } from '@vibeschedule/react/translation/get.transation.service.cli
 import { AddEditModal } from '@vibeschedule/frontend/components/new-launch/add.edit.modal';
 import { fromUtc } from '@vibeschedule/frontend/components/layout/set.timezone';
 import copy from 'copy-to-clipboard';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 
 export const Menu: FC<{
   canEnable: boolean;
@@ -148,6 +149,37 @@ export const Menu: FC<{
     setShow(false);
     onChange(false);
   }, [t]);
+
+  const user = useUser();
+  // A manual-only channel never sends anything to PfM. Turning it on takes
+  // back what is scheduled there.
+  const toggleManualOnly = useCallback(async () => {
+    const manualOnly = !findIntegration?.manualOnly;
+    if (
+      manualOnly &&
+      !(await deleteDialog(
+        t('manual_only_confirm'),
+        t('manual_only_enable'),
+        t('manual_only_title')
+      ))
+    ) {
+      return;
+    }
+    const response = await fetch(`/integrations/${id}/manual-only`, {
+      method: 'PUT',
+      body: JSON.stringify({ manualOnly }),
+    });
+    setShow(false);
+    if (!response.ok) {
+      toast.show(t('manual_only_failed'), 'warning');
+      return;
+    }
+    toast.show(
+      manualOnly ? t('manual_only_enabled') : t('manual_only_disabled'),
+      'success'
+    );
+    onChange(true);
+  }, [findIntegration, id, t]);
 
   const editTimeTable = useCallback(() => {
     const findIntegration = integrations.find(
@@ -358,6 +390,40 @@ export const Menu: FC<{
             </div>
             <div className="text-[14px]">{t('edit_time_slots')}</div>
           </div>
+          {user?.role === 'ADMIN' && (
+            <div
+              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+              onClick={toggleManualOnly}
+            >
+              <div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 20 22"
+                  fill="none"
+                >
+                  <path
+                    d="M6 1.5H14C15.6569 1.5 17 2.84315 17 4.5V17.5C17 19.1569 15.6569 20.5 14 20.5H6C4.34315 20.5 3 19.1569 3 17.5V4.5C3 2.84315 4.34315 1.5 6 1.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M7 11.2L9.2 13.4L13.2 9"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div className="text-[14px]">
+                {findIntegration?.manualOnly
+                  ? t('manual_only_turn_off')
+                  : t('manual_only_turn_on')}
+              </div>
+            </div>
+          )}
           {canEnable && (
             <div
               className="flex gap-[12px] items-center py-[8px] px-[10px]"

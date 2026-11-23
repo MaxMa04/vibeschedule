@@ -7,7 +7,7 @@ export interface SelfUser {
   email: string;
   name: string | null;
   orgId: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'CLIPPER';
   isAdmin: boolean;
   timezoneName?: string | null;
   // the org API key, only filled for admins

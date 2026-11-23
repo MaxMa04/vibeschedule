@@ -3,7 +3,7 @@
 import React, { ReactNode, useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { Logo } from '@vibeschedule/frontend/components/new-layout/logo';
@@ -26,6 +26,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   const fetch = useFetch();
   const t = useT();
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     setMenuOpen(false);
@@ -43,7 +44,18 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
     refreshWhenHidden: false,
   });
 
-  if (!user) return null;
+  // a clipper has the posting page and the password, the backend refuses
+  // everything else anyway
+  const misplaced =
+    user?.role === 'CLIPPER' &&
+    !['/manual', '/settings'].some((path) => pathname.startsWith(path));
+  useEffect(() => {
+    if (misplaced) {
+      router.replace('/manual');
+    }
+  }, [misplaced]);
+
+  if (!user || misplaced) return null;
 
   return (
     <ContextWrapper user={user}>

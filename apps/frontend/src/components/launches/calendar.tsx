@@ -1070,6 +1070,15 @@ const CalendarItem: FC<{
           )}
         >
           <div className="text-start">
+            {post.manual && (
+              <span
+                className="inline-flex items-center px-[5px] h-[16px] me-[4px] rounded-full bg-amber text-[10px] font-[700] text-black align-middle"
+                data-tooltip-id="tooltip"
+                data-tooltip-content={t('manual_only_tooltip')}
+              >
+                {t('manual_badge')}
+              </span>
+            )}
             {state === 'DRAFT' ? t('draft') + ': ' : ''}
           </div>
           <div className="w-full relative">

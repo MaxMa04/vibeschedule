@@ -253,6 +253,7 @@ export const MenuComponent: FC<
   }
 > = (props) => {
   const { mutate, update, integration, collapsed } = props;
+  const t = useT();
   const [collected, drag, dragPreview] = useDrag(() => ({
     type: 'menu',
     item: {
@@ -304,6 +305,15 @@ export const MenuComponent: FC<
       >
         {integration.name}
       </div>
+      {integration.manualOnly && (
+        <div
+          className="group-[.sidebar]:hidden shrink-0 px-[6px] h-[18px] rounded-full bg-btnSimple text-btnText text-[10px] font-[600] flex items-center"
+          data-tooltip-id="tooltip"
+          data-tooltip-content={t('manual_only_tooltip')}
+        >
+          {t('manual_badge')}
+        </div>
+      )}
       <Menu
         mutate={mutate}
         onChange={update}

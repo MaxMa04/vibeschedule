@@ -87,22 +87,24 @@ test('takes the repost closest to the marking when the caption is used twice', (
   assert.equal(hit?.platform_post_id, 'new');
 });
 
-test('falls back to the time only when exactly one post is around the marking', () => {
+test('keeps the posts of a series apart', () => {
+  const series = (food) =>
+    `Vegan für Anfänger: was du statt ${food} essen kannst #vegan #veganfüranfänger #rezepte`;
   assert.equal(
     matchFeedPost(
-      post(),
-      [feedItem('1', '2026-11-23T17:40:00Z', 'In der App neu getippt')],
+      post({ caption: series('Käse') }),
+      [feedItem('1', '2026-11-23T18:00:00Z', series('Gummibärchen'))],
       new Set()
-    )?.platform_post_id,
-    '1'
+    ),
+    undefined
   );
+});
+
+test('never links by time alone', () => {
   assert.equal(
     matchFeedPost(
       post(),
-      [
-        feedItem('1', '2026-11-23T17:40:00Z', 'In der App neu getippt'),
-        feedItem('2', '2026-11-23T16:10:00Z', 'Noch ein anderer'),
-      ],
+      [feedItem('1', '2026-11-23T18:05:00Z', 'Ein ganz anderer Post vom selben Tag')],
       new Set()
     ),
     undefined
@@ -110,7 +112,13 @@ test('falls back to the time only when exactly one post is around the marking', 
   assert.equal(
     matchFeedPost(
       post(),
-      [feedItem('1', '2026-11-23T09:00:00Z', 'Morgens gepostet')],
+      [
+        feedItem(
+          '1',
+          '2026-11-23T18:05:00Z',
+          'Nie wieder Lauch: 8 Rezepte, die du nach dem Gym kochen willst'
+        ),
+      ],
       new Set()
     ),
     undefined
