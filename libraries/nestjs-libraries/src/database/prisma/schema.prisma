@@ -33,6 +33,7 @@ model User {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   organizations UserOrganization[]
+  channels      UserIntegration[]
 }
 
 model UserOrganization {
@@ -120,14 +121,29 @@ model Integration {
   postingTimes       String       @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
   customerId         String?
   additionalSettings String?      @default("[]")
+  /// nothing of this channel ever goes to PfM, people post it themselves
+  manualOnly         Boolean      @default(false)
   customer           Customer?    @relation(fields: [customerId], references: [id])
   organization       Organization @relation(fields: [organizationId], references: [id])
   posts              Post[]
+  users              UserIntegration[]
 
   @@unique([organizationId, internalId])
   @@index([organizationId])
   @@index([deletedAt])
   @@index([customerId])
+}
+
+/// The channels a clipper may see and post for.
+model UserIntegration {
+  userId        String
+  integrationId String
+  createdAt     DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, integrationId])
+  @@index([integrationId])
 }
 
 /// One row per channel. Posts saved together for several channels share a batchId.
@@ -147,6 +163,11 @@ model Post {
   releaseURL     String?
   error          String?
   creationMethod CreationMethod @default(WEB)
+  /// posted by hand in the app instead of through PfM
+  manual         Boolean        @default(false)
+  /// when and by whom a manual post was marked as posted
+  postedAt       DateTime?
+  postedById     String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   deletedAt      DateTime?
@@ -173,6 +194,8 @@ enum State {
 enum Role {
   ADMIN
   USER
+  /// external poster, limited to the channels in UserIntegration
+  CLIPPER
 }
 
 enum CreationMethod {

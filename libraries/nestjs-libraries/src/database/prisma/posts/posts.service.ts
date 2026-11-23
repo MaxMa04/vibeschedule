@@ -36,6 +36,7 @@ import {
   getPfmPlatform,
   toPlatformConfiguration,
 } from '@vibeschedule/nestjs-libraries/integrations/pfm.platforms';
+import { ManualPostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/manual.posts.service';
 
 dayjs.extend(utc);
 
@@ -61,11 +62,15 @@ export class PostsService {
   constructor(
     private _postRepository: PostsRepository,
     private _integrationService: IntegrationService,
-    private _pfmClient: PfmClient
+    private _pfmClient: PfmClient,
+    private _manualPostsService: ManualPostsService
   ) {}
 
   async getPosts(orgId: string, query: GetPostsDto) {
-    await this.reconcile(orgId);
+    await Promise.all([
+      this.reconcile(orgId),
+      this._manualPostsService.linkPending(orgId),
+    ]);
     return this._postRepository.getPosts(orgId, query);
   }
 
@@ -146,8 +151,9 @@ export class PostsService {
         const platform = getPfmPlatform(integration.providerIdentifier)!;
         const media = post.value.flatMap((p) => p.image || []);
 
+        // the platform settings only matter for what PfM publishes
         let settingsError = '';
-        if (platform.dto) {
+        if (platform.dto && !post.manual && !integration.manualOnly) {
           settingsError = firstValidationError(
             await validate(plainToInstance(platform.dto, post.settings || {}))
           );
@@ -219,6 +225,10 @@ export class PostsService {
         );
       }
 
+      // a manual-only channel overrules whatever the client asks for
+      const manual =
+        integration.manualOnly || (post.manual ?? existing?.manual ?? false);
+
       // update keeps the state of an existing post
       const state =
         body.type === 'draft'
@@ -242,7 +252,8 @@ export class PostsService {
           },
           body.tags,
           creationMethod,
-          batchId
+          batchId,
+          manual
         ),
       });
     }
@@ -265,8 +276,8 @@ export class PostsService {
     return postList;
   }
 
-  // Keeps the PfM copy of a post in line with the local row: drafts and
-  // published posts live only here, queued ones are scheduled at PfM.
+  // Keeps the PfM copy of a post in line with the local row: drafts, manual
+  // and published posts live only here, queued ones are scheduled at PfM.
   // A PfM failure marks the post as failed and comes back as the message.
   private async syncToPfm(
     post: PostWithIntegration,
@@ -274,7 +285,12 @@ export class PostsService {
     previousState?: State
   ): Promise<string | undefined> {
     try {
-      if (post.state === State.DRAFT) {
+      // drafts and posts people publish by hand have no copy at PfM
+      if (
+        post.state === State.DRAFT ||
+        post.manual ||
+        post.integration.manualOnly
+      ) {
         if (post.pfmPostId) {
           await this._pfmClient.deletePost(post.pfmPostId);
           await this._postRepository.update(post.id, { pfmPostId: null });
@@ -443,8 +459,32 @@ export class PostsService {
     });
   }
 
+  // From now on nothing of the channel goes to PfM: what is scheduled there
+  // is taken back and waits to be posted by hand
+  async setChannelManualOnly(orgId: string, id: string, manualOnly: boolean) {
+    await this._integrationService.setManualOnly(orgId, id, manualOnly);
+    if (!manualOnly) {
+      return { converted: 0 };
+    }
+
+    // PfM first: a post that could not be taken back keeps its PfM id
+    for (const post of await this._postRepository.getScheduledAtPfm(
+      orgId,
+      id
+    )) {
+      await this._pfmClient.deletePost(post.pfmPostId!);
+      await this._postRepository.update(post.id, { pfmPostId: null });
+    }
+    return {
+      converted: await this._postRepository.makeChannelManual(orgId, id),
+    };
+  }
+
   async postAnalytics(orgId: string, postId: string): Promise<AnalyticsData[]> {
     const post = await this._postRepository.getPost(orgId, postId);
+    if (post?.manual && post.state === State.PUBLISHED) {
+      return this._manualPostsService.analyticsOf(post);
+    }
     if (!post?.pfmPostId || post.state !== State.PUBLISHED) {
       return [];
     }

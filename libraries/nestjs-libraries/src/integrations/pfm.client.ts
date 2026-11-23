@@ -33,7 +33,11 @@ export interface PfmPostResult {
 }
 
 export interface PfmFeedPost {
+  // set only for posts that went out through PfM
   social_post_id?: string;
+  platform_post_id: string;
+  platform_url?: string;
+  caption?: string;
   posted_at?: string;
   metrics?: Record<string, unknown>;
 }
@@ -201,7 +205,13 @@ export class PfmClient implements OnApplicationBootstrap {
 
   feed(
     accountId: string,
-    query: { cursor?: string; social_post_id?: string; limit?: number }
+    query: {
+      cursor?: string;
+      social_post_id?: string;
+      // the id of the post on the platform, also for posts PfM did not publish
+      platform_post_id?: string;
+      limit?: number;
+    }
   ) {
     return this.request<PfmList<PfmFeedPost>>(
       'GET',

@@ -127,6 +127,11 @@ yargs(hideBin(process.argv))
             'Plattform-Einstellungen als JSON, gilt für alle Kanäle (siehe PLATFORM_SETTINGS.md)',
           type: 'string',
         })
+        .option('manual', {
+          describe:
+            'Manuell posten: bekommt einen Termin, geht aber nicht an die Plattform. Jemand postet selbst in der App.',
+          type: 'boolean',
+        })
         .option('json', {
           alias: 'j',
           describe:
@@ -156,6 +161,10 @@ yargs(hideBin(process.argv))
         .example(
           '$0 posts:create -c "Entwurf" -i abc123,def456 -s 2026-12-01T09:00:00Z -t draft',
           'Entwurf für zwei Kanäle'
+        )
+        .example(
+          '$0 posts:create -c "Caption" -m https://…/01.jpg,https://…/02.jpg -i abc123 -s 2026-12-01T17:00:00Z --manual',
+          'Slideshow zum manuellen Posten einplanen'
         )
         .example('$0 posts:create -j ./post.json', 'Request aus JSON-Datei'),
     async (argv) => {

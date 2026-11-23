@@ -8,7 +8,8 @@ export class IntegrationRepository {
   constructor(
     private _integration: PrismaRepository<'integration'>,
     private _posts: PrismaRepository<'post'>,
-    private _customers: PrismaRepository<'customer'>
+    private _customers: PrismaRepository<'customer'>,
+    private _userIntegration: PrismaRepository<'userIntegration'>
   ) {}
 
   getIntegrationsList(org: string) {
@@ -160,6 +161,44 @@ export class IntegrationRepository {
       where: { id, organizationId: org },
       data: { disabled },
     });
+  }
+
+  async setManualOnly(org: string, id: string, manualOnly: boolean) {
+    await this._integration.model.integration.update({
+      select: { id: true },
+      where: { id, organizationId: org },
+      data: { manualOnly },
+    });
+  }
+
+  // the channels a clipper may see
+  async getUserChannelIds(userId: string) {
+    const rows = await this._userIntegration.model.userIntegration.findMany({
+      where: { userId, integration: { deletedAt: null } },
+      select: { integrationId: true },
+    });
+    return rows.map((row) => row.integrationId);
+  }
+
+  // replaces the channels of a clipper, returns the ones that are new
+  async setUserChannels(org: string, userId: string, ids: string[]) {
+    const channels = await this._integration.model.integration.findMany({
+      where: { organizationId: org, deletedAt: null, id: { in: ids } },
+      select: { id: true },
+    });
+    const wanted = channels.map((channel) => channel.id);
+    const current = await this.getUserChannelIds(userId);
+
+    await this._userIntegration.model.userIntegration.deleteMany({
+      where: { userId, integrationId: { notIn: wanted } },
+    });
+    const added = wanted.filter((id) => !current.includes(id));
+    if (added.length) {
+      await this._userIntegration.model.userIntegration.createMany({
+        data: added.map((integrationId) => ({ userId, integrationId })),
+      });
+    }
+    return { channels: wanted, added };
   }
 
   getPostGroupsForChannel(org: string, id: string) {
