@@ -29,6 +29,7 @@ description: Use when scheduling or inspecting social posts via the vibeschedule
 - One text per channel. There are no threads, comments or follow-up posts.
 - `--date` is required unless `-t now`. Use UTC (`...Z`).
 - `-t draft` keeps the post in vibeschedule only. `schedule` and `now` send it to the platform.
+- To connect somebody else's account: `integrations:connect-url <platform>` gives the link they open, then run `integrations:sync`. `integrations:manual-only <channel-id>` makes a channel manual-only (`--off` reverts).
 - `--manual` schedules a post that never goes to the platform: a person posts it by hand in the app from the "Posten" page. Use it for accounts that are posted manually; a channel set to manual-only makes every post manual anyway.
 - `--settings` applies the same object to every channel in `-i`. For channels on different platforms, use `-j` with one `settings` object per channel.
 - Settings use Post for Me field names in snake_case, for example TikTok `privacy_status`, `allow_comment`, `allow_duet`, `allow_stitch`; YouTube `title`, `privacy_status`, `tags`; Instagram `placement`. Full list in `apps/cli/PLATFORM_SETTINGS.md`. Do not set `__type`, the backend adds it.

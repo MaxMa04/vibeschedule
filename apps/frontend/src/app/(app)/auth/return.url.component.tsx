@@ -2,23 +2,10 @@
 
 import { useSearchParams } from 'next/navigation';
 import { FC, useCallback, useEffect } from 'react';
+import { sameOriginUrl as onThisApp } from '@vibeschedule/helpers/utils/same.origin.url';
 
-// Only an address on this app, so signing in can never send someone to
-// another site or run a javascript: URL
-const sameOriginUrl = (url: string | null) => {
-  if (!url) {
-    return null;
-  }
-  try {
-    const parsed = new URL(url);
-    return parsed.origin === window.location.origin &&
-      parsed.protocol === window.location.protocol
-      ? parsed.toString()
-      : null;
-  } catch {
-    return null;
-  }
-};
+const sameOriginUrl = (url: string | null) =>
+  onThisApp(url, window.location.origin);
 
 const ReturnUrlComponent: FC = () => {
   const params = useSearchParams();
