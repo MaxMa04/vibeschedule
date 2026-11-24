@@ -24,6 +24,7 @@ const POST_ITEM_KEYS: Record<string, string> = {
   tags: 'tg',
   integration: 'n',
   creationMethod: 'cm',
+  manual: 'm',
 };
 
 const INTEGRATION_KEYS: Record<string, string> = {

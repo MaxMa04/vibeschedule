@@ -107,6 +107,7 @@ export class IntegrationService {
           id: p.id,
           internalId: p.internalId,
           disabled: p.disabled,
+          manualOnly: p.manualOnly,
           editor: 'normal',
           picture: p.picture || '/no-picture.jpg',
           identifier: p.providerIdentifier,
@@ -175,6 +176,18 @@ export class IntegrationService {
 
   setDisabled(org: string, id: string, disabled: boolean) {
     return this._integrationRepository.setDisabled(org, id, disabled);
+  }
+
+  setManualOnly(org: string, id: string, manualOnly: boolean) {
+    return this._integrationRepository.setManualOnly(org, id, manualOnly);
+  }
+
+  getUserChannelIds(userId: string) {
+    return this._integrationRepository.getUserChannelIds(userId);
+  }
+
+  setUserChannels(org: string, userId: string, ids: string[]) {
+    return this._integrationRepository.setUserChannels(org, userId, ids);
   }
 
   getPostGroupsForChannel(org: string, id: string) {

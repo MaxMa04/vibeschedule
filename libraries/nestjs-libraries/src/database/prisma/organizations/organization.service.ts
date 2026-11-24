@@ -7,6 +7,7 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { OrganizationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { IntegrationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { AuthService } from '@vibeschedule/helpers/auth/auth.service';
 import { AddTeamMemberDto } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
 
@@ -14,7 +15,10 @@ import { AddTeamMemberDto } from '@vibeschedule/nestjs-libraries/dtos/settings/a
 export class OrganizationService implements OnApplicationBootstrap {
   private readonly _logger = new Logger(OrganizationService.name);
 
-  constructor(private _organizationRepository: OrganizationRepository) {}
+  constructor(
+    private _organizationRepository: OrganizationRepository,
+    private _integrationRepository: IntegrationRepository
+  ) {}
 
   // There is no sign-up: the first start creates the workspace and its admin
   async onApplicationBootstrap() {
@@ -62,6 +66,15 @@ export class OrganizationService implements OnApplicationBootstrap {
       role: body.role,
       password: AuthService.hashPassword(body.password),
     });
+  }
+
+  // the channels a clipper sees, everybody else sees all of them anyway
+  async setChannels(orgId: string, userId: string, channels: string[]) {
+    const member = await this.getMemberOrThrow(orgId, userId);
+    if (member.role !== 'CLIPPER') {
+      throw new BadRequestException('Kanäle lassen sich nur Clippern zuweisen');
+    }
+    return this._integrationRepository.setUserChannels(orgId, userId, channels);
   }
 
   async setPassword(orgId: string, userId: string, password: string) {

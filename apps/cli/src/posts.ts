@@ -9,6 +9,7 @@ export interface CreatePostArgs {
   date?: string;
   type: 'draft' | 'schedule' | 'now';
   settings?: string;
+  manual?: boolean;
 }
 
 function parseJson(text: string, label: string) {
@@ -48,6 +49,7 @@ export function buildPost(args: CreatePostArgs) {
         integration: { id },
         value: [{ content: args.content || '', image }],
         settings,
+        ...(args.manual ? { manual: true } : {}),
       })),
   };
 }

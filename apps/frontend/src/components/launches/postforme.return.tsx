@@ -12,10 +12,16 @@ export const PostForMeReturn = () => {
   const router = useRouter();
   const t = useT();
   const [failed, setFailed] = useState(false);
+  // a clipper connected the account, the sync is up to an admin
+  const [handOver, setHandOver] = useState(false);
 
   useEffect(() => {
     fetch('/integrations/sync', { method: 'POST' })
       .then((res) => {
+        if (res.status === 403) {
+          setHandOver(true);
+          return;
+        }
         if (!res.ok) {
           throw new Error();
         }
@@ -27,7 +33,17 @@ export const PostForMeReturn = () => {
   return (
     <div className="flex flex-col items-center gap-[16px] text-center p-[24px]">
       <Logo size={56} />
-      {failed ? (
+      {handOver ? (
+        <>
+          <div className="text-[18px]">{t('account_connected')}</div>
+          <div className="text-[15px] text-textItemBlur max-w-[320px]">
+            {t('account_connected_hint')}
+          </div>
+          <a href="/manual" className="text-teal underline">
+            {t('manual_posting')}
+          </a>
+        </>
+      ) : failed ? (
         <>
           <div className="text-[18px]">{t('channel_sync_failed')}</div>
           <a href="/launches" className="text-teal underline">

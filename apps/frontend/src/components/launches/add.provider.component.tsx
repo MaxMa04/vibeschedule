@@ -10,6 +10,8 @@ import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { object, string } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { Checkbox } from '@vibeschedule/react/form/checkbox';
+import copy from 'copy-to-clipboard';
 
 interface CustomField {
   key: string;
@@ -32,7 +34,10 @@ const useConnect = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
-  return useCallback(async (identifier: string, fields?: FieldValues) => {
+  const modal = useModals();
+  // `share` shows the link instead of opening it, for an account that
+  // belongs to somebody else
+  return useCallback(async (identifier: string, fields?: FieldValues, share?: boolean) => {
     const query = fields
       ? `?code=${encodeURIComponent(
           Buffer.from(JSON.stringify(fields)).toString('base64')
@@ -44,8 +49,41 @@ const useConnect = () => {
       toaster.show(t('could_not_connect_to_platform'), 'warning');
       return;
     }
+    if (share) {
+      modal.openModal({
+        title: t('connect_link_title'),
+        withCloseButton: true,
+        children: <ConnectLink url={url} />,
+      });
+      return;
+    }
     window.location.href = url;
   }, []);
+};
+
+const ConnectLink: FC<{ url: string }> = ({ url }) => {
+  const t = useT();
+  const toaster = useToaster();
+  return (
+    <div className="flex flex-col gap-[16px] w-[480px] max-w-full">
+      <div className="text-[14px] text-textItemBlur">
+        {t('connect_link_hint')}
+      </div>
+      <div className="p-[12px] rounded-[10px] bg-btnSimple text-[13px] break-all select-all">
+        {url}
+      </div>
+      <div>
+        <Button
+          onClick={() => {
+            copy(url);
+            toaster.show(t('connect_link_copied'), 'success');
+          }}
+        >
+          {t('connect_link_copy')}
+        </Button>
+      </div>
+    </div>
+  );
 };
 
 export const useAddProvider = () => {
@@ -205,9 +243,11 @@ export const AddProviderComponent: FC<{
   const modal = useModals();
   const connect = useConnect();
   const t = useT();
+  const [share, setShare] = useState(false);
 
   const select = useCallback(
     (item: SocialProvider) => () => {
+      // Bluesky asks for a handle and an app password, there is no link
       if (item.customFields?.length) {
         modal.openModal({
           title: item.name,
@@ -221,13 +261,22 @@ export const AddProviderComponent: FC<{
         });
         return;
       }
-      connect(item.identifier);
+      connect(item.identifier, undefined, share);
     },
-    []
+    [share]
   );
 
   return (
-    <div className="grid grid-cols-5 gap-[10px] mobile:!grid-cols-3">
+    <div className="flex flex-col gap-[16px]">
+      <div className="text-[14px]">
+        <Checkbox
+          disableForm={true}
+          checked={share}
+          onChange={(e) => setShare(e.target.value)}
+          label={t('connect_link_toggle')}
+        />
+      </div>
+      <div className="grid grid-cols-5 gap-[10px] mobile:!grid-cols-3">
       {social.map((item) => (
         <button
           key={item.identifier}
@@ -248,6 +297,7 @@ export const AddProviderComponent: FC<{
           <div className="text-center whitespace-pre-wrap">{item.name}</div>
         </button>
       ))}
+      </div>
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/pris
 import { IntegrationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 import { PostsRepository } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.repository';
+import { ManualPostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/manual.posts.service';
 import { MediaService } from '@vibeschedule/nestjs-libraries/database/prisma/media/media.service';
 import { MediaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/media/media.repository';
 import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
@@ -25,6 +26,7 @@ import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.clien
     IntegrationRepository,
     PostsService,
     PostsRepository,
+    ManualPostsService,
     MediaService,
     MediaRepository,
     PfmClient,

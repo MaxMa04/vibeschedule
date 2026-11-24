@@ -3,6 +3,7 @@
 import { FC, ReactNode } from 'react';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { MenuItem } from '@vibeschedule/frontend/components/new-layout/menu-item';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 
 interface MenuItemInterface {
   name: string;
@@ -12,8 +13,37 @@ interface MenuItemInterface {
 
 export const useMenuItem = () => {
   const t = useT();
+  const user = useUser();
 
-  const firstMenu: MenuItemInterface[] = [
+  // the posts people publish by hand in the app
+  const manual: MenuItemInterface = {
+    name: t('manual_posting'),
+    icon: (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="22"
+        viewBox="0 0 20 22"
+        fill="none"
+      >
+        <path
+          d="M6 1.5H14C15.6569 1.5 17 2.84315 17 4.5V17.5C17 19.1569 15.6569 20.5 14 20.5H6C4.34315 20.5 3 19.1569 3 17.5V4.5C3 2.84315 4.34315 1.5 6 1.5Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <path
+          d="M7 11.2L9.2 13.4L13.2 9"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+    path: '/manual',
+  };
+
+  const teamMenu: MenuItemInterface[] = [
     {
       name: t('calendar'),
       icon: (
@@ -78,6 +108,10 @@ export const useMenuItem = () => {
       path: '/analytics',
     },
   ];
+
+  // a clipper only posts, calendar, media and analytics are for the team
+  const firstMenu =
+    user?.role === 'CLIPPER' ? [manual] : [teamMenu[0], manual, ...teamMenu.slice(1)];
 
   const secondMenu: MenuItemInterface[] = [
     {

@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthController } from '@vibeschedule/backend/api/routes/auth.controller';
 import { UsersController } from '@vibeschedule/backend/api/routes/users.controller';
 import { AuthMiddleware } from '@vibeschedule/backend/services/auth/auth.middleware';
@@ -9,6 +10,8 @@ import { PostsController } from '@vibeschedule/backend/api/routes/posts.controll
 import { MediaController } from '@vibeschedule/backend/api/routes/media.controller';
 import { RootController } from '@vibeschedule/backend/api/routes/root.controller';
 import { PfmWebhookController } from '@vibeschedule/backend/api/routes/pfm.webhook.controller';
+import { ManualController } from '@vibeschedule/backend/api/routes/manual.controller';
+import { ClipperGuard } from '@vibeschedule/backend/services/auth/clipper.guard';
 
 const authenticatedControllers = [
   UsersController,
@@ -17,6 +20,7 @@ const authenticatedControllers = [
   SettingsController,
   PostsController,
   MediaController,
+  ManualController,
 ];
 
 @Module({
@@ -26,6 +30,8 @@ const authenticatedControllers = [
     PfmWebhookController,
     ...authenticatedControllers,
   ],
+  // clippers reach only what is marked with @AllowClipper()
+  providers: [{ provide: APP_GUARD, useClass: ClipperGuard }],
 })
 export class ApiModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

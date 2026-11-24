@@ -46,6 +46,8 @@ export class PublicIntegrationsController {
         identifier: integration.providerIdentifier,
         picture: integration.picture,
         disabled: integration.disabled,
+        // posts of this channel are published by hand, never through PfM
+        manualOnly: integration.manualOnly,
         profile: integration.profile,
         customer: integration.customer
           ? { id: integration.customer.id, name: integration.customer.name }

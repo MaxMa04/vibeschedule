@@ -60,6 +60,7 @@ import { Button } from '@vibeschedule/react/form/button';
 import { stripHtmlValidation } from '@vibeschedule/helpers/utils/strip.html.validation';
 import { countLength } from '@vibeschedule/helpers/utils/count.length';
 import { useClickOutside } from '@mantine/hooks';
+import { Checkbox } from '@vibeschedule/react/form/checkbox';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -127,6 +128,33 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   // the date sheet applies its changes only on save
   const [dateDraft, setDateDraft] = useState(date);
+
+  // Posted by hand in the app instead of through PfM. A manual-only channel
+  // decides for itself, the server enforces it as well.
+  const [manualChoice, setManualChoice] = useState(
+    !!existingData.posts?.[0]?.manual
+  );
+  const manualForced =
+    selectedIntegrations.length > 0 &&
+    selectedIntegrations.every((p) => p.integration.manualOnly);
+  const manual = manualChoice || manualForced;
+  const manualToggle = (
+    <div
+      className="flex items-center text-[14px] font-[600]"
+      data-tooltip-id="tooltip"
+      data-tooltip-content={
+        manualForced ? t('manual_forced_tooltip') : t('manual_toggle_tooltip')
+      }
+    >
+      <Checkbox
+        disableForm={true}
+        checked={manual}
+        onChange={(e) => !manualForced && setManualChoice(e.target.value)}
+        label={t('manual_toggle')}
+        className={clsx(manualForced && 'opacity-60 !cursor-not-allowed')}
+      />
+    </div>
+  );
 
   // the channels the post already has, each with its own post
   const existingPosts = [existingData, ...(existingData.siblings || [])];
@@ -358,6 +386,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             }
           : {}),
         settings: post.settings,
+        manual,
         value: post.values.slice(0, 1).map((value: any) => ({
           ...(value.id ? { id: value.id } : {}),
           content: value.content,
@@ -393,11 +422,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       );
       modal.closeAll();
     },
-    [tags, date, channelDates, selectedIntegrations, existingData]
+    [tags, date, channelDates, selectedIntegrations, existingData, manual]
   );
 
   const scheduleLabel = !existingData?.integration
-    ? t('add_to_calendar')
+    ? manual
+      ? t('manual_schedule')
+      : t('add_to_calendar')
     : existingData?.posts?.[0]?.state === 'DRAFT'
     ? t('schedule')
     : t('update');
@@ -408,11 +439,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       variant: 'primary',
       onClick: schedule('schedule'),
     },
-    {
-      label: t('post_now'),
-      variant: 'secondary',
-      onClick: schedule('now'),
-    },
+    // nothing to publish right away when somebody posts by hand
+    ...(manual
+      ? []
+      : [
+          {
+            label: t('post_now'),
+            variant: 'secondary' as const,
+            onClick: schedule('now'),
+          },
+        ]),
     {
       label: t('save_as_draft'),
       variant: 'tertiary',
@@ -680,6 +716,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 <div>{t('delete_post')}</div>
               </button>
             )}
+            {manualToggle}
             <DatePicker onChange={setPickerDate} date={pickerDate} />
             <button
               disabled={selectedIntegrations.length === 0 || loading || locked}
@@ -723,7 +760,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     e.stopPropagation();
                     setShowPostNow(!showPostNow);
                   }}
-                  className="flex justify-center items-center h-[20px] w-[20px] pt-[4px]"
+                  className={clsx(
+                    'flex justify-center items-center h-[20px] w-[20px] pt-[4px]',
+                    manual && 'hidden'
+                  )}
                 >
                   <DropdownArrowSmallIcon
                     className={clsx(
@@ -740,7 +780,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 }
                 className={clsx(
                   'rounded-[12px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner border border-newBorder',
-                  showPostNow ? 'flex' : 'hidden group-hover:flex'
+                  manual
+                    ? 'hidden'
+                    : showPostNow
+                    ? 'flex'
+                    : 'hidden group-hover:flex'
                 )}
               >
                 <div className="text-white rounded-[12px] bg-coral hover:bg-coral-hover h-[44px] w-full flex justify-center items-center">
@@ -794,6 +838,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               label={t('add_tag')}
               onClick={() => setMobileSheet('tags')}
             />
+            <div className="py-[8px]">{manualToggle}</div>
             {existingData?.integration && (
               <div
                 onClick={deletePost}
