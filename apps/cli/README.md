@@ -38,6 +38,9 @@ vibeschedule auth:check
 | `auth:check` | Schlüssel prüfen, zeigt API-URL und Anzahl Kanäle |
 | `integrations:list [--customer <id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`) und Kunde |
 | `integrations:settings <kanal-id>` | Einstellungen und Textlimit eines Kanals |
+| `integrations:connect-url <plattform>` | Link, mit dem der Besitzer ein Konto verbindet (auf seinem Gerät öffnen, anmelden, zustimmen) |
+| `integrations:sync` | Bei Post for Me verbundene Konten als Kanäle übernehmen, z. B. nach einem Verbindungslink |
+| `integrations:manual-only <kanal-id> [--off]` | Kanal auf „Nur manuell“ stellen oder (`--off`) automatisches Posten wieder erlauben |
 | `upload <datei-oder-url>` | In die Mediathek hochladen, gibt `path` (öffentliche URL) zurück |
 | `media:list [-s <suche>] [-p <seite>]` | Mediathek, neueste zuerst |
 | `posts:create ...` | Post anlegen, siehe unten |

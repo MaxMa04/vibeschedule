@@ -31,6 +31,55 @@ yargs(hideBin(process.argv))
     }
   )
   .command(
+    'integrations:sync',
+    'Bei Post for Me verbundene Konten als Kanäle übernehmen',
+    {},
+    async () => {
+      print(await request('/integrations/sync', { method: 'POST' }));
+    }
+  )
+  .command(
+    'integrations:connect-url <platform>',
+    'Link erzeugen, mit dem der Besitzer ein Konto verbindet',
+    (y) =>
+      y
+        .positional('platform', {
+          describe: 'Plattform, z. B. tiktok',
+          type: 'string',
+          demandOption: true,
+        })
+        .example(
+          '$0 integrations:connect-url tiktok',
+          'Link öffnen lassen, danach integrations:sync'
+        ),
+    async (argv) => {
+      print(await request(`/integrations/connect-url/${enc(argv.platform)}`));
+    }
+  )
+  .command(
+    'integrations:manual-only <id>',
+    'Kanal auf „Nur manuell“ stellen: nichts geht mehr an die Plattform',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('off', {
+          describe: 'Automatisches Posten wieder erlauben',
+          type: 'boolean',
+        }),
+    async (argv) => {
+      print(
+        await request(`/integrations/${enc(argv.id)}/manual-only`, {
+          method: 'PUT',
+          body: { manualOnly: !argv.off },
+        })
+      );
+    }
+  )
+  .command(
     'integrations:settings <id>',
     'Einstellungen und Limits eines Kanals anzeigen',
     (y) =>
