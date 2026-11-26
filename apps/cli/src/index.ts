@@ -201,6 +201,188 @@ yargs(hideBin(process.argv))
       );
     }
   )
+  .command(
+    'clippers:onboarding [user]',
+    'Onboarding-Accounts der Clipper: Profil, Fortschritt, Kanal, Aufgaben',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Nur dieser Clipper (Nutzer-ID oder E-Mail)',
+          type: 'string',
+        })
+        .example('$0 clippers:onboarding clipping.anna@vibelabs.to', 'Annas Accounts'),
+    async (argv) => {
+      const user = argv.user ? (await resolveUsers(argv.user))[0] : undefined;
+      print(
+        await request(
+          `/clippers/onboarding${user ? `?user=${enc(user)}` : ''}`
+        )
+      );
+    }
+  )
+  .command(
+    'clippers:account <account-id>',
+    'Ein Onboarding-Account mit Profil, Plan und Aufgaben',
+    (y) => y.positional('account-id', { type: 'string', demandOption: true }),
+    async (argv) => {
+      print(await request(`/clippers/accounts/${enc(argv['account-id'])}`));
+    }
+  )
+  .command(
+    'clippers:profile <account-id>',
+    'Profil setzen, das der Clipper für den Account bekommt',
+    (y) =>
+      y
+        .positional('account-id', {
+          describe: 'ID aus clippers:onboarding',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('name', { describe: 'Anzeigename, höchstens 30 Zeichen', type: 'string' })
+        .option('username', { describe: 'TikTok-Username ohne @', type: 'string' })
+        .option('bio', { describe: 'Bio, höchstens 80 Zeichen', type: 'string' })
+        .option('topic', { describe: 'Thema fürs Aufwärmen', type: 'string' })
+        .option('search-terms', {
+          describe: 'Suchbegriffe fürs Aufwärmen, kommagetrennt',
+          type: 'string',
+        })
+        .option('avatar', {
+          describe: 'Profilbild (JPG, PNG oder WebP), wird auf R2 hochgeladen',
+          type: 'string',
+        })
+        .example(
+          '$0 clippers:profile <account-id> --name Ethan --username ethanbulking --bio "19 · bulking diary" --avatar ./ethan.jpg',
+          'Neues Profil für einen laufenden Account'
+        ),
+    async (argv) => {
+      const id = enc(argv['account-id']);
+      const body = Object.fromEntries(
+        Object.entries({
+          name: argv.name,
+          username: argv.username,
+          bio: argv.bio,
+          topic: argv.topic,
+          searchTerms: argv['search-terms']
+            ?.split(',')
+            .map((term) => term.trim())
+            .filter(Boolean)
+            .join('\n'),
+        }).filter(([, value]) => value !== undefined)
+      );
+      if (argv.avatar) {
+        await uploadFile(argv.avatar, `/clippers/accounts/${id}/avatar`);
+      }
+      print(
+        Object.keys(body).length
+          ? await request(`/clippers/accounts/${id}`, { method: 'PUT', body })
+          : await request(`/clippers/accounts/${id}`)
+      );
+    }
+  )
+  .command(
+    'clippers:tasks [user]',
+    'Aufgaben der Clipper je Account',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Nur dieser Clipper (Nutzer-ID oder E-Mail)',
+          type: 'string',
+        })
+        .option('open', { describe: 'Nur offene Aufgaben', type: 'boolean' }),
+    async (argv) => {
+      const user = argv.user ? (await resolveUsers(argv.user))[0] : undefined;
+      const { clippers } = await request(
+        `/clippers/onboarding${user ? `?user=${enc(user)}` : ''}`
+      );
+      print(
+        clippers.flatMap(
+          (clipper: {
+            user: { id: string; email: string };
+            accounts: {
+              id: string;
+              position: number;
+              profile: { username: string | null };
+              channel: { id: string; name: string } | null;
+              tasks: { doneDay: string | null }[];
+            }[];
+          }) =>
+            clipper.accounts.flatMap((account) =>
+              account.tasks
+                .filter((task) => !argv.open || !task.doneDay)
+                .map((task) => ({
+                  ...task,
+                  clipper: clipper.user.email,
+                  account: {
+                    id: account.id,
+                    position: account.position,
+                    username: account.profile.username,
+                    channel: account.channel,
+                  },
+                }))
+            )
+        )
+      );
+    }
+  )
+  .command(
+    'clippers:task <account-id> [title]',
+    'Aufgabe für einen Account anlegen, der Clipper hakt sie auf „Manuell posten“ ab',
+    (y) =>
+      y
+        .positional('account-id', { type: 'string', demandOption: true })
+        .positional('title', { describe: 'Was zu tun ist', type: 'string' })
+        .option('description', { alias: 'd', type: 'string' })
+        .option('profile', {
+          describe:
+            'Aufgabe „Profil umstellen“: zeigt dem Clipper Bild, Name, Username und Bio. Ohne Titel mit Standardtitel',
+          type: 'boolean',
+        })
+        .example('$0 clippers:task <account-id> --profile', 'Profil umstellen lassen')
+        .example('$0 clippers:task <account-id> "Link in Bio setzen" -d "ubulk.app"', 'Eigene Aufgabe'),
+    async (argv) => {
+      if (!argv.title && !argv.profile) {
+        throw new Error('Titel fehlt (oder --profile)');
+      }
+      print(
+        await request(`/clippers/accounts/${enc(argv['account-id'])}/tasks`, {
+          method: 'POST',
+          body: {
+            kind: argv.profile ? 'PROFILE' : 'CUSTOM',
+            ...(argv.title ? { title: argv.title } : {}),
+            ...(argv.description ? { description: argv.description } : {}),
+          },
+        })
+      );
+    }
+  )
+  .command(
+    'clippers:task-done <task-id>',
+    'Aufgabe abhaken, --undo öffnet sie wieder',
+    (y) =>
+      y
+        .positional('task-id', { type: 'string', demandOption: true })
+        .option('undo', { type: 'boolean' }),
+    async (argv) => {
+      print(
+        await request(`/clippers/tasks/${enc(argv['task-id'])}`, {
+          method: 'PUT',
+          body: { done: !argv.undo },
+        })
+      );
+    }
+  )
+  .command(
+    'clippers:task-delete <task-id>',
+    'Aufgabe löschen',
+    (y) => y.positional('task-id', { type: 'string', demandOption: true }),
+    async (argv) => {
+      print(
+        await request(`/clippers/tasks/${enc(argv['task-id'])}`, {
+          method: 'DELETE',
+        })
+      );
+    }
+  )
   .command('apps:list', 'Apps mit Anzahl Kanäle', {}, async () => {
     print(await request('/apps'));
   })

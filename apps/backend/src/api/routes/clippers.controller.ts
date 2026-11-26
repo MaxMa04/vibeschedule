@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -14,6 +14,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
+import {
+  GetUserFromRequest,
+  SessionUser,
+} from '@vibeschedule/nestjs-libraries/user/user.from.request';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 import { ClipperPayService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/clipper.pay.service';
 import { ClipperApplicationsService } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.applications.service';
@@ -23,11 +27,10 @@ import { ClipperAccountsDto } from '@vibeschedule/nestjs-libraries/dtos/settings
 import {
   AcceptApplicationDto,
   ClipperProfileDto,
+  ClipperTaskDto,
+  ClipperTaskUpdateDto,
 } from '@vibeschedule/nestjs-libraries/dtos/clippers/clipper.dto';
 import { streamUploadOptions } from '@vibeschedule/nestjs-libraries/upload/multer.stream.engine';
-import { removeFile } from '@vibeschedule/nestjs-libraries/upload/r2.uploader';
-
-const AVATAR = /\.(jpe?g|png|webp)$/i;
 
 // Clippers for admins: applications, the profiles we hand out with the
 // onboarding progress, and the pay per account and month
@@ -105,23 +108,41 @@ export class ClippersController {
 
   @Post('/accounts/:id/avatar')
   @UseInterceptors(FileInterceptor('file', streamUploadOptions))
-  async avatar(
+  avatar(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
     @UploadedFile('file') file?: Express.Multer.File
   ) {
-    if (!file) {
-      throw new BadRequestException('Kein Bild');
-    }
-    if (!AVATAR.test(file.path)) {
-      await removeFile(file.path);
-      throw new BadRequestException('Nur JPG, PNG oder WebP');
-    }
-    return this._onboardingService.setAvatar(org.id, id, file.path);
+    return this._onboardingService.setAvatar(org.id, id, file);
   }
 
   @Post('/accounts/:id/restart')
   restart(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
     return this._onboardingService.restart(org.id, id);
+  }
+
+  // tasks the clipper checks off on the posting page
+  @Post('/accounts/:id/tasks')
+  addTask(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ClipperTaskDto
+  ) {
+    return this._onboardingService.addTask(org.id, id, body);
+  }
+
+  @Put('/tasks/:id')
+  updateTask(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
+    @Param('id') id: string,
+    @Body() body: ClipperTaskUpdateDto
+  ) {
+    return this._onboardingService.updateTask(org.id, id, body, user.id);
+  }
+
+  @Delete('/tasks/:id')
+  deleteTask(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    return this._onboardingService.deleteTask(org.id, id);
   }
 }

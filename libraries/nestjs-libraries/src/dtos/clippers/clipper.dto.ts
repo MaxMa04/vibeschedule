@@ -1,6 +1,8 @@
 import { Transform } from 'class-transformer';
+import { ClipperTaskKind } from '@prisma/client';
 import {
   Equals,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -17,6 +19,10 @@ import {
   ClipperDevice,
   MAX_OFFER_ACCOUNTS,
 } from '@vibeschedule/helpers/clippers/clipper.offer';
+import {
+  TASK_DESCRIPTION_MAX,
+  TASK_TITLE_MAX,
+} from '@vibeschedule/helpers/clippers/clipper.tasks';
 import { MAX_CLIPPER_ACCOUNTS } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -139,4 +145,47 @@ export class PayoutDto {
 export class FypDto {
   @IsIn([true, false])
   ok: boolean;
+}
+
+// a task for one account, PROFILE without a title gets the default one
+export class ClipperTaskDto {
+  @IsOptional()
+  @IsIn(Object.values(ClipperTaskKind))
+  kind?: ClipperTaskKind;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(TASK_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(TASK_DESCRIPTION_MAX)
+  description?: string;
+}
+
+export class ClipperTaskUpdateDto {
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(TASK_TITLE_MAX)
+  title?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(TASK_DESCRIPTION_MAX)
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  done?: boolean;
+}
+
+export class TaskDoneDto {
+  @IsBoolean()
+  done: boolean;
 }

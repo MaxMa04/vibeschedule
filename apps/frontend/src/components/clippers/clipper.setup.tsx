@@ -1,14 +1,27 @@
 'use client';
 
-import { FC, FormEvent, useEffect, useId, useRef, useState } from 'react';
+import {
+  FC,
+  FormEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import useSWR from 'swr';
 import {
   CircleAlertIcon,
   ImageUpIcon,
+  LinkIcon,
+  ListTodoIcon,
   MessageCircleIcon,
   PencilIcon,
+  PlusIcon,
   RotateCcwIcon,
+  Trash2Icon,
   TriangleAlertIcon,
+  UserRoundCogIcon,
   UserRoundIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -16,6 +29,10 @@ import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { WARMUP_DAYS } from '@vibeschedule/helpers/clippers/clipper.onboarding';
+import {
+  TASK_DESCRIPTION_MAX,
+  TASK_TITLE_MAX,
+} from '@vibeschedule/helpers/clippers/clipper.tasks';
 import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
 import { whatsappUrl } from '@vibeschedule/frontend/components/clippers/clipper.guide';
 import type {
@@ -36,6 +53,7 @@ import {
 } from '@vibeschedule/frontend/components/ui/alert-dialog';
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Checkbox } from '@vibeschedule/frontend/components/ui/checkbox';
 import {
   Card,
   CardDescription,
@@ -67,6 +85,7 @@ import {
 import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 import { Textarea } from '@vibeschedule/frontend/components/ui/textarea';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
 export const SETUP_KEY = '/clippers/onboarding';
 
@@ -82,6 +101,205 @@ const useSetup = () => {
 };
 
 type Editing = { clipper: OnboardingClipper; account: OnboardingAccount };
+type EditingIds = { clipperId: string; accountId: string };
+
+// Tasks for one account: the clipper sees the open ones on the posting page
+// and checks them off, also while the account is already running
+const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
+  account,
+  onSaved,
+}) => {
+  const t = useT();
+  const id = useId();
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const call = async (key: string, url: string, init: RequestInit) => {
+    setBusy(key);
+    const response = await fetch(url, init);
+    setBusy(null);
+    if (!response.ok) {
+      toaster.show(
+        (await responseMessage(response)) || t('setup_save_failed'),
+        'warning'
+      );
+      return false;
+    }
+    onSaved();
+    return true;
+  };
+
+  const add = async (kind: 'CUSTOM' | 'PROFILE') => {
+    if (kind === 'CUSTOM' && !title.trim()) {
+      return;
+    }
+    const ok = await call(kind, `/clippers/accounts/${account.id}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(
+        kind === 'PROFILE' ? { kind } : { kind, title, description }
+      ),
+    });
+    if (ok && kind === 'CUSTOM') {
+      setTitle('');
+      setDescription('');
+    }
+  };
+
+  const tasks = [
+    ...account.tasks.filter((task) => !task.doneDay),
+    ...account.tasks.filter((task) => task.doneDay),
+  ];
+  const profileOpen = account.tasks.some(
+    (task) => task.kind === 'PROFILE' && !task.doneDay
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="text-sm font-medium">{t('setup_tasks')}</h3>
+        <p className="text-sm text-muted-foreground">
+          {t('setup_tasks_hint')}
+        </p>
+      </div>
+      {!!tasks.length && (
+        <ul className="flex flex-col rounded-lg border">
+          {tasks.map((task) => (
+            <li
+              key={task.id}
+              className="flex items-start gap-3 border-b px-3 py-2.5 last:border-b-0"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center">
+                <Checkbox
+                  id={`${id}-${task.id}`}
+                  className="size-5"
+                  checked={!!task.doneDay}
+                  disabled={busy === task.id}
+                  onCheckedChange={(checked) =>
+                    call(task.id, `/clippers/tasks/${task.id}`, {
+                      method: 'PUT',
+                      body: JSON.stringify({ done: !!checked }),
+                    })
+                  }
+                />
+              </span>
+              <label
+                htmlFor={`${id}-${task.id}`}
+                className="flex min-w-0 flex-1 flex-col text-sm"
+              >
+                <span
+                  className={cn(
+                    'font-medium',
+                    task.doneDay &&
+                      'font-normal text-muted-foreground line-through'
+                  )}
+                >
+                  {task.title}
+                </span>
+                {task.description && (
+                  <span className="whitespace-pre-line text-muted-foreground">
+                    {task.description}
+                  </span>
+                )}
+                {task.kind === 'PROFILE' && (
+                  <span className="text-muted-foreground">
+                    {t('setup_task_profile_hint')}
+                  </span>
+                )}
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-10 shrink-0 text-muted-foreground md:size-8"
+                aria-label={t('setup_task_delete')}
+                disabled={busy === `delete-${task.id}`}
+                onClick={() =>
+                  call(`delete-${task.id}`, `/clippers/tasks/${task.id}`, {
+                    method: 'DELETE',
+                  })
+                }
+              >
+                <Trash2Icon />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <FieldGroup className="gap-3">
+        <Field>
+          <FieldLabel htmlFor={`${id}-title`} className="sr-only">
+            {t('setup_task_title')}
+          </FieldLabel>
+          <Input
+            id={`${id}-title`}
+            className="h-10 md:h-8"
+            placeholder={t('setup_task_title')}
+            maxLength={TASK_TITLE_MAX}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              // the sheet is the profile form, Enter adds the task instead
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add('CUSTOM');
+              }
+            }}
+          />
+        </Field>
+        {!!title.trim() && (
+          <Field>
+            <FieldLabel htmlFor={`${id}-description`} className="sr-only">
+              {t('setup_task_description')}
+            </FieldLabel>
+            <Textarea
+              id={`${id}-description`}
+              rows={2}
+              placeholder={t('setup_task_description')}
+              maxLength={TASK_DESCRIPTION_MAX}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
+        )}
+      </FieldGroup>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 md:h-8"
+          disabled={!title.trim() || busy === 'CUSTOM'}
+          onClick={() => add('CUSTOM')}
+        >
+          {busy === 'CUSTOM' ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <PlusIcon data-icon="inline-start" />
+          )}
+          {t('setup_task_add')}
+        </Button>
+        {!profileOpen && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 md:h-8"
+            disabled={!account.profile.ready || busy === 'PROFILE'}
+            onClick={() => add('PROFILE')}
+          >
+            {busy === 'PROFILE' ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <UserRoundCogIcon data-icon="inline-start" />
+            )}
+            {t('setup_task_add_profile')}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ProfileSheet: FC<{
   editing: Editing | null;
@@ -315,6 +533,7 @@ const ProfileSheet: FC<{
                   </FieldDescription>
                 </Field>
               </FieldGroup>
+              <TaskEditor account={account} onSaved={onSaved} />
               {(account.createdDay || account.channel) && (
                 <AlertDialog>
                   <AlertDialogTrigger
@@ -392,12 +611,33 @@ const AccountRow: FC<{ account: OnboardingAccount; onEdit: () => void }> = ({
             : t('start_account', { number: account.position + 1 })}
         </span>
         <span className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          {account.channel && (
+            <span className="flex min-w-0 items-center gap-1">
+              <LinkIcon className="size-3.5 shrink-0" />
+              <span className="truncate">{account.channel.name}</span>
+            </span>
+          )}
           {profile.topic && <span className="truncate">{profile.topic}</span>}
           {plan.stage === 'warmup' && (
             <span className="tabular-nums">
               {t('setup_warmups', { done: plan.warmups, days: WARMUP_DAYS })}
             </span>
           )}
+          {!!account.openTasks && (
+            <span className="flex items-center gap-1 tabular-nums">
+              <ListTodoIcon className="size-3.5" />
+              {t('setup_open_tasks', { count: account.openTasks })}
+            </span>
+          )}
+          {account.rebrand &&
+            !account.tasks.some((task) => task.kind === 'PROFILE') && (
+              <span className="flex items-center gap-1 text-destructive">
+                <TriangleAlertIcon className="size-3.5" />
+                {t('setup_rebrand', {
+                  username: account.channel?.username || '',
+                })}
+              </span>
+            )}
           {account.usernameMismatch && (
             <span className="flex items-center gap-1 text-destructive">
               <TriangleAlertIcon className="size-3.5" />
@@ -436,7 +676,15 @@ const AccountRow: FC<{ account: OnboardingAccount; onEdit: () => void }> = ({
 export const ClipperSetup: FC = () => {
   const t = useT();
   const { data, error, mutate } = useSetup();
-  const [editing, setEditing] = useState<Editing | null>(null);
+  const [editingIds, setEditing] = useState<EditingIds | null>(null);
+  // looked up in the live data, so saved tasks show right away
+  const editing = useMemo((): Editing | null => {
+    const clipper = data?.find((c) => c.user.id === editingIds?.clipperId);
+    const account = clipper?.accounts.find(
+      (a) => a.id === editingIds?.accountId
+    );
+    return clipper && account ? { clipper, account } : null;
+  }, [data, editingIds]);
 
   if (error) {
     return (
@@ -501,7 +749,9 @@ export const ClipperSetup: FC = () => {
               <AccountRow
                 key={account.id}
                 account={account}
-                onEdit={() => setEditing({ clipper, account })}
+                onEdit={() =>
+                  setEditing({ clipperId: clipper.user.id, accountId: account.id })
+                }
               />
             ))}
           </ul>

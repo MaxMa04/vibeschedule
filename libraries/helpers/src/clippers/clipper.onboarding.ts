@@ -235,3 +235,26 @@ export const onboardingDone = (plans: AccountPlan[], payoutDone: boolean) =>
 /** "@Name" or "name" to "name", for comparing TikTok usernames */
 export const normalizeUsername = (value?: string | null) =>
   (value || '').trim().replace(/^@+/, '').toLowerCase();
+
+export type ProfileCheck = 'ok' | 'rebrand' | 'mismatch';
+
+// Does the connected TikTok account carry the profile we handed out? Post for
+// Me reports the TikTok display name as the channel's username, so it counts
+// when it equals our name or our username. A channel that came to the account
+// without the clipper creating it here (connected before the onboarding
+// existed) still has to be switched over to our profile: 'rebrand'. One the
+// clipper created and connected through the onboarding is the wrong account.
+export const profileCheck = (
+  channelProfile: string | null | undefined,
+  profile: { name?: string | null; username?: string | null },
+  createdHere: boolean
+): ProfileCheck => {
+  const connected = normalizeUsername(channelProfile);
+  const expected = [profile.username, profile.name]
+    .map((value) => normalizeUsername(value))
+    .filter(Boolean);
+  if (!connected || !expected.length || expected.includes(connected)) {
+    return 'ok';
+  }
+  return createdHere ? 'mismatch' : 'rebrand';
+};

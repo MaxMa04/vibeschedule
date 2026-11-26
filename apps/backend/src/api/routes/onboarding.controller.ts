@@ -22,6 +22,7 @@ import { ClipperOnboardingService } from '@vibeschedule/nestjs-libraries/databas
 import {
   FypDto,
   PayoutDto,
+  TaskDoneDto,
 } from '@vibeschedule/nestjs-libraries/dtos/clippers/clipper.dto';
 
 // A clipper's start: payout details and creating, warming up and connecting
@@ -93,6 +94,17 @@ export class OnboardingController {
     @Param('id') id: string
   ) {
     return this._onboardingService.restart(org.id, id, user);
+  }
+
+  // a task we gave for one of the clipper's accounts, checked off or back
+  @Post('/tasks/:id')
+  checkTask(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
+    @Param('id') id: string,
+    @Body() body: TaskDoneDto
+  ) {
+    return this._onboardingService.checkTask(org.id, user, id, body.done);
   }
 
   // the profile picture as a file, so the phone can save it to Photos

@@ -59,7 +59,8 @@ export async function request(
   return text ? JSON.parse(text) : null;
 }
 
-export function uploadFile(file: string) {
+// to the media library, or another upload route such as a clipper avatar
+export function uploadFile(file: string, path = '/upload') {
   const form = new FormData();
   form.append(
     'file',
@@ -69,5 +70,5 @@ export function uploadFile(file: string) {
     }),
     basename(file)
   );
-  return request('/upload', { method: 'POST', body: form });
+  return request(path, { method: 'POST', body: form });
 }

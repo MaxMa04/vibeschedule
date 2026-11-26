@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { PublicIntegrationsController } from '@vibeschedule/backend/public-api/routes/v1/public.integrations.controller';
 import { PublicFormatsController } from '@vibeschedule/backend/public-api/routes/v1/public.formats.controller';
 import { PublicAppsController } from '@vibeschedule/backend/public-api/routes/v1/public.apps.controller';
+import { PublicClippersController } from '@vibeschedule/backend/public-api/routes/v1/public.clippers.controller';
 import { PublicAuthMiddleware } from '@vibeschedule/backend/services/auth/public.auth.middleware';
 
 @Module({
@@ -9,6 +10,7 @@ import { PublicAuthMiddleware } from '@vibeschedule/backend/services/auth/public
     PublicIntegrationsController,
     PublicFormatsController,
     PublicAppsController,
+    PublicClippersController,
   ],
 })
 export class PublicApiModule implements NestModule {
@@ -18,7 +20,8 @@ export class PublicApiModule implements NestModule {
       .forRoutes(
         PublicIntegrationsController,
         PublicFormatsController,
-        PublicAppsController
+        PublicAppsController,
+        PublicClippersController
       );
   }
 }

@@ -8,7 +8,7 @@ import { useT } from '@vibeschedule/react/translation/get.transation.service.cli
 import {
   onboardingProgress,
   useOnboarding,
-} from '@vibeschedule/frontend/components/onboarding/clipper.start';
+} from '@vibeschedule/frontend/components/onboarding/use.onboarding';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import { CLIPPER_GUIDE_URL } from '@vibeschedule/frontend/components/clippers/clipper.guide';
 import { Button } from '@vibeschedule/frontend/components/ui/button';

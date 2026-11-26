@@ -1,4 +1,16 @@
 import type { AccountPlan } from '@vibeschedule/helpers/clippers/clipper.onboarding';
+import type { ClipperTaskKind } from '@vibeschedule/helpers/clippers/clipper.tasks';
+
+// something the clipper still has to do on one account
+export interface ClipperTask {
+  id: string;
+  kind: ClipperTaskKind;
+  title: string;
+  description: string | null;
+  /** Berlin day it was checked off, null while open */
+  doneDay: string | null;
+  createdAt: string;
+}
 
 // what /onboarding and /clippers/onboarding return for one account
 export interface OnboardingAccount {
@@ -15,6 +27,8 @@ export interface OnboardingAccount {
   };
   createdDay: string | null;
   plan: AccountPlan;
+  tasks: ClipperTask[];
+  openTasks: number;
   channel: {
     id: string;
     name: string;
@@ -23,6 +37,8 @@ export interface OnboardingAccount {
     disabled: boolean;
   } | null;
   usernameMismatch: boolean;
+  /** connected before the onboarding, still to be switched to our profile */
+  rebrand: boolean;
 }
 
 export interface OnboardingState {

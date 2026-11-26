@@ -4,20 +4,15 @@ import {
   FC,
   ReactNode,
   useCallback,
-  useEffect,
   useId,
   useMemo,
   useState,
 } from 'react';
-import useSWR from 'swr';
-import copy from 'copy-to-clipboard';
 import {
   CheckIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   CircleDashedIcon,
-  CopyIcon,
-  DownloadIcon,
   ExternalLinkIcon,
   LinkIcon,
   LockIcon,
@@ -38,6 +33,15 @@ import {
   addDays,
 } from '@vibeschedule/helpers/clippers/clipper.onboarding';
 import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
+import {
+  Profile,
+  useCopy,
+} from '@vibeschedule/frontend/components/onboarding/clipper.profile';
+import { AccountTasks } from '@vibeschedule/frontend/components/onboarding/clipper.tasks';
+import {
+  onboardingProgress,
+  useOnboarding,
+} from '@vibeschedule/frontend/components/onboarding/use.onboarding';
 import {
   CLIPPER_GUIDE_URL,
   CLIPPER_SUPPORT_PHONE,
@@ -87,32 +91,6 @@ import { Progress } from '@vibeschedule/frontend/components/ui/progress';
 import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 
-export const ONBOARDING_KEY = '/onboarding';
-
-export const useOnboarding = () => {
-  const fetch = useFetch();
-  return useSWR(ONBOARDING_KEY, async (url: string) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error();
-    }
-    return (await response.json()) as OnboardingState | null;
-  });
-};
-
-/** steps done and all steps, the payout included */
-export const onboardingProgress = (state: OnboardingState) => {
-  const tasks = state.accounts.flatMap((a) =>
-    a.plan.tasks.filter((task) => task.key !== 'post')
-  );
-  return {
-    done:
-      tasks.filter((task) => task.state === 'done').length +
-      (state.payout.done ? 1 : 0),
-    total: tasks.length + 1,
-  };
-};
-
 const dayLabel = (day: string, today: string, t: ReturnType<typeof useT>) =>
   day === addDays(today, 1)
     ? t('start_tomorrow')
@@ -122,162 +100,6 @@ const dayLabel = (day: string, today: string, t: ReturnType<typeof useT>) =>
         month: 'numeric',
         timeZone: 'UTC',
       }).format(new Date(`${day}T12:00:00Z`));
-
-const useCopy = () => {
-  const t = useT();
-  const toaster = useToaster();
-  return useCallback(
-    (value: string) => {
-      copy(value);
-      toaster.show(t('start_copied'), 'success');
-    },
-    [t, toaster]
-  );
-};
-
-const CopyRow: FC<{ label: string; value: string | null }> = ({
-  label,
-  value,
-}) => {
-  const t = useT();
-  const copyValue = useCopy();
-  if (!value) {
-    return null;
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="truncate font-medium">{value}</span>
-      </div>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-10 shrink-0 md:size-8"
-        aria-label={t('start_copy', { label })}
-        onClick={() => copyValue(value)}
-      >
-        <CopyIcon />
-      </Button>
-    </div>
-  );
-};
-
-// the picture as a file, loaded before the tap: iOS shares only right inside it
-const useAvatarFile = (account: OnboardingAccount) => {
-  const fetch = useFetch();
-  const [file, setFile] = useState<File | null>(null);
-  useEffect(() => {
-    if (!account.profile.avatar) {
-      return;
-    }
-    let cancelled = false;
-    fetch(`/onboarding/accounts/${account.id}/avatar`)
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error();
-        }
-        const blob = await response.blob();
-        const ext = blob.type.split('/')[1] || 'jpg';
-        if (!cancelled) {
-          setFile(
-            new File(
-              [blob],
-              `${account.profile.username || 'profilbild'}.${ext}`,
-              {
-                type: blob.type,
-              }
-            )
-          );
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [account.id, account.profile.avatar]);
-  return file;
-};
-
-const Profile: FC<{ account: OnboardingAccount }> = ({ account }) => {
-  const t = useT();
-  const file = useAvatarFile(account);
-  const { profile } = account;
-
-  const save = useCallback(() => {
-    if (!file) {
-      return;
-    }
-    const download = () => {
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    };
-    if (
-      typeof navigator.share === 'function' &&
-      navigator.canShare?.({ files: [file] })
-    ) {
-      navigator.share({ files: [file] }).catch((err: Error) => {
-        if (err.name !== 'AbortError') {
-          download();
-        }
-      });
-    } else {
-      download();
-    }
-  }, [file]);
-
-  if (!profile.ready) {
-    return (
-      <Alert>
-        <CircleDashedIcon />
-        <AlertTitle>{t('start_profile_pending')}</AlertTitle>
-        <AlertDescription>{t('start_profile_pending_text')}</AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-4 rounded-lg border p-3">
-      <div className="flex items-center gap-3">
-        <img
-          src={profile.avatar!}
-          alt=""
-          className="size-16 shrink-0 rounded-full border object-cover"
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-xs text-muted-foreground">
-            {t('start_profile_picture')}
-          </span>
-          <Button
-            variant="outline"
-            className="h-10 self-start md:h-8"
-            onClick={save}
-            disabled={!file}
-          >
-            {file ? (
-              <DownloadIcon data-icon="inline-start" />
-            ) : (
-              <Spinner data-icon="inline-start" />
-            )}
-            {t('start_save_picture')}
-          </Button>
-        </div>
-      </div>
-      <CopyRow label={t('start_profile_name')} value={profile.name} />
-      <CopyRow
-        label={t('start_profile_username')}
-        value={profile.username && `@${profile.username}`}
-      />
-      <CopyRow label={t('start_profile_bio')} value={profile.bio} />
-    </div>
-  );
-};
 
 const Niche: FC<{ account: OnboardingAccount }> = ({ account }) => {
   const t = useT();
@@ -593,6 +415,12 @@ const AccountCard: FC<{
       </CardHeader>
       <CardContent className="flex flex-col gap-4 py-4">
         {account.plan.stage !== 'active' && <Profile account={account} />}
+        <AccountTasks
+          account={account}
+          today={today}
+          onChange={onChange}
+          className="rounded-lg border px-3"
+        />
         {account.usernameMismatch && (
           <Alert variant="destructive">
             <TriangleAlertIcon />
