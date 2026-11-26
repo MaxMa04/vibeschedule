@@ -32,9 +32,16 @@ export const PostForMeReturn = () => {
 
   useEffect(() => {
     fetch('/integrations/sync', { method: 'POST' })
-      .then((res) => {
+      .then(async (res) => {
+        // a clipper: the account was connected with their own link and
+        // lands with them
         if (res.status === 403) {
-          setHandOver(true);
+          const own = await fetch('/manual/sync', { method: 'POST' });
+          if (!own.ok) {
+            setHandOver(true);
+            return;
+          }
+          router.replace('/manual');
           return;
         }
         if (!res.ok) {

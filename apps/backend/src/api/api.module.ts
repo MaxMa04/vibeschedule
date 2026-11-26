@@ -12,6 +12,7 @@ import { RootController } from '@vibeschedule/backend/api/routes/root.controller
 import { AppsController } from '@vibeschedule/backend/api/routes/apps.controller';
 import { FormatsController } from '@vibeschedule/backend/api/routes/formats.controller';
 import { PfmWebhookController } from '@vibeschedule/backend/api/routes/pfm.webhook.controller';
+import { ClippersController } from '@vibeschedule/backend/api/routes/clippers.controller';
 import { ManualController } from '@vibeschedule/backend/api/routes/manual.controller';
 import { ClipperGuard } from '@vibeschedule/backend/services/auth/clipper.guard';
 
@@ -25,6 +26,7 @@ const authenticatedControllers = [
   PostsController,
   MediaController,
   ManualController,
+  ClippersController,
 ];
 
 @Module({

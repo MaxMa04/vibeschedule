@@ -40,6 +40,8 @@ vibeschedule auth:check
 | `integrations:app <kanal-id> <app>` | App eines Kanals setzen (App-ID oder Name), `none` entfernt sie |
 | `integrations:users <kanal-id> <nutzer>` | Zuständige eines Kanals setzen, ersetzt die bisherigen. Nutzer-IDs oder E-Mails kommagetrennt, `none` für keine. Ein Clipper darunter stellt den Kanal auf „Nur manuell“ |
 | `users:list` | Nutzer des Workspace mit ID, Name, E-Mail und Rolle (`ADMIN`, `USER`, `CLIPPER`) |
+| `users:create <email> --name <name> --password-file <datei> [--role CLIPPER]` | Zugang anlegen (Standardrolle `CLIPPER`). Das Passwort kommt aus einer Datei, damit es nicht in der Shell-History landet |
+| `clippers:pay [JJJJ-MM]` | Was jeder Clipper pro Account im Monat bekommt: Gepostet, Verpasst, Abzug, Betrag (Regeln in `libraries/helpers/src/clippers/clipper.billing.ts`) |
 | `apps:list` | Apps mit ID und Anzahl Kanäle |
 | `apps:create <name>` | App anlegen |
 | `apps:rename <app> <name>` | App umbenennen (App-ID oder bisheriger Name) |

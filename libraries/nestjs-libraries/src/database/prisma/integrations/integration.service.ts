@@ -11,6 +11,10 @@ import {
   IntegrationRepository,
   toTeamUsers,
 } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
+import {
+  connectExternalId,
+  connectOwner,
+} from '@vibeschedule/helpers/channels/connect.owner';
 import { ChannelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import { IntegrationTimeDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.time.dto';
 import {
@@ -89,7 +93,9 @@ export class IntegrationService {
   async getConnectUrl(
     orgId: string,
     identifier: string,
-    fields: Record<string, string>
+    fields: Record<string, string>,
+    // the clipper the account is for, it lands with them after the sync
+    ownerId?: string
   ) {
     const platform = getPfmPlatform(identifier);
     if (!platform) {
@@ -99,7 +105,7 @@ export class IntegrationService {
     return {
       url: await this._pfmClient.authUrl(
         identifier,
-        orgId,
+        connectExternalId(orgId, ownerId),
         platform.platformData?.(fields)
       ),
     };
@@ -121,18 +127,30 @@ export class IntegrationService {
         (i) => [i.internalId, i.picture]
       )
     );
+    // new channels connected through a clipper's link, see connect.owner.ts.
+    // Only new ones: an admin may take a channel away from its clipper later.
+    const owned: { channelId: string; userId: string }[] = [];
     for (const account of accounts) {
       // an expired photo keeps the last stable copy, otherwise initials show
       const previous = stored.get(account.id);
       const picture =
         (await stableAvatarUrl(account.id, account.profile_photo_url)) ||
         (previous && isStableAvatar(previous) ? previous : null);
-      await this._integrationRepository.upsertFromPfm(orgId, account, picture);
+      const { id } = await this._integrationRepository.upsertFromPfm(
+        orgId,
+        account,
+        picture
+      );
+      const userId = connectOwner(orgId, account.external_id);
+      if (userId && !known.has(account.id)) {
+        owned.push({ channelId: id, userId });
+      }
     }
 
     return {
       total: accounts.length,
       added: accounts.filter((a) => !known.has(a.id)).length,
+      owned,
       disabled: await this._integrationRepository.disableMissing(
         orgId,
         accounts.map((a) => a.id)
@@ -236,6 +254,10 @@ export class IntegrationService {
 
   setManualOnly(org: string, id: string, manualOnly: boolean) {
     return this._integrationRepository.setManualOnly(org, id, manualOnly);
+  }
+
+  getUserChannels(orgId: string, userId: string) {
+    return this._integrationRepository.getUserChannels(orgId, userId);
   }
 
   getUserChannelIds(userId: string) {

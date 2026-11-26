@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { apiUrl, request, uploadFile } from './api';
@@ -116,6 +117,61 @@ yargs(hideBin(process.argv))
   .command('users:list', 'Nutzer des Workspace mit Rolle', {}, async () => {
     print(await request('/users'));
   })
+  .command(
+    'users:create <email>',
+    'Zugang anlegen, z. B. für einen Clipper',
+    (y) =>
+      y
+        .positional('email', {
+          describe: 'E-Mail zum Anmelden, es geht keine Mail raus',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('name', { type: 'string', demandOption: true })
+        .option('role', {
+          choices: ['CLIPPER', 'USER', 'ADMIN'] as const,
+          default: 'CLIPPER' as const,
+        })
+        .option('password-file', {
+          describe: 'Datei mit dem Passwort (mind. 8 Zeichen), hält es aus der Shell-History',
+          type: 'string',
+          demandOption: true,
+        })
+        .example(
+          '$0 users:create clipping.anna@vibelabs.to --name Anna --password-file ./anna.pw',
+          'Clipper-Zugang anlegen'
+        ),
+    async (argv) => {
+      const password = readFileSync(argv['password-file'], 'utf8').trim();
+      print(
+        await request('/users', {
+          method: 'POST',
+          body: {
+            email: argv.email,
+            name: argv.name,
+            role: argv.role,
+            password,
+          },
+        })
+      );
+    }
+  )
+  .command(
+    'clippers:pay [month]',
+    'Was jeder Clipper pro Account im Monat bekommt',
+    (y) =>
+      y.positional('month', {
+        describe: 'JJJJ-MM, ohne Angabe der laufende Monat',
+        type: 'string',
+      }),
+    async (argv) => {
+      print(
+        await request(
+          `/clippers/pay${argv.month ? `?month=${enc(argv.month)}` : ''}`
+        )
+      );
+    }
+  )
   .command('apps:list', 'Apps mit Anzahl Kanäle', {}, async () => {
     print(await request('/apps'));
   })

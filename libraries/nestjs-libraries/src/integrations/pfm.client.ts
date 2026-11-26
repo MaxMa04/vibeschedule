@@ -8,6 +8,8 @@ export interface PfmSocialAccount {
   username: string | null;
   profile_photo_url: string | null;
   status: 'connected' | 'disconnected';
+  // the external_id of the connect link, see connect.owner.ts
+  external_id: string | null;
 }
 
 export interface PfmPost {

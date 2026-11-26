@@ -5,6 +5,7 @@ import {
   LayersIcon,
   SettingsIcon,
   SmartphoneIcon,
+  WalletIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -13,6 +14,8 @@ export interface NavItem {
   /** translation key */
   label: string;
   icon: LucideIcon;
+  /** only for admins */
+  admin?: boolean;
 }
 
 export const mainNav: NavItem[] = [
@@ -21,6 +24,7 @@ export const mainNav: NavItem[] = [
   { path: '/formats', label: 'formats', icon: LayersIcon },
   { path: '/analytics', label: 'analytics', icon: ChartLineIcon },
   { path: '/media', label: 'media', icon: ImageIcon },
+  { path: '/clippers', label: 'clippers', icon: WalletIcon, admin: true },
 ];
 
 export const secondaryNav: NavItem[] = [
@@ -31,7 +35,7 @@ export const secondaryNav: NavItem[] = [
 export const navFor = (role?: string) =>
   role === 'CLIPPER'
     ? mainNav.filter((item) => item.path === '/manual')
-    : mainNav;
+    : mainNav.filter((item) => !item.admin || role === 'ADMIN');
 
 export const navItemFor = (pathname: string) =>
   [...mainNav, ...secondaryNav].find((item) => pathname.startsWith(item.path));
