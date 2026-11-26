@@ -29,6 +29,7 @@ import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrati
 import {
   AddTeamMemberDto,
   ChannelUsersDto,
+  ClipperAccountsDto,
 } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { OrganizationService } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.service';
 import { ClipperPayService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/clipper.pay.service';
@@ -67,6 +68,15 @@ export class PublicIntegrationsController {
         body.channels || []
       )),
     };
+  }
+
+  @Put('/clippers/:id/accounts')
+  setClipperAccounts(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ClipperAccountsDto
+  ) {
+    return this._clipperPayService.setAccounts(org.id, id, body.accounts);
   }
 
   @Get('/clippers/pay')

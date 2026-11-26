@@ -40,27 +40,48 @@ export const ClipperAccounts: FC = () => {
     if (!response.ok) {
       throw new Error();
     }
-    return (await response.json()).channels as ClipperChannel[];
+    return (await response.json()) as {
+      channels: ClipperChannel[];
+      // agreed with a clipper, null for the team
+      maxAccounts: number | null;
+    };
   });
+  const connected = data?.channels.filter((c) => !c.disabled).length ?? 0;
+  const full =
+    !!data && data.maxAccounts !== null && connected >= data.maxAccounts;
 
   const connect = async () => {
     setConnecting(true);
     try {
       const response = await fetch('/manual/connect/tiktok');
-      if (!response.ok) {
-        throw new Error();
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.url) {
+        throw new Error(body.message);
       }
-      window.location.href = (await response.json()).url;
-    } catch {
+      window.location.href = body.url;
+    } catch (e) {
       setConnecting(false);
-      toaster.show(t('clipper_connect_failed'), 'warning');
+      toaster.show(
+        (e instanceof Error && e.message) || t('clipper_connect_failed'),
+        'warning'
+      );
     }
   };
 
   return (
     <Card className="gap-0 pb-0">
       <CardHeader className="border-b">
-        <CardTitle>{t('clipper_accounts')}</CardTitle>
+        <CardTitle className="flex items-baseline justify-between gap-3">
+          {t('clipper_accounts')}
+          {data && data.maxAccounts !== null && (
+            <span className="shrink-0 text-sm font-normal text-muted-foreground tabular-nums">
+              {t('clipper_accounts_count', {
+                connected,
+                max: data.maxAccounts,
+              })}
+            </span>
+          )}
+        </CardTitle>
         <CardDescription>{t('clipper_accounts_description')}</CardDescription>
       </CardHeader>
       <CardContent className="px-0">
@@ -68,13 +89,13 @@ export const ClipperAccounts: FC = () => {
           <div className="px-4 py-3">
             <Skeleton className="h-8 w-40" />
           </div>
-        ) : !data.length ? (
+        ) : !data.channels.length ? (
           <p className="px-4 py-3 text-sm text-muted-foreground">
             {t('clipper_accounts_empty')}
           </p>
         ) : (
           <ul className="divide-y">
-            {data.map((channel) => (
+            {data.channels.map((channel) => (
               <li key={channel.id} className="flex items-center gap-2.5 px-4 py-3">
                 <ChannelAvatar
                   picture={channel.picture}
@@ -96,7 +117,16 @@ export const ClipperAccounts: FC = () => {
         )}
       </CardContent>
       <CardFooter className="flex-wrap gap-2 border-t py-3">
-        <Button className="h-10 md:h-9" onClick={connect} disabled={connecting}>
+        {full && (
+          <p className="w-full text-sm text-muted-foreground">
+            {t('clipper_accounts_full', { max: data?.maxAccounts })}
+          </p>
+        )}
+        <Button
+          className="h-10 md:h-9"
+          onClick={connect}
+          disabled={connecting || full}
+        >
           {connecting ? <Spinner data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
           {t('clipper_connect_tiktok')}
         </Button>

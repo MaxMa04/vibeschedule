@@ -256,10 +256,6 @@ export class IntegrationService {
     return this._integrationRepository.setManualOnly(org, id, manualOnly);
   }
 
-  getUserChannels(orgId: string, userId: string) {
-    return this._integrationRepository.getUserChannels(orgId, userId);
-  }
-
   getUserChannelIds(userId: string) {
     return this._integrationRepository.getUserChannelIds(userId);
   }

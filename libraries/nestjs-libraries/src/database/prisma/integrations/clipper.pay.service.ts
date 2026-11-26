@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { IntegrationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
+import { OrganizationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.repository';
 import {
   billingDay,
   billingMonth,
@@ -12,7 +13,10 @@ import {
 // What each clipper earns per account and month (rules in clipper.billing.ts)
 @Injectable()
 export class ClipperPayService {
-  constructor(private _integrationRepository: IntegrationRepository) {}
+  constructor(
+    private _integrationRepository: IntegrationRepository,
+    private _organizationRepository: OrganizationRepository
+  ) {}
 
   async month(orgId: string, month?: string) {
     const today = billingDay(new Date());
@@ -21,9 +25,10 @@ export class ClipperPayService {
       throw new BadRequestException('Monat im Format JJJJ-MM angeben');
     }
 
-    const channels = await this._integrationRepository.getClipperChannels(
-      orgId
-    );
+    const [channels, clipperMembers] = await Promise.all([
+      this._integrationRepository.getClipperChannels(orgId),
+      this._organizationRepository.getClippers(orgId),
+    ]);
     const posted = new Map<string, string[]>();
     for (const post of await this._integrationRepository.getPostedTimes(
       orgId,
@@ -35,14 +40,19 @@ export class ClipperPayService {
       ]);
     }
 
-    const clippers = new Map<
-      string,
-      {
-        user: { id: string; name: string | null; email: string };
-        channels: unknown[];
-        totalCents: number;
-      }
-    >();
+    // every clipper, also those without an account yet
+    const clippers = new Map(
+      clipperMembers.map(({ user, clipperAccounts }) => [
+        user.id,
+        {
+          user,
+          maxAccounts: clipperAccounts,
+          connected: 0,
+          channels: [] as unknown[],
+          totalCents: 0,
+        },
+      ])
+    );
     for (const channel of channels) {
       const user = channel.users[0]?.user;
       if (!user) {
@@ -62,11 +72,13 @@ export class ClipperPayService {
         continue;
       }
 
-      const entry = clippers.get(user.id) || {
-        user,
-        channels: [],
-        totalCents: 0,
-      };
+      const entry = clippers.get(user.id);
+      if (!entry) {
+        continue;
+      }
+      if (!ended) {
+        entry.connected++;
+      }
       entry.channels.push({
         id: channel.id,
         name: channel.customName || channel.name,
@@ -83,7 +95,6 @@ export class ClipperPayService {
         postsPerDay: channel.clipPostsPerDay,
       });
       entry.totalCents += bill.amountCents;
-      clippers.set(user.id, entry);
     }
 
     const list = [...clippers.values()];
@@ -95,6 +106,19 @@ export class ClipperPayService {
       clippers: list,
       totalCents: list.reduce((sum, c) => sum + c.totalCents, 0),
     };
+  }
+
+  async setAccounts(orgId: string, userId: string, accounts: number) {
+    if (
+      !(await this._organizationRepository.setClipperAccounts(
+        orgId,
+        userId,
+        accounts
+      ))
+    ) {
+      throw new NotFoundException('Clipper nicht gefunden');
+    }
+    return { accounts };
   }
 
   async setPay(

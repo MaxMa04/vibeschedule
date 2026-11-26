@@ -88,7 +88,7 @@ export class OrganizationRepository {
   getMember(orgId: string, userId: string) {
     return this._userOrg.model.userOrganization.findUnique({
       where: { userId_organizationId: { userId, organizationId: orgId } },
-      select: { userId: true, role: true },
+      select: { userId: true, role: true, clipperAccounts: true },
     });
   }
 
@@ -101,7 +101,13 @@ export class OrganizationRepository {
 
   async createMember(
     orgId: string,
-    data: { email: string; name: string; password: string; role: Role }
+    data: {
+      email: string;
+      name: string;
+      password: string;
+      role: Role;
+      clipperAccounts?: number;
+    }
   ) {
     const user = await this._user.model.user.create({
       data: {
@@ -109,12 +115,36 @@ export class OrganizationRepository {
         name: data.name,
         password: data.password,
         organizations: {
-          create: { organizationId: orgId, role: data.role },
+          create: {
+            organizationId: orgId,
+            role: data.role,
+            clipperAccounts: data.clipperAccounts,
+          },
         },
       },
       select: teamUserSelect,
     });
     return { ...user, role: data.role };
+  }
+
+  // the clippers with the number of accounts agreed with each
+  getClippers(orgId: string) {
+    return this._userOrg.model.userOrganization.findMany({
+      where: { organizationId: orgId, role: Role.CLIPPER },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        clipperAccounts: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async setClipperAccounts(orgId: string, userId: string, accounts: number) {
+    const { count } = await this._userOrg.model.userOrganization.updateMany({
+      where: { organizationId: orgId, userId, role: Role.CLIPPER },
+      data: { clipperAccounts: accounts },
+    });
+    return count > 0;
   }
 
   async setPassword(userId: string, password: string) {

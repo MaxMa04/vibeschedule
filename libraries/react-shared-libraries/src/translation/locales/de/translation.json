@@ -659,7 +659,7 @@
   "clippers_amount": "Betrag",
   "clippers_description": "Was jeder Clipper pro Account bekommt. Bezahlt wird ab dem ersten Post, bis zu {{free}} verpasste Posts pro Account und Monat sind frei, jeder weitere kostet {{penalty}}.",
   "clippers_empty": "Noch keine Clipper-Accounts",
-  "clippers_empty_hint": "Leg unter Einstellungen einen Nutzer mit der Rolle Clipper an. Sobald er einen TikTok-Account verbindet, steht er hier.",
+  "clippers_empty_hint": "Leg unter Einstellungen einen Nutzer mit der Rolle Clipper an. Er steht dann hier, mit der Anzahl Accounts, die er verbinden darf.",
   "clippers_fee": "€/Monat",
   "clippers_load_failed": "Die Clipper konnten nicht geladen werden.",
   "clippers_missed": "Verpasst",
@@ -674,5 +674,10 @@
   "clippers_running": "läuft noch",
   "clippers_state_deleted": "gelöscht",
   "clippers_state_disconnected": "getrennt",
-  "clippers_total": "Summe im Monat"
+  "clippers_total": "Summe im Monat",
+  "clipper_accounts_count": "{{connected}} von {{max}} verbunden",
+  "clipper_accounts_full": "Du hast alle {{max}} Accounts verbunden. Für einen weiteren schreib Max.",
+  "clippers_accounts": "Accounts",
+  "clippers_connected_of": "{{connected}} verbunden von",
+  "clippers_accounts_invalid": "Anzahl Accounts als ganze Zahl von 0 bis 20 angeben."
 }

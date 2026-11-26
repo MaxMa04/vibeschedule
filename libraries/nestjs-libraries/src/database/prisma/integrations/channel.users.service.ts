@@ -11,6 +11,11 @@ import { OrganizationService } from '@vibeschedule/nestjs-libraries/database/pri
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
 import { TeamUser } from '@vibeschedule/helpers/channels/channel.filter';
+import { SessionUser } from '@vibeschedule/nestjs-libraries/user/user.from.request';
+import { DEFAULT_MONTHLY_FEE_CENTS } from '@vibeschedule/helpers/clippers/clipper.billing';
+
+// clippers connect their own accounts, only where we post by hand
+const CLIPPER_PLATFORMS = ['tiktok'];
 
 // Who is responsible for which channel (UserIntegration). For admins and team
 // members that is only a label. A clipper sees nothing but its channels and
@@ -43,11 +48,68 @@ export class ChannelUsersService {
         continue;
       }
       if (await this._integrationRepository.addUserChannel(userId, channelId)) {
-        await this._postsService.setChannelManualOnly(orgId, channelId, true);
+        await this.handToClipper(orgId, channelId);
         assigned++;
       }
     }
     return { ...result, assigned };
+  }
+
+  // the accounts the user is responsible for, and for a clipper how many
+  // were agreed
+  async ownChannels(orgId: string, user: SessionUser) {
+    const [channels, member] = await Promise.all([
+      this._integrationRepository.getUserChannels(orgId, user.id),
+      this._organizationRepository.getMember(orgId, user.id),
+    ]);
+    return {
+      channels: channels.map((c) => ({
+        id: c.id,
+        name: c.customName || c.name,
+        picture: c.picture,
+        identifier: c.providerIdentifier,
+        disabled: c.disabled,
+      })),
+      maxAccounts:
+        member?.role === Role.CLIPPER ? member.clipperAccounts : null,
+    };
+  }
+
+  // The connect link for an own account. A clipper's link carries the
+  // clipper, so the sync after the consent hands the account to them, and a
+  // clipper gets no link once the agreed accounts are connected. A
+  // disconnected account does not count, so it can always be reconnected.
+  async connectUrl(orgId: string, user: SessionUser, identifier: string) {
+    if (!CLIPPER_PLATFORMS.includes(identifier)) {
+      throw new BadRequestException('Plattform nicht verfügbar');
+    }
+    if (user.role !== Role.CLIPPER) {
+      return this._integrationService.getConnectUrl(orgId, identifier, {});
+    }
+
+    const { channels, maxAccounts } = await this.ownChannels(orgId, user);
+    const connected = channels.filter((c) => !c.disabled).length;
+    if (maxAccounts !== null && connected >= maxAccounts) {
+      throw new BadRequestException(
+        `Du hast schon alle ${maxAccounts} Accounts verbunden. Für einen weiteren schreib Max.`
+      );
+    }
+    return this._integrationService.getConnectUrl(
+      orgId,
+      identifier,
+      {},
+      user.id
+    );
+  }
+
+  // a clipper posts by hand and is paid the SOP fee unless one is set
+  private async handToClipper(orgId: string, channelId: string) {
+    await this._postsService.setChannelManualOnly(orgId, channelId, true);
+    await this._integrationRepository.setDefaultClipFee(
+      orgId,
+      channelId,
+      DEFAULT_MONTHLY_FEE_CENTS
+    );
   }
 
   async team(orgId: string): Promise<TeamUser[]> {
@@ -69,7 +131,7 @@ export class ChannelUsersService {
       );
     if (member.role === Role.CLIPPER) {
       for (const id of added) {
-        await this._postsService.setChannelManualOnly(orgId, id, true);
+        await this.handToClipper(orgId, id);
       }
     }
     return { channels };
@@ -105,8 +167,8 @@ export class ChannelUsersService {
     const clipperAdded = members.some(
       (member) => member.role === Role.CLIPPER && added.includes(member.userId)
     );
-    if (clipperAdded && !integration.manualOnly) {
-      await this._postsService.setChannelManualOnly(orgId, integrationId, true);
+    if (clipperAdded) {
+      await this.handToClipper(orgId, integrationId);
     }
 
     return {

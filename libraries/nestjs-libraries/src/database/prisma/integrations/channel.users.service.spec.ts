@@ -11,8 +11,12 @@ const setup = (
 ) => {
   const added: string[] = [];
   const manualOnly: string[] = [];
+  const fees: string[] = [];
   const service = new ChannelUsersService(
     {
+      setDefaultClipFee: async (_org: string, id: string, cents: number) => {
+        fees.push(`${id}:${cents}`);
+      },
       addUserChannel: async (userId: string, channelId: string) => {
         const key = `${userId}:${channelId}`;
         if (assigned.includes(key)) {
@@ -40,11 +44,11 @@ const setup = (
       sync: async () => ({ total: 3, added: owned.length, disabled: 0, owned }),
     } as never
   );
-  return { service, added, manualOnly };
+  return { service, added, manualOnly, fees };
 };
 
 test('a channel from a clipper link lands with the clipper, manual-only', async () => {
-  const { service, added, manualOnly } = setup(
+  const { service, added, manualOnly, fees } = setup(
     [{ channelId: 'c1', userId: 'clipper' }],
     { clipper: 'CLIPPER' }
   );
@@ -56,6 +60,8 @@ test('a channel from a clipper link lands with the clipper, manual-only', async 
   });
   assert.deepEqual(added, ['clipper:c1']);
   assert.deepEqual(manualOnly, ['c1']);
+  // the SOP fee, 30 euro a month
+  assert.deepEqual(fees, ['c1:3000']);
 });
 
 test('only clippers of the workspace get channels from a link', async () => {
@@ -79,4 +85,75 @@ test('a channel the clipper already has stays as it is', async () => {
   );
   assert.equal((await service.sync('org')).assigned, 0);
   assert.deepEqual(manualOnly, []);
+});
+
+// a clipper with these channels and this many agreed accounts
+const connectSetup = (disabled: boolean[], clipperAccounts: number) => {
+  const links: (string | undefined)[] = [];
+  const service = new ChannelUsersService(
+    {
+      getUserChannels: async () =>
+        disabled.map((off, i) => ({
+          id: `c${i}`,
+          name: `c${i}`,
+          customName: null,
+          picture: null,
+          providerIdentifier: 'tiktok',
+          disabled: off,
+        })),
+    } as never,
+    {
+      getMember: async () => ({
+        userId: 'clipper',
+        role: 'CLIPPER',
+        clipperAccounts,
+      }),
+    } as never,
+    {} as never,
+    {} as never,
+    {
+      getConnectUrl: async (
+        _org: string,
+        _id: string,
+        _fields: unknown,
+        owner?: string
+      ) => {
+        links.push(owner);
+        return { url: 'https://www.tiktok.com/auth' };
+      },
+    } as never
+  );
+  const clipper = { id: 'clipper', role: 'CLIPPER' } as never;
+  return { service, clipper, links };
+};
+
+test('a clipper connects accounts up to the agreed number', async () => {
+  const { service, clipper, links } = connectSetup([false], 2);
+  assert.deepEqual(await service.connectUrl('org', clipper, 'tiktok'), {
+    url: 'https://www.tiktok.com/auth',
+  });
+  assert.deepEqual(links, ['clipper']);
+  assert.deepEqual((await service.ownChannels('org', clipper)).maxAccounts, 2);
+});
+
+test('no link once all agreed accounts are connected', async () => {
+  const { service, clipper, links } = connectSetup([false, false], 2);
+  await assert.rejects(
+    service.connectUrl('org', clipper, 'tiktok'),
+    /alle 2 Accounts/
+  );
+  assert.deepEqual(links, []);
+});
+
+test('a disconnected account does not count, it can be reconnected', async () => {
+  const { service, clipper } = connectSetup([false, true], 2);
+  await service.connectUrl('org', clipper, 'tiktok');
+});
+
+test('only TikTok can be connected from the posting page', async () => {
+  const { service, clipper } = connectSetup([], 3);
+  await assert.rejects(
+    service.connectUrl('org', clipper, 'instagram'),
+    /Plattform nicht verfügbar/
+  );
 });
