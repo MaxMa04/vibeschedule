@@ -18,6 +18,7 @@ import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
+import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { cn } from '@vibeschedule/frontend/lib/utils';
 import {
@@ -105,10 +106,6 @@ type FieldErrors<T> = Partial<
   Record<keyof T, { type: string; message: string }>
 >;
 
-const responseMessage = async (response: Response) => {
-  const { message } = await response.json().catch(() => ({}));
-  return (Array.isArray(message) ? message[0] : message) as string | undefined;
-};
 
 const useTeam = () => {
   const fetch = useFetch();

@@ -4,9 +4,12 @@ import { Request } from 'express';
 
 const isThrottled = (method: string, url: string) =>
   method === 'POST' &&
-  (url.includes('/public/v1/posts') || url.startsWith('/auth/login'));
+  (url.includes('/public/v1/posts') ||
+    url.startsWith('/auth/login') ||
+    url.startsWith('/clipping/apply'));
 
-// Post creation through the public API (per workspace) and login (per client)
+// Post creation through the public API (per workspace), login and the public
+// clipper application (per client)
 @Injectable()
 export class ThrottlerBehindProxyGuard extends ThrottlerGuard {
   public override async canActivate(

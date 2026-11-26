@@ -9,6 +9,7 @@ import {
   isBillingMonth,
   MISSED_POST_PENALTY_CENTS,
 } from '@vibeschedule/helpers/clippers/clipper.billing';
+import { formatIban } from '@vibeschedule/helpers/clippers/iban';
 
 // What each clipper earns per account and month (rules in clipper.billing.ts)
 @Injectable()
@@ -42,10 +43,15 @@ export class ClipperPayService {
 
     // every clipper, also those without an account yet
     const clippers = new Map(
-      clipperMembers.map(({ user, clipperAccounts }) => [
+      clipperMembers.map(({ user, clipperAccounts, payoutName, payoutIban }) => [
         user.id,
         {
           user,
+          // entered by the clipper in the onboarding
+          payout: {
+            name: payoutName,
+            iban: payoutIban ? formatIban(payoutIban) : null,
+          },
           maxAccounts: clipperAccounts,
           connected: 0,
           channels: [] as unknown[],

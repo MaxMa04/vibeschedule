@@ -107,12 +107,14 @@ export class OrganizationRepository {
       password: string;
       role: Role;
       clipperAccounts?: number;
+      phone?: string;
     }
   ) {
     const user = await this._user.model.user.create({
       data: {
         email: data.email,
         name: data.name,
+        phone: data.phone,
         password: data.password,
         organizations: {
           create: {
@@ -134,7 +136,9 @@ export class OrganizationRepository {
       orderBy: { createdAt: 'asc' },
       select: {
         clipperAccounts: true,
-        user: { select: { id: true, name: true, email: true } },
+        payoutName: true,
+        payoutIban: true,
+        user: { select: { id: true, name: true, email: true, phone: true } },
       },
     });
   }

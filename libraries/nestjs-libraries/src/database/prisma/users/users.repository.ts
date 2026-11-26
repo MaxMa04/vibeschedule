@@ -30,6 +30,7 @@ export class UsersRepository {
             id: true,
             email: true,
             name: true,
+            phone: true,
             timezoneName: true,
             createdAt: true,
           },

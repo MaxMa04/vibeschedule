@@ -3,6 +3,7 @@ import {
   ChartLineIcon,
   ImageIcon,
   LayersIcon,
+  ListChecksIcon,
   SettingsIcon,
   SmartphoneIcon,
   WalletIcon,
@@ -16,9 +17,12 @@ export interface NavItem {
   icon: LucideIcon;
   /** only for admins */
   admin?: boolean;
+  /** only for clippers */
+  clipper?: boolean;
 }
 
 export const mainNav: NavItem[] = [
+  { path: '/start', label: 'start_nav', icon: ListChecksIcon, clipper: true },
   { path: '/manual', label: 'manual_posting', icon: SmartphoneIcon },
   { path: '/launches', label: 'calendar', icon: CalendarDaysIcon },
   { path: '/formats', label: 'formats', icon: LayersIcon },
@@ -31,11 +35,16 @@ export const secondaryNav: NavItem[] = [
   { path: '/settings', label: 'settings', icon: SettingsIcon },
 ];
 
-// a clipper only posts by hand, calendar, media and analytics are for the team
+// a clipper sets up the accounts and posts by hand, calendar, media and
+// analytics are for the team
+export const CLIPPER_PATHS = ['/start', '/manual', '/settings'];
+
 export const navFor = (role?: string) =>
   role === 'CLIPPER'
-    ? mainNav.filter((item) => item.path === '/manual')
-    : mainNav.filter((item) => !item.admin || role === 'ADMIN');
+    ? mainNav.filter((item) => CLIPPER_PATHS.includes(item.path))
+    : mainNav.filter(
+        (item) => !item.clipper && (!item.admin || role === 'ADMIN')
+      );
 
 export const navItemFor = (pathname: string) =>
   [...mainNav, ...secondaryNav].find((item) => pathname.startsWith(item.path));
