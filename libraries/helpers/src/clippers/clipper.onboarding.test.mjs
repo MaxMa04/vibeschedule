@@ -4,6 +4,7 @@ import {
   addDays,
   normalizeUsername,
   planAccounts,
+  profileCheck,
   WARMUP_DAYS,
 } from './clipper.onboarding.ts';
 
@@ -129,4 +130,18 @@ test('a disconnected account only needs to be connected again', () => {
 test('usernames compare without @ and case', () => {
   assert.equal(normalizeUsername(' @Gym.Max '), 'gym.max');
   assert.equal(normalizeUsername(null), '');
+});
+
+test('the TikTok display name counts as the handed-out profile', () => {
+  const profile = { name: 'Ethan', username: 'ethanbulking' };
+  assert.equal(profileCheck('Ethan', profile, true), 'ok');
+  assert.equal(profileCheck('@EthanBulking', profile, true), 'ok');
+  assert.equal(profileCheck(null, profile, true), 'ok');
+  assert.equal(profileCheck('Kira', { name: null, username: null }, false), 'ok');
+});
+
+test('an account from before the onboarding gets switched over, a new one is the wrong account', () => {
+  const profile = { name: 'Ethan', username: 'ethanbulking' };
+  assert.equal(profileCheck('Kira', profile, false), 'rebrand');
+  assert.equal(profileCheck('Kira', profile, true), 'mismatch');
 });

@@ -14,7 +14,7 @@ import { billingDay } from '@vibeschedule/helpers/clippers/clipper.billing';
 import {
   AccountPlan,
   AccountTaskKey,
-  normalizeUsername,
+  profileCheck,
   onboardingDone,
   openWarmup,
   planAccounts,
@@ -158,13 +158,17 @@ export class ClipperOnboardingService {
         picture: channel.picture,
         disabled: channel.disabled,
       },
-      // the connected TikTok account is not the one we handed out
-      usernameMismatch:
-        !!channel &&
-        !!account.username &&
-        !!channel.profile &&
-        normalizeUsername(channel.profile) !==
-          normalizeUsername(account.username),
+      ...(() => {
+        const check = channel
+          ? profileCheck(channel.profile, account, !!account.createdOn)
+          : 'ok';
+        return {
+          // the clipper created and connected a different account
+          usernameMismatch: check === 'mismatch',
+          // connected before the onboarding: switch it to our profile
+          rebrand: check === 'rebrand',
+        };
+      })(),
     };
   }
 

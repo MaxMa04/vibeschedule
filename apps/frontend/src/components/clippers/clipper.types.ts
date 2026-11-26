@@ -23,6 +23,8 @@ export interface OnboardingAccount {
     disabled: boolean;
   } | null;
   usernameMismatch: boolean;
+  /** connected before the onboarding, still to be switched to our profile */
+  rebrand: boolean;
 }
 
 export interface OnboardingState {
