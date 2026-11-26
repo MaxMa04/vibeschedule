@@ -1,12 +1,12 @@
-import '../global.scss';
+import '../globals.css';
 import 'react-tooltip/dist/react-tooltip.css';
 import { ReactNode } from 'react';
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
-import clsx from 'clsx';
 import LayoutContext from '@vibeschedule/frontend/components/layout/layout.context';
 import { VariableContextComponent } from '@vibeschedule/react/helpers/variable.context';
-import { inter, spaceGrotesk } from '@vibeschedule/frontend/fonts/fonts';
+import { geist, geistMono } from '@vibeschedule/frontend/fonts/fonts';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,19 +21,26 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const mode =
     (await cookies()).get('mode')?.value === 'dark' ? 'dark' : 'light';
   return (
-    <html lang="de">
-      <body
-        className={clsx(
-          inter.variable,
-          spaceGrotesk.variable,
-          'font-sans text-primary !bg-primary',
-          mode
-        )}
-      >
+    <html
+      lang="de"
+      className={cn(
+        'font-sans antialiased',
+        geist.variable,
+        geistMono.variable,
+        mode
+      )}
+    >
+      <body>
         <VariableContextComponent
           backendUrl={process.env.NEXT_PUBLIC_BACKEND_URL!}
           isSecured={!process.env.NOT_SECURED}

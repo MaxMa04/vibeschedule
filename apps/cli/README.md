@@ -36,12 +36,12 @@ vibeschedule auth:check
 | Befehl | Zweck |
 | --- | --- |
 | `auth:check` | Schlüssel prüfen, zeigt API-URL und Anzahl Kanäle |
-| `integrations:list [--customer <id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`) und Kunde |
+| `integrations:list [--app <id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`) und App |
 | `integrations:settings <kanal-id>` | Einstellungen und Textlimit eines Kanals |
 | `upload <datei-oder-url>` | In die Mediathek hochladen, gibt `path` (öffentliche URL) zurück |
 | `media:list [-s <suche>] [-p <seite>]` | Mediathek, neueste zuerst |
 | `posts:create ...` | Post anlegen, siehe unten |
-| `posts:list [--start <iso>] [--end <iso>] [--customer <id>]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
+| `posts:list [--start <iso>] [--end <iso>] [--app <id>]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
 | `posts:delete <post-id>` | Post mit allen Kanälen seiner Gruppe löschen |
 | `posts:delete-group <gruppe>` | Alle Posts einer Gruppe löschen |
 | `posts:find-slot <kanal-id>` | Nächster freier Zeitslot des Kanals |

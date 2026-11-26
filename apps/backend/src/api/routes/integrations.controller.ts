@@ -15,7 +15,7 @@ import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/pris
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationTimeDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { IntegrationNameDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.name.dto';
-import { CustomerNameDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/customer.name.dto';
+import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
 
 @Controller('/integrations')
 export class IntegrationsController {
@@ -62,36 +62,13 @@ export class IntegrationsController {
     return this._integrationService.sync(org.id);
   }
 
-  @Get('/customers')
-  getCustomers(@GetOrgFromRequest() org: Organization) {
-    return this._integrationService.customers(org.id);
-  }
-
-  @Put('/customers/:id')
-  updateCustomerName(
+  @Put('/:id/app')
+  setApp(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: CustomerNameDto
+    @Body() body: IntegrationAppDto
   ) {
-    return this._integrationService.updateCustomerName(org.id, id, body.name);
-  }
-
-  @Put('/:id/group')
-  updateIntegrationGroup(
-    @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body('group') group: string
-  ) {
-    return this._integrationService.updateIntegrationGroup(org.id, id, group);
-  }
-
-  @Put('/:id/customer-name')
-  updateOnCustomerName(
-    @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body('name') name: string
-  ) {
-    return this._integrationService.updateOnCustomerName(org.id, id, name);
+    return this._integrationService.setApp(org.id, id, body.appId || null);
   }
 
   @Put('/:id/custom-name')

@@ -58,7 +58,7 @@ export class PostsRepository {
         deletedAt: null,
         integration: {
           deletedAt: null,
-          ...(query.customer ? { customerId: query.customer } : {}),
+          ...(query.app ? { appId: query.app } : {}),
         },
       },
       select: {
@@ -101,7 +101,7 @@ export class PostsRepository {
       deletedAt: null,
       integration: {
         deletedAt: null,
-        ...(query.customer ? { customerId: query.customer } : {}),
+        ...(query.app ? { appId: query.app } : {}),
         ...(query.integrations?.length
           ? { id: { in: query.integrations } }
           : {}),

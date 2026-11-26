@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { LayoutComponent } from '@vibeschedule/frontend/components/new-layout/layout.component';
 
 export default async function Layout({
@@ -5,5 +6,6 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  return <LayoutComponent>{children}</LayoutComponent>;
+  const sidebarOpen = (await cookies()).get('sidebar_state')?.value !== 'false';
+  return <LayoutComponent sidebarOpen={sidebarOpen}>{children}</LayoutComponent>;
 }

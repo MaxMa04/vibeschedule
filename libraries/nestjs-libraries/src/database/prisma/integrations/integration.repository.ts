@@ -8,13 +8,13 @@ export class IntegrationRepository {
   constructor(
     private _integration: PrismaRepository<'integration'>,
     private _posts: PrismaRepository<'post'>,
-    private _customers: PrismaRepository<'customer'>
+    private _apps: PrismaRepository<'app'>
   ) {}
 
   getIntegrationsList(org: string) {
     return this._integration.model.integration.findMany({
       where: { organizationId: org, deletedAt: null },
-      include: { customer: true },
+      include: { app: true },
     });
   }
 
@@ -97,60 +97,60 @@ export class IntegrationRepository {
     });
   }
 
-  async updateOnCustomerName(org: string, id: string, name: string) {
-    const customer = !name
-      ? undefined
-      : (await this._customers.model.customer.findFirst({
-          where: { orgId: org, name, deletedAt: null },
-        })) ||
-        (await this._customers.model.customer.create({
-          data: { name, orgId: org },
-        }));
-
+  setApp(org: string, id: string, appId: string | null) {
     return this._integration.model.integration.update({
       select: { id: true },
       where: { id, organizationId: org },
       data: {
-        customer: !customer
-          ? { disconnect: true }
-          : { connect: { id: customer.id } },
+        app: !appId ? { disconnect: true } : { connect: { id: appId } },
       },
     });
   }
 
-  updateIntegrationGroup(org: string, id: string, group: string) {
-    return this._integration.model.integration.update({
-      select: { id: true },
-      where: { id, organizationId: org },
-      data: {
-        customer: !group ? { disconnect: true } : { connect: { id: group } },
-      },
-    });
-  }
-
-  getCustomer(orgId: string, id: string) {
-    return this._customers.model.customer.findFirst({
+  getApp(orgId: string, id: string) {
+    return this._apps.model.app.findFirst({
       where: { id, orgId, deletedAt: null },
       select: { id: true },
     });
   }
 
-  getCustomerByName(orgId: string, name: string) {
-    return this._customers.model.customer.findFirst({
+  getAppByName(orgId: string, name: string) {
+    return this._apps.model.app.findFirst({
       where: { orgId, name, deletedAt: null },
     });
   }
 
-  updateCustomerName(orgId: string, id: string, name: string) {
-    return this._customers.model.customer.update({
+  apps(orgId: string) {
+    return this._apps.model.app.findMany({
+      where: { orgId, deletedAt: null },
+      orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: { integrations: { where: { deletedAt: null } } },
+        },
+      },
+    });
+  }
+
+  createApp(orgId: string, name: string) {
+    return this._apps.model.app.create({ data: { orgId, name } });
+  }
+
+  updateAppName(orgId: string, id: string, name: string) {
+    return this._apps.model.app.update({
       where: { id, orgId },
       data: { name },
     });
   }
 
-  customers(orgId: string) {
-    return this._customers.model.customer.findMany({
-      where: { orgId, deletedAt: null },
+  async deleteApp(orgId: string, id: string) {
+    await this._integration.model.integration.updateMany({
+      where: { organizationId: orgId, appId: id },
+      data: { appId: null },
+    });
+    return this._apps.model.app.update({
+      where: { id, orgId },
+      data: { deletedAt: new Date() },
     });
   }
 

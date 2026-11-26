@@ -18,14 +18,14 @@ yargs(hideBin(process.argv))
     'integrations:list',
     'Verbundene Kanäle auflisten',
     (y) =>
-      y.option('customer', {
-        describe: 'Nur Kanäle dieses Kunden (Kunden-ID)',
+      y.option('app', {
+        describe: 'Nur Kanäle dieser App (App-ID)',
         type: 'string',
       }),
     async (argv) => {
       print(
         await request(
-          `/integrations${argv.customer ? `?group=${enc(argv.customer)}` : ''}`
+          `/integrations${argv.app ? `?app=${enc(argv.app)}` : ''}`
         )
       );
     }
@@ -180,8 +180,8 @@ yargs(hideBin(process.argv))
           describe: 'Ende (ISO 8601), Standard: in 30 Tagen',
           type: 'string',
         })
-        .option('customer', {
-          describe: 'Nur Posts dieses Kunden (Kunden-ID)',
+        .option('app', {
+          describe: 'Nur Posts dieser App (App-ID)',
           type: 'string',
         }),
     async (argv) => {
@@ -190,7 +190,7 @@ yargs(hideBin(process.argv))
         startDate: argv.start || new Date(Date.now() - 30 * day).toISOString(),
         endDate: argv.end || new Date(Date.now() + 30 * day).toISOString(),
       });
-      if (argv.customer) query.set('customer', argv.customer);
+      if (argv.app) query.set('app', argv.app);
       print(await request(`/posts?${query}`));
     }
   )

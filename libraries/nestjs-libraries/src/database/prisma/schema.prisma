@@ -14,7 +14,8 @@ model Organization {
   apiKey       String?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
-  customers    Customer[]
+  apps         App[]
+  formats      Format[]
   integrations Integration[]
   media        Media[]
   posts        Post[]
@@ -89,7 +90,9 @@ model Media {
   @@index([organizationId])
 }
 
-model Customer {
+/// An app of VibeLabs (UBulk, Amelie, ...). Channels belong to at most one app.
+/// Stored in the former Postiz "Customer" table.
+model App {
   id           String        @id @default(uuid())
   name         String
   orgId        String
@@ -100,12 +103,46 @@ model Customer {
   integrations Integration[]
 
   @@unique([orgId, name, deletedAt])
+  @@map("Customer")
+}
+
+/// A content format (e.g. "Lockscreen-Story"). Runs on channels via
+/// IntegrationFormat; a post can name the format it belongs to.
+model Format {
+  id           String              @id @default(cuid())
+  orgId        String
+  name         String
+  description  String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+  organization Organization        @relation(fields: [orgId], references: [id])
+  integrations IntegrationFormat[]
+  posts        Post[]
+
+  @@index([orgId])
+}
+
+/// A format running on a channel.
+model IntegrationFormat {
+  integrationId String
+  formatId      String
+  status        FormatStatus @default(ACTIVE)
+  note          String?
+  position      Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  format        Format       @relation(fields: [formatId], references: [id], onDelete: Cascade)
+
+  @@id([integrationId, formatId])
+  @@index([formatId])
 }
 
 /// A Post for Me social account. internalId is the PfM account id (spc_...),
 /// providerIdentifier the PfM platform.
 model Integration {
-  id                 String       @id @default(cuid())
+  id                 String              @id @default(cuid())
   internalId         String
   organizationId     String
   name               String
@@ -113,21 +150,22 @@ model Integration {
   picture            String?
   profile            String?
   providerIdentifier String
-  disabled           Boolean      @default(false)
+  disabled           Boolean             @default(false)
   deletedAt          DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime?    @updatedAt
-  postingTimes       String       @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
-  customerId         String?
-  additionalSettings String?      @default("[]")
-  customer           Customer?    @relation(fields: [customerId], references: [id])
-  organization       Organization @relation(fields: [organizationId], references: [id])
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime?           @updatedAt
+  postingTimes       String              @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
+  appId              String?             @map("customerId")
+  additionalSettings String?             @default("[]")
+  app                App?                @relation(fields: [appId], references: [id])
+  organization       Organization        @relation(fields: [organizationId], references: [id])
   posts              Post[]
+  formats            IntegrationFormat[]
 
   @@unique([organizationId, internalId])
   @@index([organizationId])
   @@index([deletedAt])
-  @@index([customerId])
+  @@index([appId])
 }
 
 /// One row per channel. Posts saved together for several channels share a batchId.
@@ -146,12 +184,14 @@ model Post {
   releaseId      String?
   releaseURL     String?
   error          String?
+  formatId       String?
   creationMethod CreationMethod @default(WEB)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   deletedAt      DateTime?
   integration    Integration    @relation(fields: [integrationId], references: [id])
   organization   Organization   @relation(fields: [organizationId], references: [id])
+  format         Format?        @relation(fields: [formatId], references: [id])
   tags           TagsPosts[]
 
   @@index([group])
@@ -160,6 +200,7 @@ model Post {
   @@index([state])
   @@index([pfmPostId])
   @@index([integrationId])
+  @@index([formatId])
   @@index([organizationId, publishDate])
 }
 
@@ -168,6 +209,12 @@ enum State {
   PUBLISHED
   ERROR
   DRAFT
+}
+
+enum FormatStatus {
+  ACTIVE
+  TESTING
+  PAUSED
 }
 
 enum Role {

@@ -27,7 +27,7 @@ export class GetPostsListDto {
 
   @IsOptional()
   @IsString()
-  customer?: string;
+  app?: string;
 
   @IsOptional()
   @IsArray()

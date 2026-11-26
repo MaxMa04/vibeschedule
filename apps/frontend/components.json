@@ -1,0 +1,25 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "aliases": {
+    "components": "@vibeschedule/frontend/components",
+    "utils": "@vibeschedule/frontend/lib/utils",
+    "ui": "@vibeschedule/frontend/components/ui",
+    "lib": "@vibeschedule/frontend/lib",
+    "hooks": "@vibeschedule/frontend/hooks"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}

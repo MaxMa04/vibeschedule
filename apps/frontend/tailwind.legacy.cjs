@@ -1,6 +1,5 @@
+// Transitional: legacy Postiz tokens until every screen uses the shadcn tokens in globals.css.
 module.exports = {
-  darkMode: 'class',
-  content: ['./src/**/*.{ts,tsx,html}', '../../libraries/**/*.{ts,tsx,html}'],
   theme: {
     extend: {
       colors: {
@@ -10,14 +9,11 @@ module.exports = {
         error: 'var(--error)',
         bg: 'var(--bg)',
         surface: { DEFAULT: 'var(--surface)', 2: 'var(--surface-2)' },
-        border: 'var(--border)',
         ink: {
           DEFAULT: 'var(--ink)',
           2: 'var(--ink-2)',
           3: 'var(--ink-3)',
         },
-        primary: 'var(--color-primary)',
-        secondary: 'var(--color-secondary)',
         textColor: 'var(--new-btn-text)',
         third: 'var(--color-third)',
         forth: 'var(--color-forth)',
@@ -25,7 +21,6 @@ module.exports = {
         sixth: 'var(--color-sixth)',
         seventh: 'var(--color-seventh)',
         gray: 'var(--color-gray)',
-        input: 'var(--color-input)',
         inputText: 'var(--color-input-text)',
         tableBorder: 'var(--color-table-border)',
 
@@ -70,10 +65,6 @@ module.exports = {
       },
       gridTemplateColumns: {
         13: 'repeat(13, minmax(0, 1fr));',
-      },
-      fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-space-grotesk)', 'var(--font-inter)', 'sans-serif'],
       },
       borderRadius: {
         button: '12px',
@@ -216,7 +207,6 @@ module.exports = {
     },
   },
   plugins: [
-    require('tailwind-scrollbar'),
     function ({ addVariant }) {
       addVariant('child', '& > *');
       addVariant('child-hover', '& > *:hover');

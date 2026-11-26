@@ -116,7 +116,7 @@ export class IntegrationService {
             : {}),
           display: p.profile,
           time: JSON.parse(p.postingTimes),
-          customer: p.customer,
+          app: p.app ? { id: p.app.id, name: p.app.name } : null,
           additionalSettings: p.additionalSettings || '[]',
         };
       }
@@ -147,31 +147,42 @@ export class IntegrationService {
     return this._integrationRepository.updateCustomName(org, id, name);
   }
 
-  async updateIntegrationGroup(org: string, id: string, group: string) {
-    if (group && !(await this._integrationRepository.getCustomer(org, group))) {
-      throw new NotFoundException('Kunde nicht gefunden');
+  async setApp(org: string, id: string, appId: string | null) {
+    if (appId && !(await this._integrationRepository.getApp(org, appId))) {
+      throw new NotFoundException('App nicht gefunden');
     }
-    return this._integrationRepository.updateIntegrationGroup(org, id, group);
+    return this._integrationRepository.setApp(org, id, appId);
   }
 
-  updateOnCustomerName(org: string, id: string, name: string) {
-    return this._integrationRepository.updateOnCustomerName(org, id, name);
+  apps(orgId: string) {
+    return this._integrationRepository.apps(orgId);
   }
 
-  customers(orgId: string) {
-    return this._integrationRepository.customers(orgId);
+  async createApp(orgId: string, name: string) {
+    if (await this._integrationRepository.getAppByName(orgId, name)) {
+      throw new BadRequestException('Diese App gibt es schon');
+    }
+    return this._integrationRepository.createApp(orgId, name);
   }
 
-  async updateCustomerName(orgId: string, id: string, name: string) {
-    const exists = await this._integrationRepository.getCustomerByName(
-      orgId,
-      name
-    );
+  async updateAppName(orgId: string, id: string, name: string) {
+    const exists = await this._integrationRepository.getAppByName(orgId, name);
     if (exists && exists.id !== id) {
-      throw new BadRequestException('Diesen Kunden gibt es schon');
+      throw new BadRequestException('Diese App gibt es schon');
     }
-    return this._integrationRepository.updateCustomerName(orgId, id, name);
+    if (!(await this._integrationRepository.getApp(orgId, id))) {
+      throw new NotFoundException('App nicht gefunden');
+    }
+    return this._integrationRepository.updateAppName(orgId, id, name);
   }
+
+  async deleteApp(orgId: string, id: string) {
+    if (!(await this._integrationRepository.getApp(orgId, id))) {
+      throw new NotFoundException('App nicht gefunden');
+    }
+    return this._integrationRepository.deleteApp(orgId, id);
+  }
+
 
   setDisabled(org: string, id: string, disabled: boolean) {
     return this._integrationRepository.setDisabled(org, id, disabled);
@@ -231,24 +242,15 @@ export class IntegrationService {
 
   // Daily totals of every metric the platform reports, from the PfM feed of
   // the posts published in the last `days` days
-  async analytics(org: string, id: string, days: number) {
-    const integration = await this.getIntegrationOrThrow(org, id);
-    const platform = getPfmPlatform(integration.providerIdentifier)!;
-    const since = dayjs
-      .utc()
-      .subtract(days - 1, 'day')
-      .startOf('day');
-
+  // Feed posts of a channel published since the given day, newest first
+  async feedPosts(internalId: string, since: dayjs.Dayjs) {
     const posts: PfmFeedPost[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_FEED_PAGES; page++) {
-      const { data, meta } = await this._pfmClient.feed(
-        integration.internalId,
-        {
-          cursor,
-          limit: 50,
-        }
-      );
+      const { data, meta } = await this._pfmClient.feed(internalId, {
+        cursor,
+        limit: 50,
+      });
       posts.push(
         ...data.filter(
           (p) => p.posted_at && !dayjs.utc(p.posted_at).isBefore(since)
@@ -262,6 +264,18 @@ export class IntegrationService {
       }
       cursor = meta.cursor;
     }
+    return posts;
+  }
+
+  async analytics(org: string, id: string, days: number) {
+    const integration = await this.getIntegrationOrThrow(org, id);
+    const platform = getPfmPlatform(integration.providerIdentifier)!;
+    const since = dayjs
+      .utc()
+      .subtract(days - 1, 'day')
+      .startOf('day');
+
+    const posts = await this.feedPosts(integration.internalId, since);
 
     const dates = Array.from({ length: days }, (_, i) =>
       since.add(i, 'day').format('YYYY-MM-DD')

@@ -34,11 +34,11 @@ export class PublicIntegrationsController {
   @Get('/integrations')
   async listIntegrations(
     @GetOrgFromRequest() org: Organization,
-    @Query('group') customerId?: string
+    @Query('app') appId?: string
   ) {
     return (await this._integrationService.getIntegrationsList(org.id))
       .filter(
-        (integration) => !customerId || integration.customer?.id === customerId
+        (integration) => !appId || integration.app?.id === appId
       )
       .map((integration) => ({
         id: integration.id,
@@ -47,9 +47,9 @@ export class PublicIntegrationsController {
         picture: integration.picture,
         disabled: integration.disabled,
         profile: integration.profile,
-        customer: integration.customer
-          ? { id: integration.customer.id, name: integration.customer.name }
-          : undefined,
+        app: integration.app
+          ? { id: integration.app.id, name: integration.app.name }
+          : null,
       }));
   }
 

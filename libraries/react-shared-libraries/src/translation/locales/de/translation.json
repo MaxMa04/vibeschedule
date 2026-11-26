@@ -262,5 +262,9 @@
   "youtube_title_required": "Gib einen Titel ein",
   "youtube_title_too_long": "Der Titel darf höchstens 100 Zeichen haben",
   "bold_text": "Fett",
-  "underline_text": "Unterstrichen"
+  "underline_text": "Unterstrichen",
+  "formats": "Formate",
+  "dark_mode": "Dunkles Design",
+  "light_mode": "Helles Design",
+  "compose": "Posten"
 }

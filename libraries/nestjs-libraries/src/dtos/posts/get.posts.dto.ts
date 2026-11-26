@@ -9,5 +9,5 @@ export class GetPostsDto {
 
   @IsOptional()
   @IsString()
-  customer: string;
+  app?: string;
 }
