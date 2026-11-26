@@ -1,15 +1,17 @@
 'use client';
 
-import React, { FC, useMemo } from 'react';
-import { orderBy, uniqBy } from 'lodash';
+import React, { FC, useEffect, useMemo } from 'react';
 import { BoxIcon, CheckIcon } from 'lucide-react';
+import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
 import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { useAppList } from '@vibeschedule/frontend/lib/shared-data';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@vibeschedule/frontend/components/ui/select';
@@ -17,21 +19,7 @@ import { cn } from '@vibeschedule/frontend/lib/utils';
 
 const ALL = 'all';
 
-// the apps the channels belong to
-export const useChannelApps = (integrations: Integrations[]) =>
-  useMemo(
-    () =>
-      orderBy(
-        uniqBy(
-          integrations.flatMap((i) => (i.app ? [i.app] : [])),
-          'id'
-        ),
-        (a) => a.name.toLowerCase()
-      ),
-    [integrations]
-  );
-
-// filters by app; '' means all apps. Hidden while no channel has an app.
+// filters by app; '' means all apps. Hidden while there is no app.
 export const SelectApp: FC<{
   onChange: (appId: string) => void;
   integrations: Integrations[];
@@ -40,16 +28,25 @@ export const SelectApp: FC<{
   className?: string;
 }> = ({ onChange, integrations, app, list, className }) => {
   const t = useT();
-  const apps = useChannelApps(integrations);
+  const { data: apps } = useAppList();
+  const withoutApp = integrations.some((i) => !i.app);
   const items = useMemo(
     () => [
-      { value: ALL, label: t('calendar_all_apps') },
-      ...apps.map((a) => ({ value: a.id, label: a.name })),
+      { value: ALL, label: t('filter_all') },
+      ...(apps ?? []).map((a) => ({ value: a.id, label: a.name })),
+      ...(withoutApp ? [{ value: NO_APP, label: t('calendar_no_app') }] : []),
     ],
-    [apps, t]
+    [apps, withoutApp, t]
   );
 
-  if (!apps.length) {
+  // a saved app that was deleted meanwhile
+  useEffect(() => {
+    if (apps && app && !items.some((item) => item.value === app)) {
+      onChange('');
+    }
+  }, [apps, app, items, onChange]);
+
+  if (!apps?.length) {
     return null;
   }
 
@@ -90,15 +87,24 @@ export const SelectApp: FC<{
       }
     >
       <SelectTrigger
-        className={cn('h-9 min-w-32 md:h-8', className)}
+        className={cn(
+          'h-9 min-w-32 md:h-8',
+          app && 'border-primary/40 bg-muted',
+          className
+        )}
         aria-label={t('calendar_filter_app')}
       >
         <BoxIcon className="text-muted-foreground" />
+        <span className="text-muted-foreground">{t('calendar_app')}:</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
-          {items.map((item) => (
+          <SelectItem value={ALL}>{t('filter_all')}</SelectItem>
+        </SelectGroup>
+        <SelectSeparator />
+        <SelectGroup>
+          {items.slice(1).map((item) => (
             <SelectItem key={item.value} value={item.value}>
               {item.label}
             </SelectItem>

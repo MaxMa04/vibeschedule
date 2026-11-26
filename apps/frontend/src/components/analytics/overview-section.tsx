@@ -53,12 +53,12 @@ import { cn } from '@vibeschedule/frontend/lib/utils';
 
 export function OverviewSection({
   days,
-  app,
+  filtered,
   state,
   onOpen,
 }: {
   days: number;
-  app: string | null;
+  filtered: boolean;
   state: OverviewState;
   onOpen: (id: string) => void;
 }) {
@@ -80,8 +80,8 @@ export function OverviewSection({
           </EmptyMedia>
           <EmptyTitle>{t('analytics_no_channels_title')}</EmptyTitle>
           <EmptyDescription>
-            {app
-              ? t('analytics_no_channels_in_app')
+            {filtered
+              ? t('analytics_no_channels_filtered')
               : t('analytics_no_channels_description')}
           </EmptyDescription>
         </EmptyHeader>

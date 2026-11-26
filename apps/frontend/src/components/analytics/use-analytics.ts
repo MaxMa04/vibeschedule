@@ -1,5 +1,7 @@
 'use client';
 
+import { useAppList, useChannelList } from '@vibeschedule/frontend/lib/shared-data';
+
 import useSWR from 'swr';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import type {
@@ -51,10 +53,18 @@ function useJson<T>(url: string | null) {
   return { ...swr, refresh };
 }
 
-export function useOverview(days: number, app: string | null) {
+export function useOverview(
+  days: number,
+  app: string | null,
+  user: string | null,
+  enabled = true
+) {
   const query = new URLSearchParams({ days: String(days) });
   if (app) query.set('app', app);
-  return useJson<AnalyticsOverview>(`/analytics/overview?${query}`);
+  if (user) query.set('user', user);
+  return useJson<AnalyticsOverview>(
+    enabled ? `/analytics/overview?${query}` : null
+  );
 }
 
 export function useAccount(id: string | null, days: number) {
@@ -64,12 +74,11 @@ export function useAccount(id: string | null, days: number) {
 }
 
 export function useApps() {
-  return useJson<AppItem[]>('/apps');
+  return useAppList<AppItem>();
 }
 
 export function useChannels() {
-  const result = useJson<{ integrations: ChannelItem[] }>('/integrations/list');
-  return { ...result, data: result.data?.integrations };
+  return useChannelList<ChannelItem>();
 }
 
 export type OverviewState = ReturnType<typeof useOverview>;

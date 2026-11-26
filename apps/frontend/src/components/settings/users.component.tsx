@@ -1,4 +1,6 @@
 'use client';
+import { useChannelList } from '@vibeschedule/frontend/lib/shared-data';
+import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
 
 import { FC, FormEvent, useCallback, useId, useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -119,14 +121,7 @@ const useTeam = () => {
   });
 };
 
-const useChannels = () => {
-  const fetch = useFetch();
-  return useSWR('/integrations/list', async (url: string) => {
-    return (await (await fetch(url)).json()).integrations as Channel[];
-  });
-};
-
-const NO_APP = 'none';
+const useChannels = () => useChannelList<Channel>();
 
 const ChannelPicker: FC<{
   selected: string[];
@@ -252,6 +247,17 @@ const ChannelPicker: FC<{
   );
 };
 
+const ChannelsHint: FC<{ role: UserRole }> = ({ role }) => {
+  const t = useT();
+  return (
+    <FieldDescription>
+      {role === 'CLIPPER'
+        ? t('clipper_channels_hint')
+        : t('responsible_channels_hint')}
+    </FieldDescription>
+  );
+};
+
 const ChannelsForm: FC<{
   user: TeamUser;
   onClose: () => void;
@@ -262,6 +268,8 @@ const ChannelsForm: FC<{
   const t = useT();
   const [channels, setChannels] = useState(user.channels);
   const [saving, setSaving] = useState(false);
+  // the channel list carries the responsible users
+  const { mutate: mutateChannels } = useChannels();
 
   const save = useCallback(
     async (event: FormEvent) => {
@@ -280,16 +288,17 @@ const ChannelsForm: FC<{
         return;
       }
       toaster.show(t('clipper_channels_saved'));
+      mutateChannels();
       onSaved();
       onClose();
     },
-    [channels, fetch, onClose, onSaved, t, toaster, user.id]
+    [channels, fetch, mutateChannels, onClose, onSaved, t, toaster, user.id]
   );
 
   return (
     <form onSubmit={save} className="flex flex-1 flex-col gap-6" noValidate>
       <Field>
-        <FieldDescription>{t('clipper_channels_hint')}</FieldDescription>
+        <ChannelsHint role={user.role} />
         <ChannelPicker selected={channels} onChange={setChannels} />
       </Field>
       <SheetActions onClose={onClose} submitting={saving} label={t('save')} />
@@ -332,6 +341,7 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
   const roleLabel = useRoleLabel();
   const [channels, setChannels] = useState<string[]>([]);
   const [channelsMissing, setChannelsMissing] = useState(false);
+  const { mutate: mutateChannels } = useChannels();
 
   const resolver = useCallback<Resolver<CreateUserValues>>(
     async (values) => {
@@ -380,7 +390,7 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
           ...values,
           name: values.name.trim(),
           email: values.email.trim(),
-          ...(values.role === 'CLIPPER' ? { channels } : {}),
+          channels,
         }),
       });
       if (response.status === 409) {
@@ -395,10 +405,11 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
         return;
       }
       toaster.show(t('user_created'));
+      if (channels.length) mutateChannels();
       onSaved();
       onClose();
     },
-    [channels, fetch, form, onClose, onSaved, t, toaster]
+    [channels, fetch, form, mutateChannels, onClose, onSaved, t, toaster]
   );
 
   const roles = (['USER', 'ADMIN', 'CLIPPER'] as const).map((value) => ({
@@ -485,20 +496,18 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
           />
           <FieldDescription>{roleDescription}</FieldDescription>
         </Field>
-        {role === 'CLIPPER' && (
-          <Field>
-            <FieldLabel>{t('clipper_channels')}</FieldLabel>
-            <FieldDescription>{t('clipper_channels_hint')}</FieldDescription>
+        <Field>
+            <FieldLabel>{t('responsible_for')}</FieldLabel>
+            <ChannelsHint role={role} />
             <ChannelPicker
               selected={channels}
               onChange={pickChannels}
               invalid={channelsMissing}
             />
-            {channelsMissing && (
+            {channelsMissing && role === 'CLIPPER' && (
               <FieldError>{t('clipper_channels_required')}</FieldError>
             )}
           </Field>
-        )}
       </FieldGroup>
       <SheetActions
         onClose={onClose}
@@ -592,7 +601,7 @@ const ResetPasswordForm: FC<{ user: TeamUser; onClose: () => void }> = ({
   );
 };
 
-const ClipperChannels: FC<{ channels: Channel[]; onClick: () => void }> = ({
+const UserChannels: FC<{ channels: Channel[]; onClick: () => void }> = ({
   channels,
   onClick,
 }) => {
@@ -646,7 +655,7 @@ export const UsersComponent = () => {
     (user: TeamUser) => () => {
       modals.openModal({
         variant: 'sheet',
-        title: t('clipper_channels_edit'),
+        title: t('responsible_for'),
         description: user.name || user.email,
         children: (close) => (
           <ChannelsForm user={user} onClose={close} onSaved={() => mutate()} />
@@ -791,12 +800,10 @@ export const UsersComponent = () => {
                   >
                     {roleLabel(p.role)}
                   </Badge>
-                  {p.role === 'CLIPPER' && (
-                    <ClipperChannels
-                      channels={channelsOf(p)}
-                      onClick={editChannels(p)}
-                    />
-                  )}
+                  <UserChannels
+                    channels={channelsOf(p)}
+                    onClick={editChannels(p)}
+                  />
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground tabular-nums max-md:hidden">
@@ -817,12 +824,10 @@ export const UsersComponent = () => {
                     <MoreHorizontalIcon />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
-                    {p.role === 'CLIPPER' && (
-                      <DropdownMenuItem onClick={editChannels(p)}>
-                        <RadioTowerIcon />
-                        {t('clipper_channels_edit')}
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem onClick={editChannels(p)}>
+                      <RadioTowerIcon />
+                      {t('responsible_for')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={resetPassword(p)}>
                       <KeyRoundIcon />
                       {t('reset_password')}

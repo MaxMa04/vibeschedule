@@ -2,7 +2,11 @@
 
 import React, { useCallback, useState } from 'react';
 import useCookie from 'react-use-cookie';
-import { CalendarWeekProvider } from '@vibeschedule/frontend/components/launches/calendar.context';
+import {
+  CALENDAR_FILTER_KEYS,
+  CalendarWeekProvider,
+} from '@vibeschedule/frontend/components/launches/calendar.context';
+import { usePersistedFilters } from '@vibeschedule/frontend/lib/use-persisted-filters';
 import { Filters } from '@vibeschedule/frontend/components/launches/filters';
 import { Calendar } from '@vibeschedule/frontend/components/launches/calendar';
 import { DNDProvider } from '@vibeschedule/frontend/components/launches/helpers/dnd.provider';
@@ -21,6 +25,7 @@ export const LaunchesComponent = () => {
   const [reload, setReload] = useState(false);
   const [collapsed, setCollapsed] = useCookie('calendar-channels-collapsed', '0');
   const { isLoading, data: integrations, mutate } = useIntegrationList();
+  const { ready } = usePersistedFilters('calendar', CALENDAR_FILTER_KEYS);
 
   const update = useCallback(
     async (shouldReload: boolean) => {
@@ -33,7 +38,7 @@ export const LaunchesComponent = () => {
     [mutate]
   );
 
-  if (isLoading || reload) {
+  if (isLoading || reload || !ready) {
     return (
       <div className={`flex ${pageHeight} min-w-0`}>
         <div className="hidden w-64 shrink-0 flex-col gap-2 border-e bg-card p-3 md:flex">

@@ -10,6 +10,11 @@ import {
 } from '@nestjs/common';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
+import {
+  GetUserFromRequest,
+  SessionUser,
+} from '@vibeschedule/nestjs-libraries/user/user.from.request';
+import { channelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import { FormatsService } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.service';
 import {
   FormatDto,
@@ -29,9 +34,14 @@ export class FormatsController {
   @Get('/overview')
   overview(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
     @Query() query: FormatsOverviewQueryDto
   ) {
-    return this._formatsService.overview(org.id, query.app, query.days || 30);
+    return this._formatsService.overview(
+      org.id,
+      channelFilter(query, user.id),
+      query.days || 30
+    );
   }
 
   @Post('/')

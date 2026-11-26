@@ -1,6 +1,6 @@
 # vibeschedule CLI
 
-Kommandozeile für die Public API von vibeschedule: Kanäle ansehen, Medien hochladen, Posts einplanen und Statistiken abrufen. Alle Befehle geben JSON auf stdout aus, Fehler landen auf stderr mit Exit-Code 1.
+Kommandozeile für die Public API von vibeschedule: Kanäle ansehen, Apps, Formate und Zuständige pflegen, Medien hochladen, Posts einplanen und Statistiken abrufen. Alle Befehle geben JSON auf stdout aus, Fehler landen auf stderr mit Exit-Code 1.
 
 Basiert auf der Postiz CLI (AGPL-3.0).
 
@@ -36,7 +36,14 @@ vibeschedule auth:check
 | Befehl | Zweck |
 | --- | --- |
 | `auth:check` | Schlüssel prüfen, zeigt API-URL und Anzahl Kanäle |
-| `integrations:list [--app <id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`) und App |
+| `integrations:list [--app <id>] [--user <nutzer-id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`), App, `manualOnly` und den zuständigen Nutzern (`users`). `--app none` zeigt Kanäle ohne App |
+| `integrations:app <kanal-id> <app>` | App eines Kanals setzen (App-ID oder Name), `none` entfernt sie |
+| `integrations:users <kanal-id> <nutzer>` | Zuständige eines Kanals setzen, ersetzt die bisherigen. Nutzer-IDs oder E-Mails kommagetrennt, `none` für keine. Ein Clipper darunter stellt den Kanal auf „Nur manuell“ |
+| `users:list` | Nutzer des Workspace mit ID, Name, E-Mail und Rolle (`ADMIN`, `USER`, `CLIPPER`) |
+| `apps:list` | Apps mit ID und Anzahl Kanäle |
+| `apps:create <name>` | App anlegen |
+| `apps:rename <app> <name>` | App umbenennen (App-ID oder bisheriger Name) |
+| `apps:delete <app>` | App löschen, ihre Kanäle bleiben ohne App |
 | `integrations:settings <kanal-id>` | Einstellungen und Textlimit eines Kanals |
 | `integrations:connect-url <plattform>` | Link, mit dem der Besitzer ein Konto verbindet (auf seinem Gerät öffnen, anmelden, zustimmen) |
 | `integrations:sync` | Bei Post for Me verbundene Konten als Kanäle übernehmen, z. B. nach einem Verbindungslink |
@@ -44,16 +51,25 @@ vibeschedule auth:check
 | `upload <datei-oder-url>` | In die Mediathek hochladen, gibt `path` (öffentliche URL) zurück |
 | `media:list [-s <suche>] [-p <seite>]` | Mediathek, neueste zuerst |
 | `posts:create ...` | Post anlegen, siehe unten |
-| `posts:list [--start <iso>] [--end <iso>] [--app <id>]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
+| `posts:list [--start <iso>] [--end <iso>] [--app <id>] [--user <nutzer-id>]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
 | `posts:delete <post-id>` | Post mit allen Kanälen seiner Gruppe löschen |
 | `posts:delete-group <gruppe>` | Alle Posts einer Gruppe löschen |
 | `posts:find-slot <kanal-id>` | Nächster freier Zeitslot des Kanals |
 | `formats:list` | Formate mit ID, Beschreibung und den Kanälen, auf denen sie laufen (`status` ACTIVE, TESTING oder PAUSED) |
-| `formats:overview [--app <id>] [-d <tage>]` | Pro Kanal seine Formate mit Posts, Aufrufen und Likes im Zeitraum (Standard 30 Tage), dazu `feed.withoutFormat`: veröffentlichte Posts ohne Format. `--app none` zeigt Kanäle ohne App |
-| `analytics:overview [-d <tage>] [--app <id>] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
+| `formats:overview [--app <id>] [--user <nutzer-id>] [-d <tage>]` | Pro Kanal seine Formate mit Posts, Aufrufen und Likes im Zeitraum (Standard 30 Tage), dazu `feed.withoutFormat`: veröffentlichte Posts ohne Format. `--app none` zeigt Kanäle ohne App |
+| `formats:create <name> [-d <beschreibung>]` | Format anlegen |
+| `formats:update <format> [--name <name>] [-d <beschreibung>]` | Format umbenennen oder Beschreibung ändern, was fehlt, bleibt. `-d ""` leert die Beschreibung |
+| `formats:delete <format>` | Format löschen. Es verschwindet von allen Kanälen, Posts behalten ihren Bezug |
+| `formats:assign <format> <kanal-id> [--status active\|testing\|paused] [--note <text>] [--position <n>]` | Format auf einem Kanal laufen lassen oder Status, Notiz und Reihenfolge ändern. Neu zugewiesen ist der Status `active`, was fehlt, bleibt |
+| `formats:unassign <format> <kanal-id>` | Format von einem Kanal nehmen |
+| `analytics:overview [-d <tage>] [--app <id>] [--user <nutzer-id>] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
 | `analytics:account <kanal-id> [-d <tage>] [--fresh]` | Ein Kanal: Kennzahlen mit Vergleich, `series` pro Tag und alle Posts des Zeitraums mit Metriken, Link, Vorschaubild und zugehörigem vibeschedule-Post samt Format |
 | `analytics:channel <kanal-id> [-d <tage>]` | Statistiken eines Kanals, Standard 7 Tage |
 | `analytics:post <post-id>` | Statistiken eines veröffentlichten Posts |
+
+`<format>` und `<app>` nehmen die ID oder den Namen (Groß- und Kleinschreibung egal). `--user` filtert auf die Kanäle, für die dieser Nutzer zuständig ist (ID aus `users:list`).
+
+Zuständige: Jeder Nutzer kann für Kanäle zuständig sein. Bei Admins und Team ist das nur eine Zuordnung zum Filtern. Ein Clipper sieht in der App nur seine Kanäle und postet sie von Hand, deshalb geht ein Kanal, den ein Clipper bekommt, auf „Nur manuell“. Wird der Clipper wieder entfernt, bleibt „Nur manuell“ stehen (`integrations:manual-only <kanal-id> --off` hebt es auf).
 
 Analytics-Zahlen sind die aktuellen Gesamtwerte der Posts, die im Zeitraum veröffentlicht wurden (Tage in Europe/Berlin). Ein Tag in `series` zeigt also die Aufrufe der Posts dieses Tages, nicht die Aufrufe an diesem Tag. Der Feed wird pro Kanal 5 Minuten zwischengespeichert.
 
@@ -98,6 +114,17 @@ Mehrere Plattformen mit eigenen Einstellungen je Kanal (IDs in der Datei ersetze
 
 ```bash
 vibeschedule posts:create -j examples/multi-platform-with-settings.json
+```
+
+App, Formate und Zuständige für einen Kanal einrichten:
+
+```bash
+vibeschedule apps:create "Recipe Manager"
+vibeschedule integrations:app <kanal-id> "Recipe Manager"
+vibeschedule formats:create "Storytime" -d "Hook, drei Slides, CTA"
+vibeschedule formats:assign "Storytime" <kanal-id> --status testing --note "erste Woche"
+vibeschedule users:list
+vibeschedule integrations:users <kanal-id> max@vibelabs.to,<nutzer-id>
 ```
 
 Weitere Vorlagen liegen in [examples/](examples/): `tiktok-video.json`, `youtube-video.json`, `multi-platform-post.json`.

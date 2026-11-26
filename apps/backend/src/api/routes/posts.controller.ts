@@ -10,6 +10,11 @@ import {
 } from '@nestjs/common';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
+import {
+  GetUserFromRequest,
+  SessionUser,
+} from '@vibeschedule/nestjs-libraries/user/user.from.request';
+import { channelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 import { GetPostsDto } from '@vibeschedule/nestjs-libraries/dtos/posts/get.posts.dto';
 import { GetPostsListDto } from '@vibeschedule/nestjs-libraries/dtos/posts/get.posts.list.dto';
@@ -55,9 +60,14 @@ export class PostsController {
   @Get('/')
   getPosts(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
     @Query() query: GetPostsDto
   ) {
-    return this._postsService.getPostsMinified(org.id, query);
+    return this._postsService.getPostsMinified(
+      org.id,
+      query,
+      channelFilter(query, user.id)
+    );
   }
 
   @Get('/find-slot')
@@ -76,9 +86,14 @@ export class PostsController {
   @Get('/list')
   getPostsList(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
     @Query() query: GetPostsListDto
   ) {
-    return this._postsService.getPostsList(org.id, query);
+    return this._postsService.getPostsList(
+      org.id,
+      query,
+      channelFilter(query, user.id)
+    );
   }
 
   @Get('/group/:group')

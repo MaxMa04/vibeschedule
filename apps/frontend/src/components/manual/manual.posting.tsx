@@ -52,6 +52,7 @@ import {
 } from '@vibeschedule/frontend/components/ui/tabs';
 import { Alert, AlertTitle } from '@vibeschedule/frontend/components/ui/alert';
 import { cn } from '@vibeschedule/frontend/lib/utils';
+import { usePersistedFilters } from '@vibeschedule/frontend/lib/use-persisted-filters';
 import {
   ManualMedia,
   useManualMedia,
@@ -192,13 +193,16 @@ const ListSkeleton = () => (
   </div>
 );
 
+const TAB_KEYS = ['tab'];
+
 const ManualList: FC<{
   posts?: ManualPost[];
   failed: boolean;
   onOpen: (id: string) => void;
 }> = ({ posts, failed, onOpen }) => {
   const t = useT();
-  const [tab, setTab] = useState<'open' | 'posted'>('open');
+  const { ready, params, setParams } = usePersistedFilters('manual', TAB_KEYS);
+  const tab = params.get('tab') === 'posted' ? 'posted' : 'open';
   const open = useMemo(
     () => (posts || []).filter((post) => post.state === 'QUEUE'),
     [posts]
@@ -232,7 +236,9 @@ const ManualList: FC<{
       />
       <Tabs
         value={tab}
-        onValueChange={(value) => setTab(value as 'open' | 'posted')}
+        onValueChange={(value) =>
+          setParams({ tab: value === 'posted' ? 'posted' : null })
+        }
       >
         <TabsList className="w-full group-data-horizontal/tabs:h-10">
           <TabsTrigger value="open">
@@ -252,7 +258,7 @@ const ManualList: FC<{
           <CircleAlertIcon />
           <AlertTitle>{t('manual_load_failed')}</AlertTitle>
         </Alert>
-      ) : !posts ? (
+      ) : !posts || !ready ? (
         <ListSkeleton />
       ) : !shown.length ? (
         <Empty className="border">

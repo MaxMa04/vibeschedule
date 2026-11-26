@@ -7,7 +7,13 @@ import {
   LayersIcon,
   PlusIcon,
   TriangleAlertIcon,
+  UsersRoundIcon,
 } from 'lucide-react';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
+import {
+  ChannelResponsible,
+  useResponsibleSheet,
+} from '@vibeschedule/frontend/components/team/responsible';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { cn } from '@vibeschedule/frontend/lib/utils';
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
@@ -140,6 +146,8 @@ export const AccountCard = ({
   onManageApp: () => void;
 }) => {
   const t = useT();
+  const me = useUser();
+  const setResponsible = useResponsibleSheet();
   const without = channel.feed?.withoutFormat;
 
   return (
@@ -182,6 +190,7 @@ export const AccountCard = ({
           </div>
         </div>
         <CardAction className="flex items-center gap-1">
+          <ChannelResponsible channelId={channel.id} labelled />
           <Link
             href={analyticsHref(channel.id, days)}
             className={buttonVariants({
@@ -217,6 +226,12 @@ export const AccountCard = ({
                 <LayersIcon />
                 {t('formats_change_app')}
               </DropdownMenuItem>
+              {me?.role === 'ADMIN' && (
+                <DropdownMenuItem onClick={() => setResponsible(channel)}>
+                  <UsersRoundIcon />
+                  {t('responsible_set')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </CardAction>

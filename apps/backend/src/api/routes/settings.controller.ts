@@ -19,7 +19,7 @@ import {
   AddTeamMemberDto,
   UserChannelsDto,
 } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
-import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
+import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
 import { SetPasswordDto } from '@vibeschedule/nestjs-libraries/dtos/settings/set.password.dto';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 
@@ -28,7 +28,7 @@ import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 export class SettingsController {
   constructor(
     private _organizationService: OrganizationService,
-    private _postsService: PostsService
+    private _channelUsersService: ChannelUsersService
   ) {}
 
   @Get('/team')
@@ -42,10 +42,14 @@ export class SettingsController {
     @Body() body: AddTeamMemberDto
   ) {
     const user = await this._organizationService.addTeamMember(org.id, body);
-    if (body.role !== 'CLIPPER') {
-      return { ...user, channels: [] };
-    }
-    return { ...user, ...(await this.assign(org.id, user.id, body.channels)) };
+    return {
+      ...user,
+      ...(await this._channelUsersService.setUserChannels(
+        org.id,
+        user.id,
+        body.channels || []
+      )),
+    };
   }
 
   @Put('/team/users/:id/channels')
@@ -54,21 +58,7 @@ export class SettingsController {
     @Param('id') id: string,
     @Body() body: UserChannelsDto
   ) {
-    return this.assign(org.id, id, body.channels);
-  }
-
-  // A clipper posts by hand, so a channel handed to one stops publishing
-  // through PfM
-  private async assign(orgId: string, userId: string, channels: string[] = []) {
-    const { added, ...result } = await this._organizationService.setChannels(
-      orgId,
-      userId,
-      channels
-    );
-    for (const id of added) {
-      await this._postsService.setChannelManualOnly(orgId, id, true);
-    }
-    return result;
+    return this._channelUsersService.setUserChannels(org.id, id, body.channels);
   }
 
   @Put('/team/users/:id/password')

@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
+import { usePersistedFilters } from '@vibeschedule/frontend/lib/use-persisted-filters';
+import { ResponsibleFilter } from '@vibeschedule/frontend/components/team/responsible';
 import { RefreshCwIcon } from 'lucide-react';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
@@ -35,38 +37,27 @@ import { OverviewSection } from '@vibeschedule/frontend/components/analytics/ove
 import { AccountSection } from '@vibeschedule/frontend/components/analytics/account-section';
 
 const ALL = '__all';
-const NO_APP = 'none';
+const FILTER_KEYS = ['account', 'app', 'user', 'days'];
 
 export function AnalyticsView() {
   const t = useT();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+  const { ready, params, setParams } = usePersistedFilters(
+    'analytics',
+    FILTER_KEYS
+  );
 
   const account = params.get('account');
   const app = params.get('app');
+  const user = params.get('user');
   const daysParam = Number(params.get('days'));
   const days = (PERIODS as readonly number[]).includes(daysParam)
     ? daysParam
     : 7;
 
-  const setParams = useCallback(
-    (next: Record<string, string | null>) => {
-      const query = new URLSearchParams(params.toString());
-      for (const [key, value] of Object.entries(next)) {
-        if (value === null) query.delete(key);
-        else query.set(key, value);
-      }
-      const qs = query.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [params, pathname, router]
-  );
-
   const channels = useChannels();
   const apps = useApps();
-  const overview = useOverview(days, account ? null : app);
-  const detail = useAccount(account, days);
+  const overview = useOverview(days, app, user, ready && !account);
+  const detail = useAccount(ready ? account : null, days);
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = async () => {
@@ -143,6 +134,14 @@ export function AnalyticsView() {
             </Select>
 
             {!account ? (
+              <ResponsibleFilter
+                value={user}
+                onChange={(next) => setParams({ user: next })}
+                className="h-10 w-full sm:w-auto md:h-8"
+              />
+            ) : null}
+
+            {!account ? (
               <Select
                 value={app ?? ALL}
                 items={appItems}
@@ -217,7 +216,7 @@ export function AnalyticsView() {
       ) : (
         <OverviewSection
           days={days}
-          app={app}
+          filtered={!!app || !!user}
           state={overview}
           onOpen={(id) => setParams({ account: id })}
         />

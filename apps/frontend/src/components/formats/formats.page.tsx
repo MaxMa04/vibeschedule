@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BoxesIcon, LayersIcon, PlusIcon, UsersIcon } from 'lucide-react';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
@@ -40,8 +39,10 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@vibeschedule/frontend/components/ui/toggle-group';
+import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
+import { usePersistedFilters } from '@vibeschedule/frontend/lib/use-persisted-filters';
+import { ResponsibleFilter } from '@vibeschedule/frontend/components/team/responsible';
 import {
-  NO_APP,
   OverviewChannel,
   PERIODS,
   useApps,
@@ -68,28 +69,26 @@ const channelRef = (channel: OverviewChannel) => ({
   identifier: channel.identifier,
 });
 
+const FILTER_KEYS = ['app', 'user', 'days', 'view'];
+
 const useQueryState = () => {
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { ready, params, setParams } = usePersistedFilters(
+    'formats',
+    FILTER_KEYS
+  );
   const days = Number(params.get('days'));
-  const set = (key: string, value: string | null) => {
-    const next = new URLSearchParams(params.toString());
-    if (value) next.set(key, value);
-    else next.delete(key);
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
-  };
   return {
+    ready,
     app: params.get('app'),
+    user: params.get('user'),
     days: PERIODS.includes(days) ? days : 30,
     view: (params.get('view') === 'formats' ? 'formats' : 'accounts') as View,
-    setApp: (app: string | null) => set('app', app),
+    setApp: (app: string | null) => setParams({ app }),
+    setUser: (user: string | null) => setParams({ user }),
     setDays: (value: number) =>
-      set('days', value === 30 ? null : String(value)),
-    setView: (view: View) => set('view', view === 'accounts' ? null : view),
+      setParams({ days: value === 30 ? null : String(value) }),
+    setView: (view: View) =>
+      setParams({ view: view === 'accounts' ? null : view }),
   };
 };
 
@@ -125,10 +124,11 @@ const Section = ({
 
 export const FormatsPage = () => {
   const t = useT();
-  const { app, days, view, setApp, setDays, setView } = useQueryState();
+  const { ready, app, user, days, view, setApp, setUser, setDays, setView } =
+    useQueryState();
   const { data: apps } = useApps();
   const { data: formats } = useFormats();
-  const overview = useOverview(app, days);
+  const overview = useOverview(app, user, days, ready);
   const channels = overview.data?.channels;
 
   const [formatSheet, setFormatSheet] = useState<FormatSheetState | null>(null);
@@ -216,13 +216,18 @@ export const FormatsPage = () => {
           </SelectGroup>
         </SelectContent>
       </Select>
+      <ResponsibleFilter
+        value={user}
+        onChange={setUser}
+        className="data-[size=default]:h-10 max-md:min-w-0 max-md:flex-1 md:data-[size=default]:h-8"
+      />
       <Select
         value={String(days)}
         items={periodItems}
         onValueChange={(v) => v && setDays(Number(v))}
       >
         <SelectTrigger
-          className="data-[size=default]:h-10 md:data-[size=default]:h-8"
+          className="data-[size=default]:h-10 max-md:basis-full md:data-[size=default]:h-8"
           aria-label={t('formats_period')}
         >
           <SelectValue />
@@ -311,7 +316,7 @@ export const FormatsPage = () => {
     }
     if (!channels) return <LoadingGrid />;
     if (!channels.length) {
-      return app ? (
+      return app || user ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -373,9 +378,10 @@ export const FormatsPage = () => {
       }
       const runsHere = (id: string) =>
         channels.some((c) => c.formats.some((f) => f.formatId === id));
-      // with an app filter, formats of other apps would only be noise
-      const shown = app ? formats.filter((f) => runsHere(f.id)) : formats;
-      const idle = app ? formats.filter((f) => !runsHere(f.id)) : [];
+      // with a filter, formats of other accounts would only be noise
+      const narrowed = !!app || !!user;
+      const shown = narrowed ? formats.filter((f) => runsHere(f.id)) : formats;
+      const idle = narrowed ? formats.filter((f) => !runsHere(f.id)) : [];
       return (
         <div className="flex flex-col gap-6">
           {!shown.length ? (

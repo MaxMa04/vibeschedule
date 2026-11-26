@@ -19,11 +19,9 @@ import {
   PfmPlatform,
 } from '@vibeschedule/nestjs-libraries/integrations/pfm.platforms';
 import { PfmFeedPost } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
+import { ChannelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 
 dayjs.extend(utc);
-
-/** `app` filter value for channels that belong to no app */
-export const NO_APP = 'none';
 
 export interface FormatStats {
   published: number;
@@ -138,19 +136,15 @@ export class FormatsService {
 
   // Per channel: its formats with the posts of the range and, for published
   // posts, the views and likes from the PfM feed
-  async overview(orgId: string, appFilter: string | undefined, days: number) {
+  async overview(orgId: string, filter: ChannelFilter, days: number) {
     const since = dayjs
       .utc()
       .subtract(days - 1, 'day')
       .startOf('day');
-    const channels = (
-      await this._formatsRepository.channelsWithFormats(orgId)
-    ).filter((channel) => {
-      const appId =
-        channel.app && !channel.app.deletedAt ? channel.app.id : null;
-      if (!appFilter) return true;
-      return appFilter === NO_APP ? !appId : appId === appFilter;
-    });
+    const channels = await this._formatsRepository.channelsWithFormats(
+      orgId,
+      filter
+    );
 
     const posts = await this._formatsRepository.postsSince(
       orgId,

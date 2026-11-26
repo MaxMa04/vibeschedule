@@ -19,6 +19,13 @@ const rules = [
       'Legacy Postiz token. Use the shadcn theme tokens (bg-card, text-muted-foreground, border, primary, …) and standard breakpoints.',
   },
   {
+    // SWR caches by key: two fetchers with different result shapes on one key crash the other page
+    pattern: /['"`]\/(?:integrations\/list|apps|user\/team)['"`]/,
+    allow: /lib\/shared-data\.ts$/,
+    message:
+      'Read /integrations/list, /apps and /user/team only through useChannelList/useAppList/useTeamList (or CHANNELS_KEY/APPS_KEY/TEAM_KEY) from @vibeschedule/frontend/lib/shared-data.',
+  },
+  {
     pattern: /from\s+['"]@radix-ui\//,
     message: 'This project uses shadcn on Base UI (@base-ui/react), not Radix.',
   },
@@ -40,6 +47,7 @@ for (const file of files) {
     .split('\n')
     .forEach((line, i) => {
       for (const rule of rules) {
+        if (rule.allow?.test(file)) continue;
         if (rule.pattern.test(line)) {
           failures++;
           console.error(`${relative(root, file)}:${i + 1}: ${rule.message}`);

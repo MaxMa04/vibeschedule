@@ -19,12 +19,15 @@ import { IntegrationNameDto } from '@vibeschedule/nestjs-libraries/dtos/integrat
 import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
 import { ManualOnlyDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/manual.only.dto';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
+import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
+import { ChannelUsersDto } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
 
 @Controller('/integrations')
 export class IntegrationsController {
   constructor(
     private _integrationService: IntegrationService,
-    private _postService: PostsService
+    private _postService: PostsService,
+    private _channelUsersService: ChannelUsersService
   ) {}
 
   @Get('/')
@@ -72,6 +75,18 @@ export class IntegrationsController {
     @Body() body: IntegrationAppDto
   ) {
     return this._integrationService.setApp(org.id, id, body.appId || null);
+  }
+
+  // the people responsible for the channel; a clipper among them makes it
+  // manual-only
+  @Put('/:id/users')
+  @UseGuards(AdminGuard)
+  setUsers(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ChannelUsersDto
+  ) {
+    return this._channelUsersService.setChannelUsers(org.id, id, body.userIds);
   }
 
   @Put('/:id/custom-name')

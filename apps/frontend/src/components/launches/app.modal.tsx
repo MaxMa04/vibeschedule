@@ -1,7 +1,7 @@
 'use client';
+import { APPS_KEY, useAppList } from '@vibeschedule/frontend/lib/shared-data';
 
 import React, { FC, useCallback, useMemo, useState } from 'react';
-import useSWR from 'swr';
 import { toast } from 'sonner';
 import { BoxIcon, CircleSlashIcon, PlusIcon } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
@@ -36,12 +36,7 @@ const errorText = async (response: Response, fallback: string) => {
   return (Array.isArray(message) ? message[0] : message) || fallback;
 };
 
-export const useApps = () => {
-  const fetch = useFetch();
-  return useSWR<AppItem[]>('/apps', async (path: string) =>
-    (await fetch(path)).json()
-  );
-};
+export const useApps = () => useAppList<AppItem>();
 
 // assigns the channel to an existing app, a new app typed in the search, or none
 export const AppAssignForm: FC<{
@@ -74,7 +69,7 @@ export const AppAssignForm: FC<{
       try {
         let id = appId;
         if (newName) {
-          const created = await fetch('/apps', {
+          const created = await fetch(APPS_KEY, {
             method: 'POST',
             body: JSON.stringify({ name: newName }),
           });

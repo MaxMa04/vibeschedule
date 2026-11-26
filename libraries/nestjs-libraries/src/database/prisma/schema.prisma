@@ -172,7 +172,7 @@ model Integration {
   @@index([appId])
 }
 
-/// The channels a clipper may see and post for.
+/// Who is responsible for which channel. A clipper sees and posts only these.
 model UserIntegration {
   userId        String
   integrationId String

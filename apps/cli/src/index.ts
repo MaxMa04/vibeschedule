@@ -1,10 +1,36 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { apiUrl, request, uploadFile } from './api';
-import { buildPost, resolveFormat } from './posts';
+import { buildPost } from './posts';
+import { idList, resolveId } from './resolve';
 
 const print = (data: unknown) => console.log(JSON.stringify(data, null, 2));
 const enc = encodeURIComponent;
+
+const userOption = {
+  describe: 'Nur Kanäle, für die dieser Nutzer zuständig ist (Nutzer-ID)',
+  type: 'string',
+} as const;
+
+const resolveFormat = async (value: string) =>
+  resolveId(value, await request('/formats'), 'Format');
+const resolveApp = async (value: string) =>
+  resolveId(value, await request('/apps'), 'App');
+// users by ID or email, names need not be unique
+const resolveUsers = async (value: string) => {
+  const ids = idList(value);
+  if (!ids.length) return [];
+  const users: { id: string; email: string }[] = await request('/users');
+  return ids.map((id) =>
+    resolveId(
+      id,
+      users.map(({ id, email }) => ({ id, email })),
+      'Nutzer'
+    )
+  );
+};
+
+const statuses = ['active', 'testing', 'paused'] as const;
 
 yargs(hideBin(process.argv))
   .scriptName('vibeschedule')
@@ -18,15 +44,134 @@ yargs(hideBin(process.argv))
     'integrations:list',
     'Verbundene Kanäle auflisten',
     (y) =>
-      y.option('app', {
-        describe: 'Nur Kanäle dieser App (App-ID)',
+      y
+        .option('app', {
+          describe: 'Nur Kanäle dieser App (App-ID, "none" für ohne App)',
+          type: 'string',
+        })
+        .option('user', userOption),
+    async (argv) => {
+      const query = new URLSearchParams();
+      if (argv.app) query.set('app', argv.app);
+      if (argv.user) query.set('user', argv.user);
+      print(await request(`/integrations${query.size ? `?${query}` : ''}`));
+    }
+  )
+  .command(
+    'integrations:app <id> <app>',
+    'App eines Kanals setzen',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('app', {
+          describe: 'App-ID oder Name, "none" entfernt die App',
+          type: 'string',
+          demandOption: true,
+        }),
+    async (argv) => {
+      const appId =
+        argv.app.trim().toLowerCase() === 'none'
+          ? null
+          : await resolveApp(argv.app);
+      print(
+        await request(`/integrations/${enc(argv.id)}/app`, {
+          method: 'PUT',
+          body: { appId },
+        })
+      );
+    }
+  )
+  .command(
+    'integrations:users <id> <users>',
+    'Zuständige Nutzer eines Kanals setzen (ersetzt die bisherigen)',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('users', {
+          describe: 'Nutzer-IDs oder E-Mails, kommagetrennt, "none" für keine',
+          type: 'string',
+          demandOption: true,
+        })
+        .example(
+          '$0 integrations:users abc123 max@vibelabs.to,lisa@vibelabs.to',
+          'Zwei Zuständige setzen'
+        ),
+    async (argv) => {
+      print(
+        await request(`/integrations/${enc(argv.id)}/users`, {
+          method: 'PUT',
+          body: { userIds: await resolveUsers(argv.users) },
+        })
+      );
+    }
+  )
+  .command('users:list', 'Nutzer des Workspace mit Rolle', {}, async () => {
+    print(await request('/users'));
+  })
+  .command('apps:list', 'Apps mit Anzahl Kanäle', {}, async () => {
+    print(await request('/apps'));
+  })
+  .command(
+    'apps:create <name>',
+    'App anlegen',
+    (y) =>
+      y.positional('name', {
+        describe: 'Name der App',
         type: 'string',
+        demandOption: true,
       }),
     async (argv) => {
       print(
-        await request(
-          `/integrations${argv.app ? `?app=${enc(argv.app)}` : ''}`
-        )
+        await request('/apps', { method: 'POST', body: { name: argv.name } })
+      );
+    }
+  )
+  .command(
+    'apps:rename <app> <name>',
+    'App umbenennen',
+    (y) =>
+      y
+        .positional('app', {
+          describe: 'App-ID oder bisheriger Name',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('name', {
+          describe: 'Neuer Name',
+          type: 'string',
+          demandOption: true,
+        }),
+    async (argv) => {
+      print(
+        await request(`/apps/${enc(await resolveApp(argv.app))}`, {
+          method: 'PUT',
+          body: { name: argv.name },
+        })
+      );
+    }
+  )
+  .command(
+    'apps:delete <app>',
+    'App löschen, ihre Kanäle bleiben ohne App',
+    (y) =>
+      y.positional('app', {
+        describe: 'App-ID oder Name',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(
+        await request(`/apps/${enc(await resolveApp(argv.app))}`, {
+          method: 'DELETE',
+        })
       );
     }
   )
@@ -228,7 +373,7 @@ yargs(hideBin(process.argv))
     async (argv) => {
       const formatId =
         argv.format && !argv.json
-          ? resolveFormat(argv.format, await request('/formats'))
+          ? await resolveFormat(argv.format)
           : undefined;
       print(
         await request('/posts', {
@@ -252,9 +397,10 @@ yargs(hideBin(process.argv))
           type: 'string',
         })
         .option('app', {
-          describe: 'Nur Posts dieser App (App-ID)',
+          describe: 'Nur Posts dieser App (App-ID, "none" für ohne App)',
           type: 'string',
-        }),
+        })
+        .option('user', userOption),
     async (argv) => {
       const day = 24 * 60 * 60 * 1000;
       const query = new URLSearchParams({
@@ -262,6 +408,7 @@ yargs(hideBin(process.argv))
         endDate: argv.end || new Date(Date.now() + 30 * day).toISOString(),
       });
       if (argv.app) query.set('app', argv.app);
+      if (argv.user) query.set('user', argv.user);
       print(await request(`/posts?${query}`));
     }
   )
@@ -328,11 +475,173 @@ yargs(hideBin(process.argv))
           describe: 'Zeitraum in Tagen',
           type: 'number',
           default: 30,
-        }),
+        })
+        .option('user', userOption),
     async (argv) => {
       const query = new URLSearchParams({ days: String(argv.days) });
       if (argv.app) query.set('app', argv.app);
+      if (argv.user) query.set('user', argv.user);
       print(await request(`/formats/overview?${query}`));
+    }
+  )
+  .command(
+    'formats:create <name>',
+    'Format anlegen',
+    (y) =>
+      y
+        .positional('name', {
+          describe: 'Name des Formats',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('description', {
+          alias: 'd',
+          describe: 'Beschreibung',
+          type: 'string',
+        }),
+    async (argv) => {
+      print(
+        await request('/formats', {
+          method: 'POST',
+          body: { name: argv.name, description: argv.description },
+        })
+      );
+    }
+  )
+  .command(
+    'formats:update <format>',
+    'Format umbenennen oder Beschreibung ändern',
+    (y) =>
+      y
+        .positional('format', {
+          describe: 'Format-ID oder Name',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('name', {
+          describe: 'Neuer Name',
+          type: 'string',
+        })
+        .option('description', {
+          alias: 'd',
+          describe: 'Neue Beschreibung, "" leert sie',
+          type: 'string',
+        })
+        .check((argv) => {
+          if (argv.name === undefined && argv.description === undefined) {
+            throw new Error('--name oder --description fehlt.');
+          }
+          return true;
+        }),
+    async (argv) => {
+      const formats: {
+        id: string;
+        name: string;
+        description: string | null;
+      }[] = await request('/formats');
+      const id = resolveId(argv.format, formats, 'Format');
+      const current = formats.find((f) => f.id === id)!;
+      print(
+        await request(`/formats/${enc(id)}`, {
+          method: 'PUT',
+          body: {
+            name: argv.name ?? current.name,
+            description: argv.description ?? current.description,
+          },
+        })
+      );
+    }
+  )
+  .command(
+    'formats:delete <format>',
+    'Format löschen, Posts behalten ihren Bezug',
+    (y) =>
+      y.positional('format', {
+        describe: 'Format-ID oder Name',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(
+        await request(`/formats/${enc(await resolveFormat(argv.format))}`, {
+          method: 'DELETE',
+        })
+      );
+    }
+  )
+  .command(
+    'formats:assign <format> <id>',
+    'Format auf einem Kanal laufen lassen oder Status und Notiz ändern',
+    (y) =>
+      y
+        .positional('format', {
+          describe: 'Format-ID oder Name',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('status', {
+          describe: 'Status auf dem Kanal, neu zugewiesen: active',
+          choices: statuses,
+        })
+        .option('note', {
+          describe: 'Notiz zum Format auf diesem Kanal, "" leert sie',
+          type: 'string',
+        })
+        .option('position', {
+          describe: 'Reihenfolge auf dem Kanal, ab 0',
+          type: 'number',
+        })
+        .example(
+          '$0 formats:assign "Storytime" abc123 --status testing',
+          'Format auf einem Kanal testen'
+        ),
+    async (argv) => {
+      const formatId = await resolveFormat(argv.format);
+      print(
+        await request(
+          `/formats/${enc(formatId)}/integrations/${enc(argv.id)}`,
+          {
+            method: 'PUT',
+            body: {
+              ...(argv.status ? { status: argv.status.toUpperCase() } : {}),
+              ...(argv.note !== undefined ? { note: argv.note } : {}),
+              ...(argv.position !== undefined
+                ? { position: argv.position }
+                : {}),
+            },
+          }
+        )
+      );
+    }
+  )
+  .command(
+    'formats:unassign <format> <id>',
+    'Format von einem Kanal nehmen',
+    (y) =>
+      y
+        .positional('format', {
+          describe: 'Format-ID oder Name',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        }),
+    async (argv) => {
+      const formatId = await resolveFormat(argv.format);
+      print(
+        await request(
+          `/formats/${enc(formatId)}/integrations/${enc(argv.id)}`,
+          { method: 'DELETE' }
+        )
+      );
     }
   )
   .command(
@@ -350,6 +659,7 @@ yargs(hideBin(process.argv))
           describe: 'Nur Kanäle dieser App-ID',
           type: 'string',
         })
+        .option('user', userOption)
         .option('fresh', {
           describe: 'Cache umgehen und den Feed neu laden',
           type: 'boolean',
@@ -358,6 +668,7 @@ yargs(hideBin(process.argv))
     async (argv) => {
       const query = new URLSearchParams({ days: String(argv.days) });
       if (argv.app) query.set('app', argv.app);
+      if (argv.user) query.set('user', argv.user);
       if (argv.fresh) query.set('fresh', '1');
       print(await request(`/analytics/overview?${query}`));
     }

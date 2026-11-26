@@ -7,7 +7,11 @@ import {
   isStableAvatar,
   stableAvatarUrl,
 } from '@vibeschedule/nestjs-libraries/upload/avatar.mirror';
-import { IntegrationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
+import {
+  IntegrationRepository,
+  toTeamUsers,
+} from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
+import { ChannelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import { IntegrationTimeDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.time.dto';
 import {
   PfmClient,
@@ -158,14 +162,15 @@ export class IntegrationService {
           display: p.profile,
           time: JSON.parse(p.postingTimes),
           app: p.app ? { id: p.app.id, name: p.app.name } : null,
+          users: toTeamUsers(p.users),
           additionalSettings: p.additionalSettings || '[]',
         };
       }
     );
   }
 
-  getIntegrationsList(org: string) {
-    return this._integrationRepository.getIntegrationsList(org);
+  getIntegrationsList(org: string, filter?: ChannelFilter) {
+    return this._integrationRepository.getIntegrationsList(org, filter);
   }
 
   getIntegrationById(org: string, id: string) {
@@ -189,6 +194,7 @@ export class IntegrationService {
   }
 
   async setApp(org: string, id: string, appId: string | null) {
+    await this.getIntegrationOrThrow(org, id);
     if (appId && !(await this._integrationRepository.getApp(org, appId))) {
       throw new NotFoundException('App nicht gefunden');
     }
@@ -224,7 +230,6 @@ export class IntegrationService {
     return this._integrationRepository.deleteApp(orgId, id);
   }
 
-
   setDisabled(org: string, id: string, disabled: boolean) {
     return this._integrationRepository.setDisabled(org, id, disabled);
   }
@@ -235,10 +240,6 @@ export class IntegrationService {
 
   getUserChannelIds(userId: string) {
     return this._integrationRepository.getUserChannelIds(userId);
-  }
-
-  setUserChannels(org: string, userId: string, ids: string[]) {
-    return this._integrationRepository.setUserChannels(org, userId, ids);
   }
 
   getPostGroupsForChannel(org: string, id: string) {
@@ -409,7 +410,11 @@ export class IntegrationService {
       throw new NotFoundException('Kanal nicht gefunden');
     }
     const range = analyticsRange(days);
-    const feed = await this.feedPosts(integration.internalId, range.since, fresh);
+    const feed = await this.feedPosts(
+      integration.internalId,
+      range.since,
+      fresh
+    );
     const report = this.channelReport(integration, feed, range);
 
     const links = await this._integrationRepository.postsForFeed(
@@ -442,7 +447,8 @@ export class IntegrationService {
           postedAt: p.posted_at!,
           caption: p.caption || '',
           url: p.platform_url || null,
-          thumbnail: p.media?.find((m) => m.thumbnail_url)?.thumbnail_url || null,
+          thumbnail:
+            p.media?.find((m) => m.thumbnail_url)?.thumbnail_url || null,
           metrics,
           engagementRate: engagementRate(metrics, report.defs, report.primary),
           post: link ? { id: link.id, format: link.format } : null,
@@ -453,18 +459,17 @@ export class IntegrationService {
   }
 
   // totals and a sparkline per channel, optionally only the channels of an
-  // app ('none': channels without an app)
+  // app or of a responsible user
   async analyticsOverview(
     org: string,
     days: number,
-    appId?: string,
+    filter: ChannelFilter = {},
     fresh = false
   ): Promise<AnalyticsOverview> {
     const range = analyticsRange(days);
-    const integrations = (
-      await this._integrationRepository.getIntegrationsList(org)
-    ).filter(
-      (i) => !appId || i.appId === (appId === 'none' ? null : appId)
+    const integrations = await this._integrationRepository.getIntegrationsList(
+      org,
+      filter
     );
 
     const channels = await mapLimit(
@@ -486,13 +491,15 @@ export class IntegrationService {
             current: report.current,
             previous: report.previous,
             change: periodChange(report.current, report.previous),
-            series: dailySeries(range.dates, report.currentRows, report.defs).map(
-              (d) => ({
-                date: d.date,
-                posts: d.posts,
-                value: key ? Number(d[key as keyof typeof d]) || 0 : 0,
-              })
-            ),
+            series: dailySeries(
+              range.dates,
+              report.currentRows,
+              report.defs
+            ).map((d) => ({
+              date: d.date,
+              posts: d.posts,
+              value: key ? Number(d[key as keyof typeof d]) || 0 : 0,
+            })),
             error: null,
           };
         } catch (e) {
@@ -516,7 +523,8 @@ export class IntegrationService {
       const sums: Record<string, number> = {};
       for (const c of channels) {
         for (const m of c.metrics) {
-          sums[m.label] = (sums[m.label] || 0) + (c[period].metrics[m.key] || 0);
+          sums[m.label] =
+            (sums[m.label] || 0) + (c[period].metrics[m.key] || 0);
         }
       }
       return sums;

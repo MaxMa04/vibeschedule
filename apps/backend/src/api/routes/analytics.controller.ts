@@ -1,6 +1,11 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
+import {
+  GetUserFromRequest,
+  SessionUser,
+} from '@vibeschedule/nestjs-libraries/user/user.from.request';
+import { channelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 
@@ -18,14 +23,16 @@ export class AnalyticsController {
   @Get('/overview')
   getOverview(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: SessionUser,
     @Query('days') days: string,
     @Query('app') app?: string,
+    @Query('user') responsible?: string,
     @Query('fresh') fresh?: string
   ) {
     return this._integrationService.analyticsOverview(
       org.id,
       analyticsDays(days),
-      app || undefined,
+      channelFilter({ app, user: responsible }, user.id),
       fresh === '1'
     );
   }

@@ -13,6 +13,7 @@ import { MediaService } from '@vibeschedule/nestjs-libraries/database/prisma/med
 import { MediaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/media/media.repository';
 import { FormatsService } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.service';
 import { FormatsRepository } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.repository';
+import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
 import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
 
 @Global()
@@ -26,6 +27,7 @@ import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.clien
     OrganizationRepository,
     IntegrationService,
     IntegrationRepository,
+    ChannelUsersService,
     PostsService,
     PostsRepository,
     ManualPostsService,

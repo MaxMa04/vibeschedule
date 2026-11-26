@@ -9,7 +9,6 @@ import React, {
   useState,
 } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { SendIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
@@ -41,10 +40,6 @@ import {
   areYouSure,
   useModals,
 } from '@vibeschedule/frontend/components/layout/new-modal';
-import {
-  PageBody,
-  PageHeader,
-} from '@vibeschedule/frontend/components/layout/page-header';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
 import {
   Card,
@@ -203,13 +198,11 @@ const PreviewCard: FC = () => {
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
   const fetch = useFetch();
-  const router = useRouter();
   const modal = useModals();
   const existingData = useExistingData();
   const ref = useRef<ShowAllProvidersHandle>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState<SaveType | 'delete' | null>(null);
-  const variant = props.variant || 'modal';
   const { mutate } = props;
 
   const {
@@ -529,22 +522,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
       if (failed?.error) {
         toast.warning(failed.error);
-      } else if (variant === 'page') {
-        toast.success(message, {
-          action: {
-            label: t('editor_open_calendar'),
-            onClick: () => router.push('/launches'),
-          },
-        });
       } else {
         toast.success(message);
       }
-
-      if (variant === 'page') {
-        props.onSaved?.();
-      } else {
-        modal.closeAll();
-      }
+      modal.closeAll();
     },
     [
       validate,
@@ -555,7 +536,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       existingData,
       formatId,
       manual,
-      variant,
     ]
   );
 
@@ -720,8 +700,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         </div>
         <div
           className={cn(
-            'flex min-w-0 flex-col gap-4 @4xl:sticky',
-            variant === 'page' ? '@4xl:top-16' : '@4xl:top-0'
+            'flex min-w-0 flex-col gap-4 @4xl:sticky @4xl:top-0'
           )}
         >
           {publishCard}
@@ -731,18 +710,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       {actionBar}
     </div>
   );
-
-  if (variant === 'page') {
-    return (
-      <PageBody>
-        <PageHeader
-          title={t('compose')}
-          description={t('editor_page_description')}
-        />
-        {body}
-      </PageBody>
-    );
-  }
 
   return (
     <ModalFrame

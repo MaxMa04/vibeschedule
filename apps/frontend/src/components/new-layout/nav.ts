@@ -5,7 +5,6 @@ import {
   LayersIcon,
   SettingsIcon,
   SmartphoneIcon,
-  SquarePenIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -17,7 +16,6 @@ export interface NavItem {
 }
 
 export const mainNav: NavItem[] = [
-  { path: '/post', label: 'compose', icon: SquarePenIcon },
   { path: '/manual', label: 'manual_posting', icon: SmartphoneIcon },
   { path: '/launches', label: 'calendar', icon: CalendarDaysIcon },
   { path: '/formats', label: 'formats', icon: LayersIcon },

@@ -20,6 +20,7 @@ import {
   useChannelFilter,
 } from '@vibeschedule/frontend/components/launches/select.channels';
 import { NewPost } from '@vibeschedule/frontend/components/launches/new.post';
+import { ResponsibleFilter } from '@vibeschedule/frontend/components/team/responsible';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { newDayjs } from '@vibeschedule/frontend/components/layout/set.timezone';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
@@ -264,40 +265,50 @@ const ViewSwitch: FC<{ className?: string }> = ({ className }) => {
 };
 
 const AppFilter: FC<{ list?: boolean }> = ({ list }) => {
-  const { app, integrations, setFilters, startDate, endDate, display } =
+  const { app, user, integrations, setFilters, startDate, endDate, display } =
     useCalendar();
+  const onChange = useCallback(
+    (next: string) =>
+      setFilters({ startDate, endDate, display, app: next || null, user }),
+    [setFilters, startDate, endDate, display, user]
+  );
   return (
     <SelectApp
       list={list}
       app={app}
       integrations={integrations}
-      onChange={(next) =>
-        setFilters({ startDate, endDate, display, app: next || null })
-      }
+      onChange={onChange}
     />
   );
+};
+
+const UserFilter: FC<{ list?: boolean }> = ({ list }) => {
+  const { app, user, setFilters, startDate, endDate, display } = useCalendar();
+  const onChange = useCallback(
+    (next: string | null) =>
+      setFilters({ startDate, endDate, display, app, user: next }),
+    [setFilters, startDate, endDate, display, app]
+  );
+  return <ResponsibleFilter list={list} value={user} onChange={onChange} />;
 };
 
 const MobileFilters: FC = () => {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const { app, integrations } = useCalendar();
-  const { active, channels } = useChannelFilter();
-  const hasApps = integrations.some((i) => !!i.app);
-  if (channels.length <= 1 && !hasApps) {
-    return null;
-  }
+  const { app, user } = useCalendar();
+  const { active } = useChannelFilter();
+  const filtered = active || !!app || !!user;
   return (
     <>
       <Button
         variant="outline"
         size="icon"
-        className={cn('relative size-9', (active || app) && 'bg-muted')}
+        className={cn('relative size-9', filtered && 'bg-muted')}
         onClick={() => setOpen(true)}
         aria-label={t('calendar_filters')}
       >
         <SlidersHorizontalIcon />
-        {(active || !!app) && (
+        {filtered && (
           <span className="absolute end-1.5 top-1.5 size-1.5 rounded-full bg-primary" />
         )}
       </Button>
@@ -308,6 +319,7 @@ const MobileFilters: FC = () => {
           </SheetHeader>
           <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-6">
             <AppFilter list />
+            <UserFilter list />
             <SelectChannels list />
           </div>
         </SheetContent>
@@ -334,6 +346,7 @@ export const Filters: FC<{ channelsButton?: ReactNode }> = ({
         </div>
         <div className="ms-auto flex items-center gap-2 max-md:hidden">
           <AppFilter />
+          <UserFilter />
           <SelectChannels />
           <ViewSwitch />
           <NewPost />

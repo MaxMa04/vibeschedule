@@ -14,6 +14,7 @@ import {
   PowerOffIcon,
   SmartphoneIcon,
   UnplugIcon,
+  UsersRoundIcon,
   ZapIcon,
 } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
@@ -28,6 +29,7 @@ import {
 import { useCreatePost } from '@vibeschedule/frontend/components/launches/new.post';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
+import { useResponsibleSheet } from '@vibeschedule/frontend/components/team/responsible';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
 import {
   DropdownMenu,
@@ -50,6 +52,7 @@ export const Menu: FC<{
   const modal = useModals();
   const createPost = useCreatePost();
   const user = useUser();
+  const setResponsible = useResponsibleSheet();
   const { id, disabled, manualOnly } = integration;
   const reload = useCallback(() => onChange(false), [onChange]);
 
@@ -219,6 +222,12 @@ export const Menu: FC<{
               <BoxIcon />
               {t('calendar_assign_app')}
             </DropdownMenuItem>
+            {user?.role === 'ADMIN' && (
+              <DropdownMenuItem onClick={() => setResponsible(integration)}>
+                <UsersRoundIcon />
+                {t('responsible_set')}
+              </DropdownMenuItem>
+            )}
             {user?.role === 'ADMIN' && (
               <DropdownMenuItem onClick={toggleManualOnly}>
                 {manualOnly ? <ZapIcon /> : <SmartphoneIcon />}

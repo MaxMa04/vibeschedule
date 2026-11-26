@@ -37,6 +37,7 @@ import {
   toPlatformConfiguration,
 } from '@vibeschedule/nestjs-libraries/integrations/pfm.platforms';
 import { ManualPostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/manual.posts.service';
+import { ChannelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 
 dayjs.extend(utc);
 
@@ -66,22 +67,30 @@ export class PostsService {
     private _manualPostsService: ManualPostsService
   ) {}
 
-  async getPosts(orgId: string, query: GetPostsDto) {
+  async getPosts(orgId: string, query: GetPostsDto, filter?: ChannelFilter) {
     await Promise.all([
       this.reconcile(orgId),
       this._manualPostsService.linkPending(orgId),
     ]);
-    return this._postRepository.getPosts(orgId, query);
+    return this._postRepository.getPosts(orgId, query, filter);
   }
 
-  async getPostsMinified(orgId: string, query: GetPostsDto) {
-    return minifyPosts({ posts: await this.getPosts(orgId, query) });
+  async getPostsMinified(
+    orgId: string,
+    query: GetPostsDto,
+    filter?: ChannelFilter
+  ) {
+    return minifyPosts({ posts: await this.getPosts(orgId, query, filter) });
   }
 
-  async getPostsList(orgId: string, query: GetPostsListDto) {
+  async getPostsList(
+    orgId: string,
+    query: GetPostsListDto,
+    filter?: ChannelFilter
+  ) {
     await this.reconcile(orgId);
     return minifyPostsList(
-      await this._postRepository.getPostsList(orgId, query)
+      await this._postRepository.getPostsList(orgId, query, filter)
     );
   }
 

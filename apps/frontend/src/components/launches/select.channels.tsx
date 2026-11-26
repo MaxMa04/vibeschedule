@@ -17,15 +17,11 @@ import { cn } from '@vibeschedule/frontend/lib/utils';
 
 // the channels of the selected app, and which of them the calendar shows
 export const useChannelFilter = () => {
-  const { integrations, app, selectedChannels, setSelectedChannels } =
+  const { channels: filtered, selectedChannels, setSelectedChannels } =
     useCalendar();
   const channels = useMemo(
-    () =>
-      orderBy(
-        integrations.filter((i) => !app || i.app?.id === app),
-        (i) => i.name.toLowerCase()
-      ),
-    [integrations, app]
+    () => orderBy(filtered, (i) => i.name.toLowerCase()),
+    [filtered]
   );
   const selectedIds = selectedChannels ?? channels.map((c) => c.id);
   const allSelected = channels.every((c) => selectedIds.includes(c.id));

@@ -2,6 +2,44 @@ import { PrismaRepository } from '@vibeschedule/nestjs-libraries/database/prisma
 import { Injectable } from '@nestjs/common';
 import { IntegrationTimeDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PfmSocialAccount } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
+import {
+  ChannelFilter,
+  channelWhere,
+} from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
+import { TeamUser } from '@vibeschedule/helpers/channels/channel.filter';
+
+// the people responsible for a channel, with their role in the workspace
+const channelUsersInclude = (org: string) =>
+  ({
+    orderBy: { createdAt: 'asc' },
+    select: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          organizations: {
+            where: { organizationId: org },
+            select: { role: true },
+          },
+        },
+      },
+    },
+  } as const);
+
+type ChannelUserRow = {
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    organizations: { role: TeamUser['role'] }[];
+  };
+};
+
+export const toTeamUsers = (rows: ChannelUserRow[]): TeamUser[] =>
+  rows.flatMap(({ user: { organizations, ...user } }) =>
+    organizations[0] ? [{ ...user, role: organizations[0].role }] : []
+  );
 
 @Injectable()
 export class IntegrationRepository {
@@ -12,10 +50,10 @@ export class IntegrationRepository {
     private _userIntegration: PrismaRepository<'userIntegration'>
   ) {}
 
-  getIntegrationsList(org: string) {
+  getIntegrationsList(org: string, filter?: ChannelFilter) {
     return this._integration.model.integration.findMany({
-      where: { organizationId: org, deletedAt: null },
-      include: { app: true },
+      where: { organizationId: org, deletedAt: null, ...channelWhere(filter) },
+      include: { app: true, users: channelUsersInclude(org) },
     });
   }
 
@@ -175,7 +213,8 @@ export class IntegrationRepository {
     });
   }
 
-  // the channels a clipper may see
+  // the channels a user is responsible for; for a clipper also the only
+  // channels it may see
   async getUserChannelIds(userId: string) {
     const rows = await this._userIntegration.model.userIntegration.findMany({
       where: { userId, integration: { deletedAt: null } },
@@ -184,7 +223,7 @@ export class IntegrationRepository {
     return rows.map((row) => row.integrationId);
   }
 
-  // replaces the channels of a clipper, returns the ones that are new
+  // replaces the channels of a user, returns the ones that are new
   async setUserChannels(org: string, userId: string, ids: string[]) {
     const channels = await this._integration.model.integration.findMany({
       where: { organizationId: org, deletedAt: null, id: { in: ids } },
@@ -203,6 +242,36 @@ export class IntegrationRepository {
       });
     }
     return { channels: wanted, added };
+  }
+
+  // replaces the responsible users of a channel, returns the ones that are new
+  async setChannelUsers(integrationId: string, userIds: string[]) {
+    const current = (
+      await this._userIntegration.model.userIntegration.findMany({
+        where: { integrationId },
+        select: { userId: true },
+      })
+    ).map((row) => row.userId);
+
+    await this._userIntegration.model.userIntegration.deleteMany({
+      where: { integrationId, userId: { notIn: userIds } },
+    });
+    const added = userIds.filter((id) => !current.includes(id));
+    if (added.length) {
+      await this._userIntegration.model.userIntegration.createMany({
+        data: added.map((userId) => ({ userId, integrationId })),
+      });
+    }
+    return { added };
+  }
+
+  async getChannelUsers(org: string, integrationId: string) {
+    return toTeamUsers(
+      await this._userIntegration.model.userIntegration.findMany({
+        where: { integrationId },
+        ...channelUsersInclude(org),
+      })
+    );
   }
 
   getPostGroupsForChannel(org: string, id: string) {

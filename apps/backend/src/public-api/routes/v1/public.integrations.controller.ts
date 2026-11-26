@@ -25,37 +25,70 @@ import { ManualOnlyDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/
 import { streamUploadOptions } from '@vibeschedule/nestjs-libraries/upload/multer.stream.engine';
 import { assertValidPosts } from '@vibeschedule/backend/api/routes/posts.validation.exception';
 import { analyticsDays } from '@vibeschedule/backend/api/routes/analytics.controller';
+import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
+import { ChannelUsersDto } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
+import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
+import { toTeamUsers } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
+import { channelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 
 @Controller('/public/v1')
 export class PublicIntegrationsController {
   constructor(
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
-    private _mediaService: MediaService
+    private _mediaService: MediaService,
+    private _channelUsersService: ChannelUsersService
   ) {}
+
+  @Get('/users')
+  listUsers(@GetOrgFromRequest() org: Organization) {
+    return this._channelUsersService.team(org.id);
+  }
 
   @Get('/integrations')
   async listIntegrations(
     @GetOrgFromRequest() org: Organization,
-    @Query('app') appId?: string
+    @Query('app') app?: string,
+    @Query('user') user?: string
   ) {
-    return (await this._integrationService.getIntegrationsList(org.id))
-      .filter(
-        (integration) => !appId || integration.app?.id === appId
+    return (
+      await this._integrationService.getIntegrationsList(
+        org.id,
+        channelFilter({ app, user })
       )
-      .map((integration) => ({
-        id: integration.id,
-        name: integration.customName || integration.name,
-        identifier: integration.providerIdentifier,
-        picture: integration.picture,
-        disabled: integration.disabled,
-        // posts of this channel are published by hand, never through PfM
-        manualOnly: integration.manualOnly,
-        profile: integration.profile,
-        app: integration.app
-          ? { id: integration.app.id, name: integration.app.name }
-          : null,
-      }));
+    ).map((integration) => ({
+      id: integration.id,
+      name: integration.customName || integration.name,
+      identifier: integration.providerIdentifier,
+      picture: integration.picture,
+      disabled: integration.disabled,
+      // posts of this channel are published by hand, never through PfM
+      manualOnly: integration.manualOnly,
+      profile: integration.profile,
+      app: integration.app
+        ? { id: integration.app.id, name: integration.app.name }
+        : null,
+      users: toTeamUsers(integration.users),
+    }));
+  }
+
+  @Put('/integrations/:id/app')
+  setApp(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: IntegrationAppDto
+  ) {
+    return this._integrationService.setApp(org.id, id, body.appId || null);
+  }
+
+  // a clipper among the users makes the channel manual-only
+  @Put('/integrations/:id/users')
+  setUsers(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ChannelUsersDto
+  ) {
+    return this._channelUsersService.setChannelUsers(org.id, id, body.userIds);
   }
 
   // Takes over the accounts connected in PfM, e.g. after somebody finished
@@ -132,7 +165,13 @@ export class PublicIntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Query() query: GetPostsDto
   ) {
-    return { posts: await this._postsService.getPosts(org.id, query) };
+    return {
+      posts: await this._postsService.getPosts(
+        org.id,
+        query,
+        channelFilter(query)
+      ),
+    };
   }
 
   @Post('/posts')
@@ -182,12 +221,13 @@ export class PublicIntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Query('days') days: string,
     @Query('app') app?: string,
+    @Query('user') user?: string,
     @Query('fresh') fresh?: string
   ) {
     return this._integrationService.analyticsOverview(
       org.id,
       analyticsDays(days),
-      app || undefined,
+      channelFilter({ app, user }),
       fresh === '1'
     );
   }

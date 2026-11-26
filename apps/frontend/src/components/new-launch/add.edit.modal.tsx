@@ -26,10 +26,6 @@ export interface AddEditModalProps {
   selectedChannels?: string[];
   reopenModal: () => void;
   mutate: () => void;
-  // 'page': the editor fills the Posten page instead of a modal
-  variant?: 'modal' | 'page';
-  // after a save on the page, which then starts a new post
-  onSaved?: () => void;
   onlyValues?: Array<{
     content: string;
     formatId?: string | null;

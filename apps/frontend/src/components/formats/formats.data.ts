@@ -3,13 +3,16 @@
 import { useCallback } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import {
+  APPS_KEY,
+  CHANNELS_KEY,
+  useAppList,
+  useChannelList,
+} from '@vibeschedule/frontend/lib/shared-data';
 
 export type FormatStatus = 'ACTIVE' | 'TESTING' | 'PAUSED';
 
 export const FORMAT_STATUSES: FormatStatus[] = ['ACTIVE', 'TESTING', 'PAUSED'];
-
-/** `app` filter value for accounts without an app */
-export const NO_APP = 'none';
 
 export const PERIODS = [7, 30, 90];
 
@@ -112,11 +115,21 @@ const swrOptions = {
   keepPreviousData: true,
 };
 
-export const useOverview = (app: string | null, days: number) => {
+export const useOverview = (
+  app: string | null,
+  user: string | null,
+  days: number,
+  enabled = true
+) => {
   const json = useJson();
   const query = new URLSearchParams({ days: String(days) });
   if (app) query.set('app', app);
-  return useSWR<Overview>(`/formats/overview?${query}`, json, swrOptions);
+  if (user) query.set('user', user);
+  return useSWR<Overview>(
+    enabled ? `/formats/overview?${query}` : null,
+    json,
+    swrOptions
+  );
 };
 
 export const useFormats = () => {
@@ -124,25 +137,15 @@ export const useFormats = () => {
   return useSWR<Format[]>('/formats', json, swrOptions);
 };
 
-export const useApps = () => {
-  const json = useJson();
-  return useSWR<App[]>('/apps', json, swrOptions);
-};
+export const useApps = () => useAppList<App>();
 
-export const useChannels = () => {
-  const json = useJson();
-  return useSWR<Channel[]>(
-    '/integrations/list',
-    async (path: string) => (await json(path)).integrations,
-    swrOptions
-  );
-};
+export const useChannels = () => useChannelList<Channel>();
 
 const touched = (key: unknown) =>
   typeof key === 'string' &&
   (key.startsWith('/formats') ||
-    key === '/apps' ||
-    key === '/integrations/list');
+    key === APPS_KEY ||
+    key === CHANNELS_KEY);
 
 /** Writes to the API and reloads everything the Formate page shows */
 export const useFormatsApi = () => {
@@ -178,7 +181,7 @@ export const useFormatsApi = () => {
     unassign: (formatId: string, integrationId: string) =>
       send('DELETE', `/formats/${formatId}/integrations/${integrationId}`),
     createApp: (name: string) =>
-      send('POST', '/apps', { name }) as Promise<{ id: string }>,
+      send('POST', APPS_KEY, { name }) as Promise<{ id: string }>,
     renameApp: (id: string, name: string) =>
       send('PUT', `/apps/${id}`, { name }),
     deleteApp: (id: string) => send('DELETE', `/apps/${id}`),

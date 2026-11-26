@@ -22,7 +22,7 @@ export class AddTeamMemberDto {
   @IsIn(['USER', 'ADMIN', 'CLIPPER'])
   role: 'USER' | 'ADMIN' | 'CLIPPER';
 
-  // the channels of a clipper
+  // the channels the user is responsible for, a clipper sees only these
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -33,4 +33,10 @@ export class UserChannelsDto {
   @IsArray()
   @IsString({ each: true })
   channels: string[];
+}
+
+export class ChannelUsersDto {
+  @IsArray()
+  @IsString({ each: true })
+  userIds: string[];
 }

@@ -19,6 +19,7 @@ import {
 } from '@vibeschedule/frontend/components/launches/calendar.context';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import { ManualBadge } from '@vibeschedule/frontend/components/launches/manual.badge';
+import { UserAvatars } from '@vibeschedule/frontend/components/team/responsible';
 import { Menu } from '@vibeschedule/frontend/components/launches/menu/menu';
 import {
   AddProviderButton,
@@ -149,6 +150,20 @@ const ChannelRow: FC<{
           </div>
         )}
       </div>
+      {!!integration.users?.length && (
+        <Tooltip>
+          <TooltipTrigger render={<span className="flex" />}>
+            <UserAvatars users={integration.users} size="xs" max={2} />
+          </TooltipTrigger>
+          <TooltipContent>
+            {t('responsible_names', {
+              names: integration.users
+                .map((u) => u.name || u.email)
+                .join(', '),
+            })}
+          </TooltipContent>
+        </Tooltip>
+      )}
       {integration.manualOnly && <ManualBadge variant="icon" />}
       <Menu
         integration={integration}
@@ -338,10 +353,18 @@ const NoChannels: FC = () => {
 export const ChannelList: FC<{
   update: (shouldReload: boolean) => void;
 }> = ({ update }) => {
-  const { integrations } = useCalendar();
-  const groups = useChannelGroups(integrations);
+  const t = useT();
+  const { integrations, channels } = useCalendar();
+  const groups = useChannelGroups(channels);
   if (!integrations.length) {
     return <NoChannels />;
+  }
+  if (!channels.length) {
+    return (
+      <p className="px-2 py-4 text-sm text-muted-foreground">
+        {t('calendar_no_channels_filtered')}
+      </p>
+    );
   }
   return (
     <div className="flex flex-col gap-3">
@@ -359,8 +382,9 @@ export const ChannelPanel: FC<{
   update: (shouldReload: boolean) => void;
 }> = ({ collapsed, setCollapsed, update }) => {
   const t = useT();
-  const { integrations, selectedChannels, setSelectedChannels } = useCalendar();
-  const sorted = useChannelGroups(integrations).flatMap((g) => g.values);
+  const { integrations, channels, selectedChannels, setSelectedChannels } =
+    useCalendar();
+  const sorted = useChannelGroups(channels).flatMap((g) => g.values);
 
   if (collapsed) {
     return (
@@ -424,8 +448,10 @@ export const ChannelPanel: FC<{
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
         <h2 className="flex-1 text-sm font-semibold">
           {t('channels')}{' '}
-          <span className="font-normal text-muted-foreground">
-            {integrations.length}
+          <span className="font-normal text-muted-foreground tabular-nums">
+            {channels.length === integrations.length
+              ? integrations.length
+              : `${channels.length}/${integrations.length}`}
           </span>
         </h2>
         <Button
@@ -453,7 +479,7 @@ export const ChannelsSheetButton: FC<{
 }> = ({ update }) => {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const { integrations, selectedChannels } = useCalendar();
+  const { channels: integrations, selectedChannels } = useCalendar();
   return (
     <>
       <Button

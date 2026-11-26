@@ -78,6 +78,13 @@ export class OrganizationRepository {
     }));
   }
 
+  getMembers(orgId: string, userIds: string[]) {
+    return this._userOrg.model.userOrganization.findMany({
+      where: { organizationId: orgId, userId: { in: userIds } },
+      select: { userId: true, role: true },
+    });
+  }
+
   getMember(orgId: string, userId: string) {
     return this._userOrg.model.userOrganization.findUnique({
       where: { userId_organizationId: { userId, organizationId: orgId } },

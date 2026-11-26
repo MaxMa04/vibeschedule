@@ -1,10 +1,10 @@
 'use client';
+import { useAppList } from '@vibeschedule/frontend/lib/shared-data';
+import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
 
 import { FC, useMemo, useState } from 'react';
-import useSWR from 'swr';
 import { useShallow } from 'zustand/react/shallow';
 import { CheckIcon } from 'lucide-react';
-import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
@@ -21,16 +21,9 @@ interface App {
   name: string;
 }
 
-const NO_APP = 'none';
 const ALL_APPS = 'all';
 
-const useApps = () => {
-  const fetch = useFetch();
-  return useSWR<App[]>('/apps', async (path: string) => {
-    const response = await fetch(path);
-    return response.ok ? response.json() : [];
-  });
-};
+const useApps = () => useAppList<App>();
 
 const ChannelChip: FC<{
   integration: Integrations;

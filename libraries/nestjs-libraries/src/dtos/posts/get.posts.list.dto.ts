@@ -29,6 +29,11 @@ export class GetPostsListDto {
   @IsString()
   app?: string;
 
+  /** responsible user id, `me` for the signed-in user */
+  @IsOptional()
+  @IsString()
+  user?: string;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

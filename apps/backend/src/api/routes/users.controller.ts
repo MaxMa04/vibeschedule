@@ -21,12 +21,14 @@ import { ChangePasswordDto } from '@vibeschedule/nestjs-libraries/dtos/users/cha
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 import { clearAuthCookie } from '@vibeschedule/backend/services/auth/auth.cookie';
 import { AllowClipper } from '@vibeschedule/backend/services/auth/clipper.guard';
+import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
 
 @Controller('/user')
 export class UsersController {
   constructor(
     private _usersService: UsersService,
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _channelUsersService: ChannelUsersService
   ) {}
 
   @Get('/self')
@@ -42,6 +44,13 @@ export class UsersController {
       isAdmin,
       publicApi: isAdmin ? organization.apiKey : '',
     };
+  }
+
+  // the team for filters, closed for clippers like every route without
+  // @AllowClipper
+  @Get('/team')
+  team(@GetOrgFromRequest() organization: Organization) {
+    return this._channelUsersService.team(organization.id);
   }
 
   @Post('/password')

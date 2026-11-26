@@ -19,7 +19,9 @@ import { useSearchParams } from 'next/navigation';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { extend } from 'dayjs';
-import useCookie from 'react-use-cookie';
+import type { TeamUser } from '@vibeschedule/helpers/channels/channel.filter';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
+import { channelMatches } from '@vibeschedule/frontend/components/team/channel-match';
 import {
   fromUtc,
   newDayjs,
@@ -58,6 +60,8 @@ export interface Integrations {
     id: string;
     name: string;
   } | null;
+  // the people responsible for the channel
+  users?: TeamUser[];
 }
 
 export interface CalendarFilters {
@@ -65,7 +69,18 @@ export interface CalendarFilters {
   endDate: string;
   display: CalendarDisplay;
   app: string | null;
+  // responsible user id or `me`
+  user: string | null;
 }
+
+/** The calendar params that survive leaving the page (not the date) */
+export const CALENDAR_FILTER_KEYS = [
+  'display',
+  'app',
+  'user',
+  'channels',
+  'state',
+] as const;
 
 // the range of the view that contains the reference date (today by default)
 export const getDateRange = (
@@ -97,8 +112,12 @@ export const CalendarContext = createContext({
   startDate: newDayjs().startOf('isoWeek').format('YYYY-MM-DD'),
   endDate: newDayjs().endOf('isoWeek').format('YYYY-MM-DD'),
   app: null as string | null,
+  user: null as string | null,
   loading: true,
+  // every channel, for the editor
   integrations: [] as Integrations[],
+  // the channels of the app and responsible filter
+  channels: [] as Integrations[],
   posts: [] as CalendarPost[],
   // the publish date of each post, in the user's timezone
   postDates: new Map<object, dayjs.Dayjs>(),
@@ -153,6 +172,12 @@ export const useNow = (unit: 'minute' | 'hour' = 'minute') => {
 const isDisplay = (value: string | null): value is CalendarDisplay =>
   value === 'day' || value === 'week' || value === 'month' || value === 'list';
 
+const isListState = (value: string | null): value is ListStateFilter =>
+  value === 'all' ||
+  value === 'scheduled' ||
+  value === 'draft' ||
+  value === 'published';
+
 const swrOptions = {
   refreshInterval: 3600000,
   refreshWhenOffline: false,
@@ -165,25 +190,24 @@ export const CalendarWeekProvider: FC<{
   integrations: Integrations[];
 }> = ({ children, integrations }) => {
   const fetch = useFetch();
+  const me = useUser();
   const [internalData, setInternalData] = useState<CalendarPost[]>([]);
+  // read once: the provider mounts after the saved filters are back in the URL
   const searchParams = useSearchParams();
-  // a 7-column week needs sideways scrolling on a phone, so phones start with the day
-  const [displaySaved, setDisplaySaved] = useCookie(
-    'calendar-display',
-    typeof window !== 'undefined' &&
-      window.matchMedia('(max-width: 767px)').matches
-      ? 'day'
-      : 'week'
-  );
   const urlDisplay = searchParams.get('display');
+  // a 7-column week needs sideways scrolling on a phone, so phones start with the day
   const display: CalendarDisplay = isDisplay(urlDisplay)
     ? urlDisplay
-    : isDisplay(displaySaved)
-    ? displaySaved
+    : typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 767px)').matches
+    ? 'day'
     : 'week';
 
   const [listPage, setListPage] = useState(0);
-  const [listState, setListStateRaw] = useState<ListStateFilter>('all');
+  const urlState = searchParams.get('state');
+  const [listState, setListStateRaw] = useState<ListStateFilter>(
+    isListState(urlState) ? urlState : 'all'
+  );
   const setListState = useCallback((next: ListStateFilter) => {
     setListStateRaw(next);
     setListPage(0);
@@ -197,7 +221,7 @@ export const CalendarWeekProvider: FC<{
       : getDateRange(display);
 
   const [selectedChannels, setSelectedChannelsRaw] = useState<string[] | null>(
-    null
+    () => searchParams.get('channels')?.split(',').filter(Boolean) || null
   );
   const setSelectedChannels = useCallback((next: string[] | null) => {
     setSelectedChannelsRaw(next);
@@ -208,17 +232,48 @@ export const CalendarWeekProvider: FC<{
     startDate: initialRange.startDate,
     endDate: initialRange.endDate,
     app: searchParams.get('app') || null,
+    user: searchParams.get('user') || null,
     display,
   });
 
+  const channels = useMemo(
+    () =>
+      integrations.filter((i) =>
+        channelMatches(i, { app: filters.app, user: filters.user }, me?.id)
+      ),
+    [integrations, filters.app, filters.user, me?.id]
+  );
+
+  // a saved selection may name channels that are gone or filtered out
   useEffect(() => {
-    setSelectedChannels(null);
-  }, [filters.app]);
+    if (!selectedChannels) return;
+    const known = selectedChannels.filter((id) =>
+      channels.some((c) => c.id === id)
+    );
+    if (known.length !== selectedChannels.length) {
+      setSelectedChannelsRaw(known.length ? known : null);
+    }
+  }, [channels, selectedChannels]);
+
+  // the URL mirrors the view, usePersistedFilters saves it from there
+  useEffect(() => {
+    const path = new URLSearchParams({
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      display: filters.display,
+      ...(filters.app ? { app: filters.app } : {}),
+      ...(filters.user ? { user: filters.user } : {}),
+      ...(selectedChannels ? { channels: selectedChannels.join(',') } : {}),
+      ...(listState !== 'all' ? { state: listState } : {}),
+    });
+    window.history.replaceState(null, '', `/launches?${path.toString()}`);
+  }, [filters, selectedChannels, listState]);
 
   const loadData = useCallback(async () => {
     const params = new URLSearchParams({
       display: filters.display,
       app: filters.app || '',
+      user: filters.user || '',
       startDate: newDayjs(filters.startDate).startOf('day').utc().format(),
       endDate: newDayjs(filters.endDate).endOf('day').utc().format(),
     }).toString();
@@ -231,10 +286,11 @@ export const CalendarWeekProvider: FC<{
       page: listPage.toString(),
       limit: '100',
       app: filters.app || '',
+      user: filters.user || '',
       state: listState,
       ...(selectedChannels ? { integrations: selectedChannels.join(',') } : {}),
     }).toString();
-  }, [listPage, filters.app, listState, selectedChannels]);
+  }, [listPage, filters.app, filters.user, listState, selectedChannels]);
 
   const loadListData = useCallback(async () => {
     const response = await fetch(`/posts/list?${listParams}`);
@@ -245,7 +301,7 @@ export const CalendarWeekProvider: FC<{
     filters.display !== 'list'
       ? `/posts-${filters.display}-${filters.startDate}-${filters.endDate}-${
           filters.app || ''
-        }`
+        }-${filters.user || ''}`
       : null;
   const {
     data: calendarData,
@@ -263,20 +319,19 @@ export const CalendarWeekProvider: FC<{
     swrOptions
   );
 
-  const setFilters = useCallback((next: CalendarFilters) => {
-    setDisplaySaved(next.display);
-    setFiltersState(next);
-    if (next.display === 'list') {
-      setListPage(0);
-    }
-    const path = new URLSearchParams({
-      startDate: next.startDate,
-      endDate: next.endDate,
-      display: next.display,
-      ...(next.app ? { app: next.app } : {}),
-    });
-    window.history.replaceState(null, '', `/launches?${path.toString()}`);
-  }, []);
+  const setFilters = useCallback(
+    (next: CalendarFilters) => {
+      // a channel selection belongs to the channels of the old filter
+      if (next.app !== filters.app || next.user !== filters.user) {
+        setSelectedChannelsRaw(null);
+      }
+      setFiltersState(next);
+      if (next.display === 'list') {
+        setListPage(0);
+      }
+    },
+    [filters.app, filters.user]
+  );
 
   const goTo = useCallback(
     (nextDisplay: CalendarDisplay, date?: string) => {
@@ -284,9 +339,10 @@ export const CalendarWeekProvider: FC<{
         ...getDateRange(nextDisplay, date),
         display: nextDisplay,
         app: filters.app,
+        user: filters.user,
       });
     },
-    [filters.app, setFilters]
+    [filters.app, filters.user, setFilters]
   );
 
   const filterByChannels = useCallback(
@@ -364,6 +420,7 @@ export const CalendarWeekProvider: FC<{
         postDates,
         loading,
         integrations,
+        channels,
         setFilters,
         goTo,
         changeDate,

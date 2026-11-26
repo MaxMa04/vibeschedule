@@ -8,6 +8,10 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@vibeschedule/nestjs-libraries/dtos/posts/create.tag.dto';
+import {
+  ChannelFilter,
+  channelWhere,
+} from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 
 dayjs.extend(utc);
 
@@ -57,7 +61,7 @@ export class PostsRepository {
     return formats.map((format) => format.id);
   }
 
-  getPosts(orgId: string, query: GetPostsDto) {
+  getPosts(orgId: string, query: GetPostsDto, filter?: ChannelFilter) {
     return this._post.model.post.findMany({
       where: {
         organizationId: orgId,
@@ -66,10 +70,7 @@ export class PostsRepository {
           lte: dayjs.utc(query.endDate).toDate(),
         },
         deletedAt: null,
-        integration: {
-          deletedAt: null,
-          ...(query.app ? { appId: query.app } : {}),
-        },
+        integration: { deletedAt: null, ...channelWhere(filter) },
       },
       select: {
         id: true,
@@ -89,7 +90,11 @@ export class PostsRepository {
     });
   }
 
-  async getPostsList(orgId: string, query: GetPostsListDto) {
+  async getPostsList(
+    orgId: string,
+    query: GetPostsListDto,
+    filter?: ChannelFilter
+  ) {
     const page = query.page || 0;
     const limit = query.limit || 20;
     const skip = page * limit;
@@ -112,7 +117,7 @@ export class PostsRepository {
       deletedAt: null,
       integration: {
         deletedAt: null,
-        ...(query.app ? { appId: query.app } : {}),
+        ...channelWhere(filter),
         ...(query.integrations?.length
           ? { id: { in: query.integrations } }
           : {}),

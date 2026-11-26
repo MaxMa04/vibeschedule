@@ -48,6 +48,7 @@ import {
   type AccountState,
 } from '@vibeschedule/frontend/components/analytics/use-analytics';
 import { cn } from '@vibeschedule/frontend/lib/utils';
+import { ChannelResponsible } from '@vibeschedule/frontend/components/team/responsible';
 
 export function AccountSection({
   id,
@@ -137,6 +138,7 @@ export function AccountSection({
           {data.channel.disabled ? (
             <Badge variant="outline">{t('analytics_disabled')}</Badge>
           ) : null}
+          <ChannelResponsible channelId={data.channel.id} labelled />
         </div>
       </div>
 

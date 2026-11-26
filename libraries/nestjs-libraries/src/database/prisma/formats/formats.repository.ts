@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { FormatStatus, State } from '@prisma/client';
 import { PrismaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/prisma.service';
+import {
+  ChannelFilter,
+  channelWhere,
+} from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 
 const assignmentSelect = {
   integrationId: true,
@@ -123,9 +127,13 @@ export class FormatsRepository {
     });
   }
 
-  channelsWithFormats(orgId: string) {
+  channelsWithFormats(orgId: string, filter: ChannelFilter) {
     return this._integrations.model.integration.findMany({
-      where: { organizationId: orgId, deletedAt: null },
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        ...channelWhere(filter),
+      },
       orderBy: { name: 'asc' },
       select: {
         id: true,
