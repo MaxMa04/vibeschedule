@@ -37,6 +37,7 @@ import {
 } from '@vibeschedule/frontend/components/ui/card';
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -50,6 +51,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@vibeschedule/frontend/components/ui/tabs';
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@vibeschedule/frontend/components/ui/toggle-group';
 import { Alert, AlertTitle } from '@vibeschedule/frontend/components/ui/alert';
 import { cn } from '@vibeschedule/frontend/lib/utils';
 import { usePersistedFilters } from '@vibeschedule/frontend/lib/use-persisted-filters';
@@ -197,11 +202,23 @@ const ListSkeleton = () => (
 
 const TAB_KEYS = ['tab'];
 
+type Day = 'today' | 'all';
+
+// open posts count by their date, posted ones by the day they were posted
+const isToday = (post: ManualPost) =>
+  fromUtc(
+    post.state === 'PUBLISHED'
+      ? post.postedAt || post.publishDate
+      : post.publishDate
+  ).isSame(newDayjs(), 'day');
+
 const ManualList: FC<{
   posts?: ManualPost[];
   failed: boolean;
+  day: Day;
+  onDay: (day: Day) => void;
   onOpen: (id: string) => void;
-}> = ({ posts, failed, onOpen }) => {
+}> = ({ posts, failed, day, onDay, onOpen }) => {
   const t = useT();
   const user = useUser();
   const { ready, params, setParams } = usePersistedFilters('manual', TAB_KEYS);
@@ -217,7 +234,10 @@ const ManualList: FC<{
         .sort((a, b) => ((a.postedAt || '') < (b.postedAt || '') ? 1 : -1)),
     [posts]
   );
-  const shown = tab === 'open' ? open : posted;
+  const all = tab === 'open' ? open : posted;
+  const today = useMemo(() => all.filter(isToday), [all]);
+  const shown = day === 'today' ? today : all;
+  const openCount = day === 'today' ? open.filter(isToday).length : open.length;
 
   // one card per account, in the order of its next post
   const channels = useMemo(() => {
@@ -248,13 +268,37 @@ const ManualList: FC<{
             {t('manual_tab_open')}
             {posts && (
               <span className="text-muted-foreground tabular-nums">
-                {open.length}
+                {openCount}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="posted">{t('manual_tab_posted')}</TabsTrigger>
         </TabsList>
       </Tabs>
+      <ToggleGroup
+        value={[day]}
+        onValueChange={(value) => value.length && onDay(value[0] as Day)}
+        variant="outline"
+        size="sm"
+        spacing={0}
+        aria-label={t('manual_day_filter')}
+      >
+        {(
+          [
+            ['today', t('manual_day_today'), today.length],
+            ['all', t('manual_day_all'), all.length],
+          ] as const
+        ).map(([value, label, count]) => (
+          <ToggleGroupItem
+            key={value}
+            value={value}
+            className="h-10 gap-1.5 px-3 text-muted-foreground aria-pressed:bg-muted aria-pressed:text-foreground md:h-8"
+          >
+            {label}
+            {posts && <span className="tabular-nums opacity-70">{count}</span>}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
 
       {failed ? (
         <Alert variant="destructive">
@@ -270,16 +314,27 @@ const ManualList: FC<{
               {tab === 'open' ? <InboxIcon /> : <SmartphoneIcon />}
             </EmptyMedia>
             <EmptyTitle>
-              {tab === 'open'
+              {day === 'today'
+                ? tab === 'open'
+                  ? t('manual_nothing_open_today')
+                  : t('manual_nothing_posted_today')
+                : tab === 'open'
                 ? t('manual_nothing_open')
                 : t('manual_nothing_posted')}
             </EmptyTitle>
-            {tab === 'open' && (
+            {tab === 'open' && !all.length && (
               <EmptyDescription>
                 {t('manual_nothing_open_hint')}
               </EmptyDescription>
             )}
           </EmptyHeader>
+          {day === 'today' && !!all.length && (
+            <EmptyContent>
+              <Button variant="outline" onClick={() => onDay('all')}>
+                {t('manual_show_all', { count: all.length })}
+              </Button>
+            </EmptyContent>
+          )}
         </Empty>
       ) : (
         channels.map((channelPosts) => {
@@ -689,6 +744,8 @@ export const ManualPosting = () => {
   const fetch = useFetch();
   const router = useRouter();
   const postId = useSearchParams().get('post');
+  // starts on today each visit, kept while a post is open
+  const [day, setDay] = useState<Day>('today');
 
   const { data, error, mutate } = useSWR(
     '/manual/posts',
@@ -726,6 +783,8 @@ export const ManualPosting = () => {
     <ManualList
       posts={data}
       failed={!!error}
+      day={day}
+      onDay={setDay}
       onOpen={(id) => router.push(`/manual?post=${id}`)}
     />
   );
