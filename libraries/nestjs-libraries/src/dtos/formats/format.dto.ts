@@ -57,3 +57,17 @@ export class FormatsOverviewQueryDto {
   @Max(365)
   days?: number;
 }
+
+export class FeedPostFormatDto {
+  /** share link, platform post id or PfM post id of the published post */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  post: string;
+
+  /** format id, null removes the format */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  formatId?: string | null;
+}

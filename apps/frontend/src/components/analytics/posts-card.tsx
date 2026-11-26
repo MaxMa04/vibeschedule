@@ -159,8 +159,8 @@ export function PostsCard({
                       </span>
                       <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         {formatDateTime(post.postedAt)}
-                        {post.post?.format ? (
-                          <Badge variant="outline">{post.post.format.name}</Badge>
+                        {post.format ? (
+                          <Badge variant="outline">{post.format.name}</Badge>
                         ) : null}
                       </span>
                       <span className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
@@ -225,9 +225,9 @@ export function PostsCard({
                             <span className="truncate font-medium">
                               {postTitle(post, noCaption)}
                             </span>
-                            {post.post?.format ? (
+                            {post.format ? (
                               <span className="truncate text-xs text-muted-foreground">
-                                {post.post.format.name}
+                                {post.format.name}
                               </span>
                             ) : null}
                           </span>
