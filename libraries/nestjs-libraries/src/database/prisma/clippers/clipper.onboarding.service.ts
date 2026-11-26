@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { ClipperTaskKind, Prisma, Role } from '@prisma/client';
 import {
   ClipperAccountRow,
   ClipperRepository,
@@ -25,11 +25,21 @@ import {
   isValidIban,
   normalizeIban,
 } from '@vibeschedule/helpers/clippers/iban';
+import {
+  needsProfileTask,
+  openTaskCount,
+  PROFILE_TASK_TITLE,
+  profileChanged,
+} from '@vibeschedule/helpers/clippers/clipper.tasks';
 import { removeFile } from '@vibeschedule/nestjs-libraries/upload/r2.uploader';
 import {
   ClipperProfileDto,
+  ClipperTaskDto,
+  ClipperTaskUpdateDto,
   PayoutDto,
 } from '@vibeschedule/nestjs-libraries/dtos/clippers/clipper.dto';
+
+const AVATAR = /\.(jpe?g|png|webp)$/i;
 
 const profileReady = (account: ClipperAccountRow) =>
   !!(account.name && account.username && account.avatar);
@@ -133,6 +143,14 @@ export class ClipperOnboardingService {
   }
 
   private present(account: ClipperAccountRow, plan: AccountPlan) {
+    const tasks = account.tasks.map((task) => ({
+      id: task.id,
+      kind: task.kind,
+      title: task.title,
+      description: task.description,
+      doneDay: task.doneAt ? billingDay(task.doneAt) : null,
+      createdAt: task.createdAt,
+    }));
     const channel =
       account.integration && !account.integration.deletedAt
         ? account.integration
@@ -151,6 +169,8 @@ export class ClipperOnboardingService {
       },
       createdDay: account.createdOn ? billingDay(account.createdOn) : null,
       plan,
+      tasks,
+      openTasks: openTaskCount(tasks),
       channel: channel && {
         id: channel.id,
         name: channel.customName || channel.name,
@@ -213,9 +233,14 @@ export class ClipperOnboardingService {
     };
   }
 
-  // every clipper with their accounts, for admins
-  async overview(orgId: string) {
-    const members = await this._clipperRepository.clipperMembers(orgId);
+  // every clipper with their accounts, for admins; userId: only this one
+  async overview(orgId: string, userId?: string) {
+    const members = (await this._clipperRepository.clipperMembers(orgId)).filter(
+      (member) => !userId || member.user.id === userId
+    );
+    if (userId && !members.length) {
+      throw new NotFoundException('Clipper nicht gefunden');
+    }
     const clippers = [];
     for (const member of members) {
       const accounts = this.plan(
@@ -347,25 +372,57 @@ export class ClipperOnboardingService {
       fypOkAt: null,
       integrationId: null,
     });
+    // the tasks were for the lost account
+    await this._clipperRepository.deleteAccountTasks(id);
     return user ? this.state(orgId, user) : { ok: true };
   }
 
+  // one account with its plan and tasks, for admins
+  async account(orgId: string, id: string) {
+    const row = await this._clipperRepository.getAccount(orgId, id);
+    if (!row) {
+      throw new NotFoundException('Account nicht gefunden');
+    }
+    // the plan depends on the accounts before it
+    const account = this.plan(
+      await this._clipperRepository.accounts(orgId, row.userId)
+    ).find((a) => a.id === id);
+    if (!account) {
+      throw new NotFoundException('Account nicht gefunden');
+    }
+    return account;
+  }
+
   async updateProfile(orgId: string, id: string, body: ClipperProfileDto) {
-    if (!(await this._clipperRepository.getAccount(orgId, id))) {
+    const account = await this._clipperRepository.getAccount(orgId, id);
+    if (!account) {
       throw new NotFoundException('Account nicht gefunden');
     }
     const value = (v?: string) => (v === undefined ? undefined : v || null);
-    await this._clipperRepository.updateAccount(id, {
+    const profile = {
       name: value(body.name),
       username: value(body.username),
       bio: value(body.bio),
+    };
+    await this._clipperRepository.updateAccount(id, {
+      ...profile,
       topic: value(body.topic),
       searchTerms: value(body.searchTerms),
     });
-    return { ok: true };
+    await this.profileTask(orgId, account, profileChanged(account, profile));
+    return this.account(orgId, id);
   }
 
-  async setAvatar(orgId: string, id: string, url: string) {
+  // the picture as uploaded by the multer stream engine (already on R2)
+  async setAvatar(orgId: string, id: string, file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Kein Bild');
+    }
+    const url = file.path;
+    if (!AVATAR.test(url)) {
+      await removeFile(url);
+      throw new BadRequestException('Nur JPG, PNG oder WebP');
+    }
     const account = await this._clipperRepository.getAccount(orgId, id);
     if (!account) {
       await removeFile(url);
@@ -375,6 +432,105 @@ export class ClipperOnboardingService {
     if (account.avatar) {
       await removeFile(account.avatar).catch(() => undefined);
     }
+    await this.profileTask(orgId, account, true);
     return { avatar: url };
+  }
+
+  // a new profile on an account the clipper already set up has to be
+  // switched over in TikTok, see needsProfileTask
+  private async profileTask(
+    orgId: string,
+    account: ClipperAccountRow,
+    changed: boolean
+  ) {
+    const started =
+      !!account.createdOn ||
+      !!(account.integration && !account.integration.deletedAt);
+    const openProfileTask = account.tasks.some(
+      (task) => task.kind === ClipperTaskKind.PROFILE && !task.doneAt
+    );
+    if (needsProfileTask({ changed, started, openProfileTask })) {
+      await this._clipperRepository.createTask(orgId, account.id, {
+        kind: ClipperTaskKind.PROFILE,
+        title: PROFILE_TASK_TITLE,
+      });
+    }
+  }
+
+  // An admin gives the clipper something to do on an account. A second
+  // open profile task would only show the same profile twice.
+  async addTask(orgId: string, accountId: string, body: ClipperTaskDto) {
+    const account = await this._clipperRepository.getAccount(orgId, accountId);
+    if (!account) {
+      throw new NotFoundException('Account nicht gefunden');
+    }
+    const kind = body.kind || ClipperTaskKind.CUSTOM;
+    const title =
+      body.title || (kind === ClipperTaskKind.PROFILE ? PROFILE_TASK_TITLE : '');
+    if (!title) {
+      throw new BadRequestException('Die Aufgabe braucht einen Titel.');
+    }
+    const duplicate =
+      kind === ClipperTaskKind.PROFILE &&
+      account.tasks.some(
+        (task) => task.kind === ClipperTaskKind.PROFILE && !task.doneAt
+      );
+    if (!duplicate) {
+      await this._clipperRepository.createTask(orgId, accountId, {
+        kind,
+        title,
+        description: body.description || null,
+      });
+    }
+    return this.account(orgId, accountId);
+  }
+
+  async updateTask(
+    orgId: string,
+    id: string,
+    body: ClipperTaskUpdateDto,
+    // null through the public API
+    adminId: string | null
+  ) {
+    const task = await this._clipperRepository.getTask(orgId, id);
+    if (!task) {
+      throw new NotFoundException('Aufgabe nicht gefunden');
+    }
+    await this._clipperRepository.updateTask(id, {
+      title: body.title || undefined,
+      description:
+        body.description === undefined ? undefined : body.description || null,
+      ...(body.done === undefined
+        ? {}
+        : body.done
+        ? { doneAt: task.doneAt || new Date(), doneById: adminId }
+        : { doneAt: null, doneById: null }),
+    });
+    return this.account(orgId, task.account.id);
+  }
+
+  async deleteTask(orgId: string, id: string) {
+    const task = await this._clipperRepository.getTask(orgId, id);
+    if (!task) {
+      throw new NotFoundException('Aufgabe nicht gefunden');
+    }
+    await this._clipperRepository.deleteTask(id);
+    return this.account(orgId, task.account.id);
+  }
+
+  // the clipper checks a task off, or takes the tick back: only on an own
+  // account
+  async checkTask(orgId: string, user: SessionUser, id: string, done: boolean) {
+    const task = await this._clipperRepository.getTask(orgId, id);
+    if (!task || user.role !== Role.CLIPPER || task.account.userId !== user.id) {
+      throw new NotFoundException('Aufgabe nicht gefunden');
+    }
+    await this._clipperRepository.updateTask(
+      id,
+      done
+        ? { doneAt: task.doneAt || new Date(), doneById: user.id }
+        : { doneAt: null, doneById: null }
+    );
+    return this.state(orgId, user);
   }
 }

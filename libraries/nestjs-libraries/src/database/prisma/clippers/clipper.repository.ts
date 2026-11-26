@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { ApplicationStatus, Prisma, Role } from '@prisma/client';
+import {
+  ApplicationStatus,
+  ClipperTaskKind,
+  Prisma,
+  Role,
+} from '@prisma/client';
 import { PrismaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/prisma.service';
 
 const accountSelect = {
@@ -24,6 +29,17 @@ const accountSelect = {
       picture: true,
       disabled: true,
       deletedAt: true,
+    },
+  },
+  tasks: {
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      kind: true,
+      title: true,
+      description: true,
+      doneAt: true,
+      createdAt: true,
     },
   },
 } as const;
@@ -54,6 +70,7 @@ export class ClipperRepository {
   constructor(
     private _application: PrismaRepository<'clipperApplication'>,
     private _account: PrismaRepository<'clipperAccount'>,
+    private _task: PrismaRepository<'clipperTask'>,
     private _organization: PrismaRepository<'organization'>,
     private _userIntegration: PrismaRepository<'userIntegration'>,
     private _userOrg: PrismaRepository<'userOrganization'>
@@ -173,6 +190,49 @@ export class ClipperRepository {
       data,
       select: accountSelect,
     });
+  }
+
+  createTask(
+    orgId: string,
+    accountId: string,
+    data: { kind: ClipperTaskKind; title: string; description?: string | null }
+  ) {
+    return this._task.model.clipperTask.create({
+      data: { ...data, orgId, accountId },
+      select: { id: true },
+    });
+  }
+
+  // with the account it belongs to, for the owner check
+  getTask(orgId: string, id: string) {
+    return this._task.model.clipperTask.findFirst({
+      where: { orgId, id },
+      select: {
+        id: true,
+        kind: true,
+        doneAt: true,
+        account: { select: { id: true, userId: true } },
+      },
+    });
+  }
+
+  async updateTask(id: string, data: Prisma.ClipperTaskUncheckedUpdateInput) {
+    await this._task.model.clipperTask.update({
+      where: { id },
+      data,
+      select: { id: true },
+    });
+  }
+
+  async deleteTask(id: string) {
+    await this._task.model.clipperTask.delete({
+      where: { id },
+      select: { id: true },
+    });
+  }
+
+  async deleteAccountTasks(accountId: string) {
+    await this._task.model.clipperTask.deleteMany({ where: { accountId } });
   }
 
   // a channel belongs to at most one account, a newer link moves it

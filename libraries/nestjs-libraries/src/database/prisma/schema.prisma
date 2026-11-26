@@ -23,6 +23,7 @@ model Organization {
   users               UserOrganization[]
   clipperApplications ClipperApplication[]
   clipperAccounts     ClipperAccount[]
+  clipperTasks        ClipperTask[]
 
   @@index([apiKey])
 }
@@ -252,7 +253,7 @@ model ClipperApplication {
 /// name, username, niche) and how far the clipper got with creating and warming
 /// it up (rules in libraries/helpers/src/clippers/clipper.onboarding.ts).
 model ClipperAccount {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   orgId         String
   userId        String
   /// 0, 1, 2 … the order the clipper creates the accounts in
@@ -273,15 +274,43 @@ model ClipperAccount {
   /// the For You page shows the niche after the warm-up
   fypOkAt       DateTime?
   /// the vibeschedule channel once the account is connected
-  integrationId String?      @unique
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  organization  Organization @relation(fields: [orgId], references: [id])
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  integrationId String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  organization  Organization  @relation(fields: [orgId], references: [id])
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration   Integration?  @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  tasks         ClipperTask[]
 
   @@unique([userId, position])
   @@index([orgId])
+}
+
+/// Something the clipper still has to do on one account, also while it is
+/// running, e.g. switching it to a new profile. The clipper checks it off on
+/// the posting page (rules in libraries/helpers/src/clippers/clipper.tasks.ts).
+model ClipperTask {
+  id           String          @id @default(cuid())
+  orgId        String
+  accountId    String
+  /// PROFILE shows the handed-out profile (picture, name, username, bio)
+  kind         ClipperTaskKind @default(CUSTOM)
+  title        String
+  description  String?
+  doneAt       DateTime?
+  doneById     String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  organization Organization    @relation(fields: [orgId], references: [id])
+  account      ClipperAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([orgId])
+}
+
+enum ClipperTaskKind {
+  CUSTOM
+  PROFILE
 }
 
 /// One row per channel. Posts saved together for several channels share a batchId.

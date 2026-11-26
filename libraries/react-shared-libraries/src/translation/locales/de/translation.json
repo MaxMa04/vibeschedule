@@ -875,5 +875,22 @@
   "setup_saved": "Profil gespeichert",
   "setup_save_failed": "Das Profil konnte nicht gespeichert werden.",
   "clipping_terms_accept_end": "gelesen und bin einverstanden.",
-  "clipping_terms_required": "Bitte stimm der Vereinbarung zu."
+  "clipping_terms_required": "Bitte stimm der Vereinbarung zu.",
+  "tasks_title": "Offene Aufgaben",
+  "tasks_description": "Das brauchen wir noch von dir für deine Accounts. Hak ab, was du erledigt hast.",
+  "tasks_open_count_one": "{{count}} offen",
+  "tasks_open_count_other": "{{count}} offen",
+  "tasks_all_done": "Alles erledigt",
+  "tasks_check_failed": "Die Aufgabe konnte nicht gespeichert werden.",
+  "setup_tasks": "Aufgaben",
+  "setup_tasks_hint": "Der Clipper sieht offene Aufgaben oben auf „Manuell posten“ und hakt sie ab, auch wenn der Account schon läuft.",
+  "setup_task_title": "Neue Aufgabe",
+  "setup_task_description": "Beschreibung (optional)",
+  "setup_task_add": "Aufgabe hinzufügen",
+  "setup_task_add_profile": "Profil umstellen",
+  "setup_task_profile_hint": "Zeigt Bild, Name, Username und Bio zum Übernehmen.",
+  "setup_task_delete": "Aufgabe löschen",
+  "setup_open_tasks_one": "{{count}} Aufgabe offen",
+  "setup_open_tasks_other": "{{count}} Aufgaben offen",
+  "setup_rebrand": "trägt noch nicht das Profil ({{- username}})"
 }
