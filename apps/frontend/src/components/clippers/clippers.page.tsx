@@ -69,6 +69,10 @@ interface PayMonth {
   missedPostPenaltyCents: number;
   clippers: {
     user: { id: string; name: string | null; email: string };
+    /** accounts agreed with the clipper */
+    maxAccounts: number;
+    /** accounts connected and not lost */
+    connected: number;
     channels: PayChannel[];
     totalCents: number;
   }[];
@@ -158,7 +162,7 @@ const PayInputs: FC<{ channel: PayChannel; onSaved: () => void }> = ({
         <Input
           aria-label={t('clippers_fee')}
           inputMode="decimal"
-          placeholder="30"
+          placeholder="–"
           className="w-20 text-right tabular-nums"
           value={fee}
           onChange={(e) => setFee(e.target.value)}
@@ -178,6 +182,53 @@ const PayInputs: FC<{ channel: PayChannel; onSaved: () => void }> = ({
         />
       </TableCell>
     </>
+  );
+};
+
+// how many accounts the clipper may connect
+const AccountsInput: FC<{
+  userId: string;
+  value: number;
+  onSaved: () => void;
+}> = ({ userId, value, onSaved }) => {
+  const t = useT();
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const save = async () => {
+    const accounts = Number(draft);
+    if (!Number.isInteger(accounts) || accounts < 0 || accounts > 20) {
+      toaster.show(t('clippers_accounts_invalid'), 'warning');
+      setDraft(String(value));
+      return;
+    }
+    if (accounts === value) {
+      return;
+    }
+    const response = await fetch(`/clippers/users/${userId}/accounts`, {
+      method: 'PUT',
+      body: JSON.stringify({ accounts }),
+    });
+    if (!response.ok) {
+      toaster.show(t('clippers_pay_failed'), 'warning');
+      return;
+    }
+    toaster.show(t('clippers_pay_saved'), 'success');
+    onSaved();
+  };
+
+  return (
+    <Input
+      aria-label={t('clippers_accounts')}
+      inputMode="numeric"
+      className="h-8 w-14 text-right tabular-nums"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+    />
   );
 };
 
@@ -282,10 +333,28 @@ export const ClippersPage = () => {
                     {money(clipper.totalCents)}
                   </span>
                 </CardTitle>
-                <CardDescription className="truncate">
-                  {clipper.user.email}
+                <CardDescription className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <span className="truncate">{clipper.user.email}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="tabular-nums">
+                      {t('clippers_connected_of', {
+                        connected: clipper.connected,
+                      })}
+                    </span>
+                    <AccountsInput
+                      userId={clipper.user.id}
+                      value={clipper.maxAccounts}
+                      onSaved={() => mutate()}
+                    />
+                    <span>{t('clippers_accounts')}</span>
+                  </span>
                 </CardDescription>
               </CardHeader>
+              {!clipper.channels.length ? (
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  {t('clipper_accounts_empty')}
+                </p>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -346,6 +415,7 @@ export const ClippersPage = () => {
                   ))}
                 </TableBody>
               </Table>
+              )}
             </Card>
           ))}
         </>

@@ -285,6 +285,14 @@ export class IntegrationRepository {
     });
   }
 
+  // the SOP fee for a channel that just got a clipper, a set fee stays
+  async setDefaultClipFee(org: string, id: string, feeCents: number) {
+    await this._integration.model.integration.updateMany({
+      where: { id, organizationId: org, clipFeeCents: null },
+      data: { clipFeeCents: feeCents },
+    });
+  }
+
   async setClipPay(
     org: string,
     id: string,

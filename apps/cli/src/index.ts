@@ -132,6 +132,10 @@ yargs(hideBin(process.argv))
           choices: ['CLIPPER', 'USER', 'ADMIN'] as const,
           default: 'CLIPPER' as const,
         })
+        .option('accounts', {
+          describe: 'Wie viele TikTok-Accounts der Clipper betreibt (Standard 3)',
+          type: 'number',
+        })
         .option('password-file', {
           describe: 'Datei mit dem Passwort (mind. 8 Zeichen), hält es aus der Shell-History',
           type: 'string',
@@ -151,7 +155,32 @@ yargs(hideBin(process.argv))
             name: argv.name,
             role: argv.role,
             password,
+            ...(argv.accounts !== undefined
+              ? { clipperAccounts: argv.accounts }
+              : {}),
           },
+        })
+      );
+    }
+  )
+  .command(
+    'clippers:accounts <user> <accounts>',
+    'Wie viele Accounts ein Clipper verbinden darf',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Nutzer-ID oder E-Mail',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('accounts', { type: 'number', demandOption: true })
+        .example('$0 clippers:accounts clipping.anna@vibelabs.to 2', 'Anna betreibt 2 Accounts'),
+    async (argv) => {
+      const [id] = await resolveUsers(argv.user);
+      print(
+        await request(`/clippers/${enc(id)}/accounts`, {
+          method: 'PUT',
+          body: { accounts: argv.accounts },
         })
       );
     }

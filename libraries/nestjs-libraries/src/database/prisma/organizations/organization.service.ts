@@ -60,6 +60,7 @@ export class OrganizationService implements OnApplicationBootstrap {
       email,
       name: body.name,
       role: body.role,
+      clipperAccounts: body.clipperAccounts,
       password: AuthService.hashPassword(body.password),
     });
   }
