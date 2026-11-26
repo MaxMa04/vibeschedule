@@ -18,6 +18,7 @@ import {
   useCalendar,
 } from '@vibeschedule/frontend/components/launches/calendar.context';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import { ManualBadge } from '@vibeschedule/frontend/components/launches/manual.badge';
 import { Menu } from '@vibeschedule/frontend/components/launches/menu/menu';
 import {
   AddProviderButton,
@@ -148,6 +149,7 @@ const ChannelRow: FC<{
           </div>
         )}
       </div>
+      {integration.manualOnly && <ManualBadge variant="icon" />}
       <Menu
         integration={integration}
         onChange={update}

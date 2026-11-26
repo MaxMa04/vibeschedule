@@ -15,7 +15,7 @@
     "build:cli": "pnpm --filter ./apps/cli run build",
     "start:backend": "pnpm --filter ./apps/backend run start",
     "start:frontend": "pnpm --filter ./apps/frontend run start",
-    "test": "node scripts/test-unit.mjs",
+    "test": "node scripts/test-unit.mjs && node --test \"libraries/**/*.test.mjs\"",
     "typecheck": "tsc -p apps/backend/tsconfig.json --noEmit && tsc -p apps/frontend/tsconfig.json --noEmit && tsc -p apps/cli/tsconfig.json --noEmit && node scripts/check-frontend.mjs",
     "dev:docker": "docker compose -f ./docker-compose.dev.yaml up -d",
     "prisma-generate": "prisma generate --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma",

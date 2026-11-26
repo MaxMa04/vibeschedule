@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { TriangleAlertIcon } from 'lucide-react';
+import {
+  CircleCheckIcon,
+  SmartphoneIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { Logo } from '@vibeschedule/frontend/components/new-layout/logo';
@@ -23,10 +27,16 @@ export const PostForMeReturn = () => {
   const router = useRouter();
   const t = useT();
   const [failed, setFailed] = useState(false);
+  // a clipper connected the account, the sync is up to an admin
+  const [handOver, setHandOver] = useState(false);
 
   useEffect(() => {
     fetch('/integrations/sync', { method: 'POST' })
       .then((res) => {
+        if (res.status === 403) {
+          setHandOver(true);
+          return;
+        }
         if (!res.ok) {
           throw new Error();
         }
@@ -34,6 +44,30 @@ export const PostForMeReturn = () => {
       })
       .catch(() => setFailed(true));
   }, []);
+
+  if (handOver) {
+    return (
+      <Card className="w-full max-w-sm">
+        <CardHeader className="items-center text-center">
+          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-muted">
+            <CircleCheckIcon className="size-6" />
+          </div>
+          <CardTitle>{t('account_connected')}</CardTitle>
+          <CardDescription>{t('account_connected_hint')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center">
+          <Button
+            className="h-10 md:h-9"
+            nativeButton={false}
+            render={<Link href="/manual" />}
+          >
+            <SmartphoneIcon data-icon="inline-start" />
+            {t('manual_posting')}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-sm">

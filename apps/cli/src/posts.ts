@@ -9,6 +9,7 @@ export interface CreatePostArgs {
   date?: string;
   type: 'draft' | 'schedule' | 'now';
   settings?: string;
+  manual?: boolean;
   formatId?: string;
 }
 
@@ -69,6 +70,7 @@ export function buildPost(args: CreatePostArgs) {
         value: [{ content: args.content || '', image }],
         settings,
         ...(args.formatId ? { formatId: args.formatId } : {}),
+        ...(args.manual ? { manual: true } : {}),
       })),
   };
 }

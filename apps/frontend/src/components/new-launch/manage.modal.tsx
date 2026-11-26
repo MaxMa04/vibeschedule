@@ -56,10 +56,12 @@ import {
 } from '@vibeschedule/frontend/components/ui/card';
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
 } from '@vibeschedule/frontend/components/ui/field';
+import { Switch } from '@vibeschedule/frontend/components/ui/switch';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
 import { cn } from '@vibeschedule/frontend/lib/utils';
@@ -267,6 +269,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   );
   const isDraft = existingData.posts?.[0]?.state === 'DRAFT';
 
+  // Posted by hand in the app instead of through PfM. A manual-only channel
+  // decides for itself, the server enforces it as well.
+  const [manualChoice, setManualChoice] = useState(
+    !!existingData.posts?.[0]?.manual
+  );
+  const manualForced =
+    selectedIntegrations.length > 0 &&
+    selectedIntegrations.every((p) => p.integration.manualOnly);
+  const manual = manualChoice || manualForced;
+
   const close = useCallback(async () => {
     if (
       await areYouSure({
@@ -468,6 +480,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           : {}),
         settings: post.settings,
         formatId,
+        manual,
         value: post.values.slice(0, 1).map((value) => ({
           ...(value.id ? { id: value.id } : {}),
           content: value.content,
@@ -541,13 +554,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       selectedIntegrations,
       existingData,
       formatId,
+      manual,
       variant,
     ]
   );
 
   const busy = !!loading || locked;
   const scheduleLabel = !existingData.integration
-    ? t('editor_schedule')
+    ? manual
+      ? t('manual_schedule')
+      : t('editor_schedule')
     : isDraft
     ? t('editor_schedule')
     : t('update');
@@ -559,6 +575,22 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <FormatSelect />
+        <Field orientation="horizontal" data-disabled={manualForced || undefined}>
+          <FieldContent>
+            <FieldLabel htmlFor="editor-manual">{t('manual_toggle')}</FieldLabel>
+            <FieldDescription>
+              {manualForced
+                ? t('manual_forced_tooltip')
+                : t('manual_toggle_tooltip')}
+            </FieldDescription>
+          </FieldContent>
+          <Switch
+            id="editor-manual"
+            checked={manual}
+            disabled={manualForced}
+            onCheckedChange={setManualChoice}
+          />
+        </Field>
         <Field data-invalid={!!errors.date}>
           <FieldLabel>{t('editor_date')}</FieldLabel>
           <DateTimePicker
@@ -588,7 +620,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             {loading === 'schedule' && <Spinner />}
             {scheduleLabel}
           </Button>
-          <div className="grid grid-cols-2 gap-2">
+          <div className={cn('grid gap-2', !manual && 'grid-cols-2')}>
             <Button
               variant="outline"
               size="lg"
@@ -598,15 +630,17 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               {loading === 'draft' && <Spinner />}
               {t('editor_save_draft')}
             </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              disabled={busy}
-              onClick={save('now')}
-            >
-              {loading === 'now' ? <Spinner /> : <SendIcon />}
-              {t('editor_post_now')}
-            </Button>
+            {!manual && (
+              <Button
+                variant="secondary"
+                size="lg"
+                disabled={busy}
+                onClick={save('now')}
+              >
+                {loading === 'now' ? <Spinner /> : <SendIcon />}
+                {t('editor_post_now')}
+              </Button>
+            )}
           </div>
           {!!existingData.integration && (
             <Button

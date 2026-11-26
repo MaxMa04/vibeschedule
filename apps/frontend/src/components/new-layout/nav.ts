@@ -4,6 +4,7 @@ import {
   ImageIcon,
   LayersIcon,
   SettingsIcon,
+  SmartphoneIcon,
   SquarePenIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ export interface NavItem {
 
 export const mainNav: NavItem[] = [
   { path: '/post', label: 'compose', icon: SquarePenIcon },
+  { path: '/manual', label: 'manual_posting', icon: SmartphoneIcon },
   { path: '/launches', label: 'calendar', icon: CalendarDaysIcon },
   { path: '/formats', label: 'formats', icon: LayersIcon },
   { path: '/analytics', label: 'analytics', icon: ChartLineIcon },
@@ -26,6 +28,12 @@ export const mainNav: NavItem[] = [
 export const secondaryNav: NavItem[] = [
   { path: '/settings', label: 'settings', icon: SettingsIcon },
 ];
+
+// a clipper only posts by hand, calendar, media and analytics are for the team
+export const navFor = (role?: string) =>
+  role === 'CLIPPER'
+    ? mainNav.filter((item) => item.path === '/manual')
+    : mainNav;
 
 export const navItemFor = (pathname: string) =>
   [...mainNav, ...secondaryNav].find((item) => pathname.startsWith(item.path));

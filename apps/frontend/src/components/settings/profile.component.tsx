@@ -45,6 +45,21 @@ import {
   FieldLabel,
 } from '@vibeschedule/frontend/components/ui/field';
 
+export type UserRole = 'ADMIN' | 'USER' | 'CLIPPER';
+
+export const useRoleLabel = () => {
+  const t = useT();
+  return useCallback(
+    (role: UserRole) =>
+      role === 'ADMIN'
+        ? t('admin')
+        : role === 'CLIPPER'
+        ? t('role_clipper')
+        : t('role_user'),
+    [t]
+  );
+};
+
 const offsetLabel = (timezone: string) => {
   try {
     return (
@@ -201,6 +216,7 @@ export const ProfileComponent = () => {
   const user = useUser();
   const t = useT();
   const isAdmin = user?.role === 'ADMIN' || !!user?.isAdmin;
+  const roleLabel = useRoleLabel();
 
   return (
     <div className="flex flex-col gap-4">
@@ -219,8 +235,16 @@ export const ProfileComponent = () => {
               {user?.email}
             </span>
           </div>
-          <Badge variant={isAdmin ? 'default' : 'secondary'}>
-            {isAdmin ? t('admin') : t('role_user')}
+          <Badge
+            variant={
+              isAdmin
+                ? 'default'
+                : user?.role === 'CLIPPER'
+                ? 'outline'
+                : 'secondary'
+            }
+          >
+            {roleLabel(isAdmin ? 'ADMIN' : user?.role || 'USER')}
           </Badge>
         </CardContent>
       </Card>

@@ -72,6 +72,12 @@ export class Post {
   @IsOptional()
   @IsString()
   formatId?: string | null;
+
+  // posted by hand in the app: the post gets a date but never goes to PfM.
+  // Left out, an existing post keeps what it had.
+  @IsOptional()
+  @IsBoolean()
+  manual?: boolean;
 }
 
 export class ValidatePostsDto {

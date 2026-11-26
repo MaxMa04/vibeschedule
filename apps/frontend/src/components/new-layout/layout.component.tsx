@@ -1,7 +1,7 @@
 'use client';
 
-import React, { ReactNode, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { ReactNode, useCallback, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { Toaster } from '@vibeschedule/react/toaster/toaster';
@@ -37,6 +37,8 @@ export const LayoutComponent = ({
   sidebarOpen: boolean;
 }) => {
   const fetch = useFetch();
+  const pathname = usePathname();
+  const router = useRouter();
   const load = useCallback(async (path: string) => {
     return await (await fetch(path)).json();
   }, []);
@@ -50,7 +52,18 @@ export const LayoutComponent = ({
     refreshWhenHidden: false,
   });
 
-  if (!user) return null;
+  // a clipper has the posting page and the password, the backend refuses
+  // everything else anyway
+  const misplaced =
+    user?.role === 'CLIPPER' &&
+    !['/manual', '/settings'].some((path) => pathname.startsWith(path));
+  useEffect(() => {
+    if (misplaced) {
+      router.replace('/manual');
+    }
+  }, [misplaced]);
+
+  if (!user || misplaced) return null;
 
   return (
     <ContextWrapper user={user}>

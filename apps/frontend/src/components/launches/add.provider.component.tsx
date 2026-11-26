@@ -3,7 +3,14 @@
 import React, { FC, useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
-import { ArrowLeftIcon, PlusIcon, RefreshCwIcon } from 'lucide-react';
+import copy from 'copy-to-clipboard';
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  CopyIcon,
+  PlusIcon,
+  RefreshCwIcon,
+} from 'lucide-react';
 import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
@@ -11,8 +18,16 @@ import { Button } from '@vibeschedule/frontend/components/ui/button';
 import { Input } from '@vibeschedule/frontend/components/ui/input';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
+import { Switch } from '@vibeschedule/frontend/components/ui/switch';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@vibeschedule/frontend/components/ui/input-group';
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -41,8 +56,9 @@ interface SocialProvider {
   customFields?: CustomField[];
 }
 
-// PfM sends the browser back to /integrations/social/postforme after the consent
-const useConnect = () => {
+// The consent URL of PfM, which sends the browser back to
+// /integrations/social/postforme afterwards
+const useConnectUrl = () => {
   const fetch = useFetch();
   const t = useT();
   return useCallback(
@@ -58,12 +74,101 @@ const useConnect = () => {
       const { url } = await response.json().catch(() => ({}));
       if (!response.ok || !url) {
         toast.error(t('could_not_connect_to_platform'));
-        return false;
+        return null;
       }
-      window.location.href = url;
-      return true;
+      return url as string;
     },
     [fetch, t]
+  );
+};
+
+const useConnect = () => {
+  const connectUrl = useConnectUrl();
+  return useCallback(
+    async (identifier: string, fields?: Record<string, string>) => {
+      const url = await connectUrl(identifier, fields);
+      if (url) {
+        window.location.href = url;
+      }
+      return !!url;
+    },
+    [connectUrl]
+  );
+};
+
+const ProviderTitle: FC<{
+  provider: SocialProvider;
+  onBack: () => void;
+}> = ({ provider, onBack }) => {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onBack}
+        aria-label={t('calendar_back')}
+      >
+        <ArrowLeftIcon />
+      </Button>
+      <img
+        src={`/icons/platforms/${provider.identifier}.png`}
+        alt=""
+        className="size-6 rounded-full"
+      />
+      <span className="font-medium">{provider.name}</span>
+    </div>
+  );
+};
+
+// for an account that belongs to somebody else: the link goes to that person
+const ConnectLink: FC<{
+  provider: SocialProvider;
+  url: string;
+  onBack: () => void;
+}> = ({ provider, url, onBack }) => {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+  const copyUrl = () => {
+    copy(url);
+    setCopied(true);
+    toast.success(t('connect_link_copied'));
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <ProviderTitle provider={provider} onBack={onBack} />
+      <Field>
+        <FieldLabel htmlFor="connect-link">{t('connect_link_title')}</FieldLabel>
+        <InputGroup className="h-10 md:h-9">
+          <InputGroupInput
+            id="connect-link"
+            value={url}
+            readOnly
+            onFocus={(e) => e.currentTarget.select()}
+            className="font-mono text-xs"
+          />
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              size="icon-xs"
+              onClick={copyUrl}
+              aria-label={t('connect_link_copy')}
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
+        <FieldDescription>{t('connect_link_hint')}</FieldDescription>
+      </Field>
+      <Button className="h-10 md:h-9" onClick={copyUrl}>
+        {copied ? (
+          <CheckIcon data-icon="inline-start" />
+        ) : (
+          <CopyIcon data-icon="inline-start" />
+        )}
+        {copied ? t('connect_link_copied') : t('connect_link_copy')}
+      </Button>
+    </div>
   );
 };
 
@@ -112,23 +217,7 @@ const CustomFieldsForm: FC<{
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onBack}
-          aria-label={t('calendar_back')}
-        >
-          <ArrowLeftIcon />
-        </Button>
-        <img
-          src={`/icons/platforms/${provider.identifier}.png`}
-          alt=""
-          className="size-6 rounded-full"
-        />
-        <span className="font-medium">{provider.name}</span>
-      </div>
+      <ProviderTitle provider={provider} onBack={onBack} />
       <FieldGroup className="gap-4">
         {fields.map((field) => {
           const showError = touched && invalid[field.key];
@@ -171,9 +260,14 @@ const CustomFieldsForm: FC<{
 export const AddProviderComponent: FC = () => {
   const t = useT();
   const fetch = useFetch();
-  const connect = useConnect();
+  const connectUrl = useConnectUrl();
   const [selected, setSelected] = useState<SocialProvider | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [share, setShare] = useState(false);
+  const [shared, setShared] = useState<{
+    provider: SocialProvider;
+    url: string;
+  } | null>(null);
   const { data, isLoading } = useSWR('/integrations', async (path: string) =>
     (await fetch(path)).json()
   );
@@ -181,17 +275,34 @@ export const AddProviderComponent: FC = () => {
 
   const select = useCallback(
     (item: SocialProvider) => async () => {
+      // Bluesky asks for a handle and an app password, there is no link
       if (item.customFields?.length) {
         setSelected(item);
         return;
       }
       setConnecting(item.identifier);
-      if (!(await connect(item.identifier))) {
-        setConnecting(null);
+      const url = await connectUrl(item.identifier);
+      if (url && !share) {
+        window.location.href = url;
+        return;
+      }
+      setConnecting(null);
+      if (url) {
+        setShared({ provider: item, url });
       }
     },
-    [connect]
+    [connectUrl, share]
   );
+
+  if (shared) {
+    return (
+      <ConnectLink
+        provider={shared.provider}
+        url={shared.url}
+        onBack={() => setShared(null)}
+      />
+    );
+  }
 
   if (selected) {
     return (
@@ -204,6 +315,21 @@ export const AddProviderComponent: FC = () => {
       <p className="text-sm text-muted-foreground">
         {t('calendar_add_channel_description')}
       </p>
+      <Field orientation="horizontal" className="rounded-lg border p-3">
+        <FieldContent>
+          <FieldLabel htmlFor="connect-share">
+            {t('connect_link_switch')}
+          </FieldLabel>
+          <FieldDescription>
+            {t('connect_link_switch_description')}
+          </FieldDescription>
+        </FieldContent>
+        <Switch
+          id="connect-share"
+          checked={share}
+          onCheckedChange={setShare}
+        />
+      </Field>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {isLoading
           ? Array.from({ length: 9 }, (_, i) => (

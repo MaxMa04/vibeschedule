@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
@@ -16,6 +17,8 @@ import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/pos
 import { IntegrationTimeDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { IntegrationNameDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/integration.name.dto';
 import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
+import { ManualOnlyDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/manual.only.dto';
+import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 
 @Controller('/integrations')
 export class IntegrationsController {
@@ -78,6 +81,17 @@ export class IntegrationsController {
     @Body() body: IntegrationNameDto
   ) {
     return this._integrationService.updateCustomName(org.id, id, body.name);
+  }
+
+  // nothing of a manual-only channel goes to PfM, people post it themselves
+  @Put('/:id/manual-only')
+  @UseGuards(AdminGuard)
+  setManualOnly(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ManualOnlyDto
+  ) {
+    return this._postService.setChannelManualOnly(org.id, id, body.manualOnly);
   }
 
   @Post('/:id/settings')

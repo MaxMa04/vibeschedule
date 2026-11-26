@@ -12,7 +12,9 @@ import {
   PlusIcon,
   PowerIcon,
   PowerOffIcon,
+  SmartphoneIcon,
   UnplugIcon,
+  ZapIcon,
 } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
@@ -25,6 +27,7 @@ import {
 } from '@vibeschedule/frontend/components/launches/app.modal';
 import { useCreatePost } from '@vibeschedule/frontend/components/launches/new.post';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
 import {
   DropdownMenu,
@@ -46,7 +49,8 @@ export const Menu: FC<{
   const fetch = useFetch();
   const modal = useModals();
   const createPost = useCreatePost();
-  const { id, disabled } = integration;
+  const user = useUser();
+  const { id, disabled, manualOnly } = integration;
   const reload = useCallback(() => onChange(false), [onChange]);
 
   const preferences = useCallback(() => {
@@ -145,6 +149,32 @@ export const Menu: FC<{
     onChange(true);
   }, [fetch, id, integration.name, onChange, t]);
 
+  // A manual-only channel never sends anything to PfM. Turning it on takes
+  // back what is scheduled there.
+  const toggleManualOnly = useCallback(async () => {
+    const next = !manualOnly;
+    if (
+      next &&
+      !(await deleteDialog(
+        t('manual_only_confirm'),
+        t('manual_only_enable'),
+        t('manual_only_title')
+      ))
+    ) {
+      return;
+    }
+    const response = await fetch(`/integrations/${id}/manual-only`, {
+      method: 'PUT',
+      body: JSON.stringify({ manualOnly: next }),
+    });
+    if (!response.ok) {
+      toast.error(t('manual_only_failed'));
+      return;
+    }
+    toast.success(next ? t('manual_only_enabled') : t('manual_only_disabled'));
+    onChange(true);
+  }, [fetch, id, manualOnly, onChange, t]);
+
   const copyId = useCallback(() => {
     copy(id);
     toast.success(t('channel_id_copied'));
@@ -189,6 +219,14 @@ export const Menu: FC<{
               <BoxIcon />
               {t('calendar_assign_app')}
             </DropdownMenuItem>
+            {user?.role === 'ADMIN' && (
+              <DropdownMenuItem onClick={toggleManualOnly}>
+                {manualOnly ? <ZapIcon /> : <SmartphoneIcon />}
+                {manualOnly
+                  ? t('manual_only_turn_off')
+                  : t('manual_only_turn_on')}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={copyId}>
               <CopyIcon />
               {t('copy_id')}

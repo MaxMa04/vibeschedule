@@ -35,12 +35,18 @@ export async function proxy(request: NextRequest) {
 
   const search = new URL(nextUrl).search;
   if (!nextUrl.pathname.startsWith('/auth') && !authCookie) {
-    // the PfM OAuth return page needs a login first, then continues
-    const returnUrl = nextUrl.pathname.startsWith('/integrations/social/')
-      ? `?returnUrl=${encodeURIComponent(nextUrl.href)}`
-      : '';
+    // The PfM OAuth return page: whoever connected the account may have no
+    // login (a clipper with a connect link), a login from there continues.
+    // Only the path: behind nginx this server sees itself as localhost.
     return NextResponse.redirect(
-      new URL(`/auth/login${returnUrl}`, nextUrl.href)
+      new URL(
+        nextUrl.pathname.startsWith('/integrations/social/')
+          ? `/auth/connected?returnUrl=${encodeURIComponent(
+              nextUrl.pathname + nextUrl.search
+            )}`
+          : '/auth/login',
+        nextUrl.href
+      )
     );
   }
 

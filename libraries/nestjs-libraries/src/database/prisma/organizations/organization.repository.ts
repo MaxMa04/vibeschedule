@@ -58,15 +58,30 @@ export class OrganizationRepository {
     const members = await this._userOrg.model.userOrganization.findMany({
       where: { organizationId: orgId },
       orderBy: { createdAt: 'asc' },
-      select: { role: true, user: { select: teamUserSelect } },
+      select: {
+        role: true,
+        user: {
+          select: {
+            ...teamUserSelect,
+            channels: {
+              where: { integration: { deletedAt: null } },
+              select: { integrationId: true },
+            },
+          },
+        },
+      },
     });
-    return members.map(({ role, user }) => ({ ...user, role }));
+    return members.map(({ role, user: { channels, ...user } }) => ({
+      ...user,
+      role,
+      channels: channels.map((channel) => channel.integrationId),
+    }));
   }
 
   getMember(orgId: string, userId: string) {
     return this._userOrg.model.userOrganization.findUnique({
       where: { userId_organizationId: { userId, organizationId: orgId } },
-      select: { userId: true },
+      select: { userId: true, role: true },
     });
   }
 

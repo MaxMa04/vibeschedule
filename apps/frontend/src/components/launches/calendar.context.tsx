@@ -45,6 +45,8 @@ export interface Integrations {
   name: string;
   id: string;
   disabled?: boolean;
+  // nothing of this channel goes to PfM, people post it themselves
+  manualOnly?: boolean;
   display: string;
   identifier: string;
   type: string;

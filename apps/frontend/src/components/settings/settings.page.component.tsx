@@ -59,7 +59,9 @@ export const SettingsPage = () => {
     <PageBody className="max-w-4xl">
       <PageHeader
         title={t('settings')}
-        description={t('settings_description')}
+        description={
+          isAdmin ? t('settings_description') : t('settings_description_member')
+        }
       />
       <Tabs value={tab} onValueChange={(value) => select(value as Tab)}>
         <TabsList className="max-w-full">

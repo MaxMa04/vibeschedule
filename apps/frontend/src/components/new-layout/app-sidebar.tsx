@@ -36,8 +36,8 @@ import {
   AvatarFallback,
 } from '@vibeschedule/frontend/components/ui/avatar';
 import {
-  mainNav,
   NavItem,
+  navFor,
   secondaryNav,
 } from '@vibeschedule/frontend/components/new-layout/nav';
 import { useThemeMode } from '@vibeschedule/frontend/components/layout/mode.component';
@@ -148,6 +148,8 @@ const UserMenu = () => {
 
 export const AppSidebar = () => {
   const { isMobile, setOpenMobile } = useSidebar();
+  const user = useUser();
+  const home = user?.role === 'CLIPPER' ? '/manual' : '/launches';
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -157,7 +159,7 @@ export const AppSidebar = () => {
               size="lg"
               render={
                 <Link
-                  href="/launches"
+                  href={home}
                   onClick={() => isMobile && setOpenMobile(false)}
                 />
               }
@@ -180,7 +182,7 @@ export const AppSidebar = () => {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <NavLinks items={mainNav} />
+            <NavLinks items={navFor(user?.role)} />
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup className="mt-auto">

@@ -226,7 +226,17 @@ export const stripHtmlValidation = (
   }
 
   if (!/<p[\s>]/i.test(value) && !none) {
-    return value;
+    // Plain text from the API or the CLI. As the text for a platform it loses
+    // the entities the serializer above put in, "&" would go out as "&amp;".
+    return replaceBold
+      ? value
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/&quot;/gi, '"')
+          .replace(/&#39;/gi, "'")
+          .replace(/&gt;/gi, '>')
+          .replace(/&lt;/gi, '<')
+          .replace(/&amp;/gi, '&')
+      : value;
   }
 
   const html = (value || '')

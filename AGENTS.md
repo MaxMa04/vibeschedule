@@ -25,7 +25,7 @@ corepack pnpm@10.6.1 install
 corepack pnpm@10.6.1 run prisma-db-push   # Schema in die DB aus .env schreiben
 corepack pnpm@10.6.1 run dev              # Backend :3000 + Frontend :4200
 corepack pnpm@10.6.1 run typecheck        # Gate: Backend, Frontend, CLI + scripts/check-frontend.mjs
-corepack pnpm@10.6.1 test                 # Unit-Tests (scripts/test-unit.mjs)
+corepack pnpm@10.6.1 test                 # Unit-Tests: *.spec.ts (scripts/test-unit.mjs) und libraries/**/*.test.mjs
 corepack pnpm@10.6.1 run build
 ```
 
@@ -35,6 +35,9 @@ Lokale Konfiguration steht in `.env` (Vorlage `.env.example`), beide Apps lesen 
 
 - Kein eigener Scheduler, keine Queue: Posts gehen mit `scheduled_at` an PfM. Status kommt über den PfM-Webhook `POST /public/pfm/webhook` und den Abgleich beim Laden des Kalenders.
 - Kanäle sind PfM-Social-Accounts (`Integration.internalId` = PfM-ID). Plattformen nur die zehn aus `pfm.platforms.ts`.
+- Manuelles Posten: Ein Post mit `manual` bekommt einen Termin, geht aber nie an PfM. Jemand postet ihn selbst in der App (Seite `/manual`, Routen `/manual/*`, `ManualPostsService`) und markiert ihn als gepostet. Ein Kanal mit `manualOnly` erzwingt das serverseitig für alle seine Posts. Jeder Weg zu PfM läuft über `PostsService.syncToPfm`, dort steht die Sperre. Der Kanal bleibt in PfM verbunden: Die Zahlen kommen aus dem Account-Feed, verknüpft über die TikTok-Post-ID aus dem Link oder über die gleiche Caption (`libraries/helpers/src/manual/manual.match.ts`), nie nur über die Zeit.
+- PfM kennt keine Nur-Lese-Verbindung: Es fordert bei TikTok immer auch die Rechte zum Veröffentlichen an. Der Schutz ist deshalb `manualOnly`, nicht die OAuth-Berechtigung.
+- Rollen: `ADMIN`, `USER` (Team, sieht alles außer den Einstellungen) und `CLIPPER`. Clipper sind für jede Route gesperrt, die nicht `@AllowClipper()` trägt (`ClipperGuard`, global). Offen sind nur `/manual/*` und die eigenen `/user`-Routen; `ManualPostsService` beschränkt sie auf die Kanäle aus `UserIntegration`. Eine neue Route für Clipper braucht beides: die Markierung und die Kanalprüfung im Service. Einem Clipper zugewiesene Kanäle werden `manualOnly`.
 - Nach dem OAuth leitet PfM immer auf die im PfM-Dashboard hinterlegte Projekt-URL `https://vibeschedule.vibelabs.to/integrations/social/postforme` weiter (Quickstart-Projekte erlauben keinen Override). Lokal verbundene Konten landen also auf Prod; lokal danach den Sync-Button neben "Kanal hinzufügen" nutzen.
 - Plattform-Einstellungen eines Posts tragen die Feldnamen von PfM `platform_configurations` (snake_case). Das DTO in `libraries/nestjs-libraries/src/dtos/posts/providers-settings` ist zugleich die Whitelist; Frontend-Formular (`apps/frontend/src/components/new-launch/providers`) und CLI-Doku (`apps/cli/PLATFORM_SETTINGS.md`) bei Änderungen mitziehen.
 - Medien nur auf R2, öffentliche URLs unter `CLOUDFLARE_BUCKET_URL`. PfM lädt sie von dort.

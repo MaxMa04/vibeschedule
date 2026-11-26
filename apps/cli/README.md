@@ -38,6 +38,9 @@ vibeschedule auth:check
 | `auth:check` | Schlüssel prüfen, zeigt API-URL und Anzahl Kanäle |
 | `integrations:list [--app <id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`) und App |
 | `integrations:settings <kanal-id>` | Einstellungen und Textlimit eines Kanals |
+| `integrations:connect-url <plattform>` | Link, mit dem der Besitzer ein Konto verbindet (auf seinem Gerät öffnen, anmelden, zustimmen) |
+| `integrations:sync` | Bei Post for Me verbundene Konten als Kanäle übernehmen, z. B. nach einem Verbindungslink |
+| `integrations:manual-only <kanal-id> [--off]` | Kanal auf „Nur manuell“ stellen oder (`--off`) automatisches Posten wieder erlauben |
 | `upload <datei-oder-url>` | In die Mediathek hochladen, gibt `path` (öffentliche URL) zurück |
 | `media:list [-s <suche>] [-p <seite>]` | Mediathek, neueste zuerst |
 | `posts:create ...` | Post anlegen, siehe unten |
@@ -65,9 +68,10 @@ Analytics-Zahlen sind die aktuellen Gesamtwerte der Posts, die im Zeitraum verö
 | `-t, --type` | `schedule` (Standard), `draft` oder `now` |
 | `--settings` | Plattform-Einstellungen als JSON für alle Kanäle, siehe [PLATFORM_SETTINGS.md](PLATFORM_SETTINGS.md) |
 | `-f, --format` | Format des Posts, ID oder Name aus `formats:list`. Gilt für alle Kanäle |
+| `--manual` | Manuell posten: Der Post bekommt den Termin, geht aber nicht an die Plattform. Die zuständige Person postet ihn selbst in der App (Seite „Posten“). In einer `--json`-Datei ist das `"manual": true` am einzelnen Post |
 | `-j, --json` | Kompletten Request aus einer Datei senden, z. B. für eigene Texte oder Einstellungen je Kanal |
 
-`--date` ist Pflicht, außer bei `--type now`. Im JSON-Request (`--json`) steht das Format als `formatId` (ID, nicht Name) in jedem Eintrag von `posts[]`. Entwürfe bleiben in vibeschedule und gehen erst beim Einplanen an die Plattform.
+`--date` ist Pflicht, außer bei `--type now`. Im JSON-Request (`--json`) steht das Format als `formatId` (ID, nicht Name) und `"manual": true` am einzelnen Eintrag von `posts[]`. Entwürfe bleiben in vibeschedule und gehen erst beim Einplanen an die Plattform. Manuelle Posts gehen nie an die Plattform; ein Kanal, der in vibeschedule auf „Nur manuell“ steht, macht jeden Post manuell, auch ohne `--manual`.
 
 ## Beispiele
 

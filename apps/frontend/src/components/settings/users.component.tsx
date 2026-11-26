@@ -1,12 +1,13 @@
 'use client';
 
-import { FC, useCallback, useId } from 'react';
+import { FC, FormEvent, useCallback, useId, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { Controller, Resolver, useForm } from 'react-hook-form';
 import {
   KeyRoundIcon,
   MoreHorizontalIcon,
+  RadioTowerIcon,
   Trash2Icon,
   UserPlusIcon,
 } from 'lucide-react';
@@ -16,7 +17,12 @@ import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { initials } from '@vibeschedule/frontend/components/settings/profile.component';
+import { cn } from '@vibeschedule/frontend/lib/utils';
+import {
+  initials,
+  useRoleLabel,
+  UserRole,
+} from '@vibeschedule/frontend/components/settings/profile.component';
 import {
   Card,
   CardAction,
@@ -32,10 +38,14 @@ import {
   TableHeader,
   TableRow,
 } from '@vibeschedule/frontend/components/ui/table';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import {
   Avatar,
   AvatarFallback,
+  AvatarGroup,
+  AvatarImage,
 } from '@vibeschedule/frontend/components/ui/avatar';
+import { Checkbox } from '@vibeschedule/frontend/components/ui/checkbox';
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
 import { Input } from '@vibeschedule/frontend/components/ui/input';
@@ -63,21 +73,30 @@ import {
   DropdownMenuTrigger,
 } from '@vibeschedule/frontend/components/ui/dropdown-menu';
 
-type Role = 'ADMIN' | 'USER';
-
 interface TeamUser {
   id: string;
   email: string;
   name: string | null;
-  role: Role;
+  role: UserRole;
+  channels: string[];
   createdAt: string;
+}
+
+interface Channel {
+  id: string;
+  name: string;
+  identifier: string;
+  picture: string;
+  display?: string | null;
+  disabled: boolean;
+  app: { id: string; name: string } | null;
 }
 
 interface CreateUserValues {
   name: string;
   email: string;
   password: string;
-  role: Role;
+  role: UserRole;
 }
 
 type FieldErrors<T> = Partial<
@@ -98,6 +117,184 @@ const useTeam = () => {
     }
     return (await response.json()).users as TeamUser[];
   });
+};
+
+const useChannels = () => {
+  const fetch = useFetch();
+  return useSWR('/integrations/list', async (url: string) => {
+    return (await (await fetch(url)).json()).integrations as Channel[];
+  });
+};
+
+const NO_APP = 'none';
+
+const ChannelPicker: FC<{
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  invalid?: boolean;
+}> = ({ selected, onChange, invalid }) => {
+  const t = useT();
+  const { data, isLoading } = useChannels();
+
+  const groups = useMemo(() => {
+    const channels = data || [];
+    const apps = new Map<string, string>();
+    for (const channel of channels) {
+      if (channel.app) {
+        apps.set(channel.app.id, channel.app.name);
+      }
+    }
+    return [
+      ...[...apps]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      { id: NO_APP, name: t('formats_no_app') },
+    ]
+      .map((group) => ({
+        ...group,
+        channels: channels.filter(
+          (channel) => (channel.app?.id || NO_APP) === group.id
+        ),
+      }))
+      .filter((group) => group.channels.length > 0);
+  }, [data, t]);
+
+  const toggle = (id: string) =>
+    onChange(
+      selected.includes(id)
+        ? selected.filter((p) => p !== id)
+        : [...selected, id]
+    );
+
+  const toggleGroup = (channels: Channel[], all: boolean) => {
+    const ids = channels.map((channel) => channel.id);
+    onChange(
+      all
+        ? selected.filter((id) => !ids.includes(id))
+        : [...selected, ...ids.filter((id) => !selected.includes(id))]
+    );
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-32 w-full" />;
+  }
+
+  if (!groups.length) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t('clipper_no_channels')}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {groups.map((group) => {
+        const count = group.channels.filter((channel) =>
+          selected.includes(channel.id)
+        ).length;
+        const all = count === group.channels.length;
+        return (
+          <div key={group.id} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{group.name}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {count}/{group.channels.length}
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className="ms-auto"
+                onClick={() => toggleGroup(group.channels, all)}
+              >
+                {all ? t('clipper_select_none') : t('clipper_select_all')}
+              </Button>
+            </div>
+            <div
+              className={cn(
+                'flex flex-col divide-y overflow-hidden rounded-lg border',
+                invalid && 'border-destructive'
+              )}
+            >
+              {group.channels.map((channel) => (
+                <label
+                  key={channel.id}
+                  className="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50 has-data-checked:bg-primary/5"
+                >
+                  <Checkbox
+                    checked={selected.includes(channel.id)}
+                    onCheckedChange={() => toggle(channel.id)}
+                  />
+                  <ChannelAvatar
+                    picture={channel.picture}
+                    identifier={channel.identifier}
+                    name={channel.name}
+                    disabled={channel.disabled}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium">
+                      {channel.name}
+                    </span>
+                    {!!channel.display && channel.display !== channel.name && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {channel.display}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ChannelsForm: FC<{
+  user: TeamUser;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ user, onClose, onSaved }) => {
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const t = useT();
+  const [channels, setChannels] = useState(user.channels);
+  const [saving, setSaving] = useState(false);
+
+  const save = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      setSaving(true);
+      const response = await fetch(`/settings/team/users/${user.id}/channels`, {
+        method: 'PUT',
+        body: JSON.stringify({ channels }),
+      });
+      setSaving(false);
+      if (!response.ok) {
+        toaster.show(
+          (await responseMessage(response)) || t('clipper_channels_failed'),
+          'warning'
+        );
+        return;
+      }
+      toaster.show(t('clipper_channels_saved'));
+      onSaved();
+      onClose();
+    },
+    [channels, fetch, onClose, onSaved, t, toaster, user.id]
+  );
+
+  return (
+    <form onSubmit={save} className="flex flex-1 flex-col gap-6" noValidate>
+      <Field>
+        <FieldDescription>{t('clipper_channels_hint')}</FieldDescription>
+        <ChannelPicker selected={channels} onChange={setChannels} />
+      </Field>
+      <SheetActions onClose={onClose} submitting={saving} label={t('save')} />
+    </form>
+  );
 };
 
 const SheetActions: FC<{
@@ -132,6 +329,9 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
   const toaster = useToaster();
   const t = useT();
   const id = useId();
+  const roleLabel = useRoleLabel();
+  const [channels, setChannels] = useState<string[]>([]);
+  const [channelsMissing, setChannelsMissing] = useState(false);
 
   const resolver = useCallback<Resolver<CreateUserValues>>(
     async (values) => {
@@ -161,14 +361,26 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
   });
   const { errors, isSubmitting } = form.formState;
 
+  const role = form.watch('role');
+
+  const pickChannels = useCallback((next: string[]) => {
+    setChannels(next);
+    setChannelsMissing(false);
+  }, []);
+
   const submit = useCallback(
     async (values: CreateUserValues) => {
+      if (values.role === 'CLIPPER' && !channels.length) {
+        setChannelsMissing(true);
+        return;
+      }
       const response = await fetch('/settings/team/users', {
         method: 'POST',
         body: JSON.stringify({
           ...values,
           name: values.name.trim(),
           email: values.email.trim(),
+          ...(values.role === 'CLIPPER' ? { channels } : {}),
         }),
       });
       if (response.status === 409) {
@@ -186,13 +398,18 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
       onSaved();
       onClose();
     },
-    [fetch, form, onClose, onSaved, t, toaster]
+    [channels, fetch, form, onClose, onSaved, t, toaster]
   );
 
-  const roles = [
-    { value: 'USER', label: t('role_user') },
-    { value: 'ADMIN', label: t('admin') },
-  ];
+  const roles = (['USER', 'ADMIN', 'CLIPPER'] as const).map((value) => ({
+    value,
+    label: roleLabel(value),
+  }));
+  const roleDescription = {
+    USER: t('role_description_user'),
+    ADMIN: t('role_description_admin'),
+    CLIPPER: t('role_description_clipper'),
+  }[role];
 
   return (
     <form
@@ -251,7 +468,7 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
               <Select
                 items={roles}
                 value={field.value}
-                onValueChange={(value) => field.onChange(value as Role)}
+                onValueChange={(value) => field.onChange(value as UserRole)}
               >
                 <SelectTrigger className="h-10 w-full md:h-9">
                   <SelectValue />
@@ -266,8 +483,22 @@ const CreateUserForm: FC<{ onClose: () => void; onSaved: () => void }> = ({
               </Select>
             )}
           />
-          <FieldDescription>{t('role_description')}</FieldDescription>
+          <FieldDescription>{roleDescription}</FieldDescription>
         </Field>
+        {role === 'CLIPPER' && (
+          <Field>
+            <FieldLabel>{t('clipper_channels')}</FieldLabel>
+            <FieldDescription>{t('clipper_channels_hint')}</FieldDescription>
+            <ChannelPicker
+              selected={channels}
+              onChange={pickChannels}
+              invalid={channelsMissing}
+            />
+            {channelsMissing && (
+              <FieldError>{t('clipper_channels_required')}</FieldError>
+            )}
+          </Field>
+        )}
       </FieldGroup>
       <SheetActions
         onClose={onClose}
@@ -361,6 +592,38 @@ const ResetPasswordForm: FC<{ user: TeamUser; onClose: () => void }> = ({
   );
 };
 
+const ClipperChannels: FC<{ channels: Channel[]; onClick: () => void }> = ({
+  channels,
+  onClick,
+}) => {
+  const t = useT();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      className="-ms-2 h-7 text-muted-foreground"
+      onClick={onClick}
+    >
+      {channels.length > 0 && (
+        <AvatarGroup className="me-0.5 max-sm:hidden">
+          {channels.slice(0, 3).map((channel) => (
+            <Avatar key={channel.id} size="sm" className="size-5">
+              <AvatarImage src={channel.picture} alt="" />
+              <AvatarFallback className="text-xs">
+                {channel.name.slice(0, 1).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+        </AvatarGroup>
+      )}
+      {channels.length
+        ? t('clipper_channels_count', { count: channels.length })
+        : t('clipper_no_channels_assigned')}
+    </Button>
+  );
+};
+
 export const UsersComponent = () => {
   const me = useUser();
   const fetch = useFetch();
@@ -368,6 +631,30 @@ export const UsersComponent = () => {
   const toaster = useToaster();
   const t = useT();
   const { data, isLoading, error, mutate } = useTeam();
+  const { data: allChannels } = useChannels();
+  const roleLabel = useRoleLabel();
+
+  const channelsOf = useCallback(
+    (user: TeamUser) =>
+      (allChannels || []).filter((channel) =>
+        user.channels.includes(channel.id)
+      ),
+    [allChannels]
+  );
+
+  const editChannels = useCallback(
+    (user: TeamUser) => () => {
+      modals.openModal({
+        variant: 'sheet',
+        title: t('clipper_channels_edit'),
+        description: user.name || user.email,
+        children: (close) => (
+          <ChannelsForm user={user} onClose={close} onSaved={() => mutate()} />
+        ),
+      });
+    },
+    [modals, mutate, t]
+  );
 
   const createUser = useCallback(() => {
     modals.openModal({
@@ -492,9 +779,25 @@ export const UsersComponent = () => {
                 {p.email}
               </TableCell>
               <TableCell>
-                <Badge variant={p.role === 'ADMIN' ? 'default' : 'secondary'}>
-                  {p.role === 'ADMIN' ? t('admin') : t('role_user')}
-                </Badge>
+                <div className="flex flex-col items-start gap-1.5 lg:flex-row lg:items-center lg:gap-2">
+                  <Badge
+                    variant={
+                      p.role === 'ADMIN'
+                        ? 'default'
+                        : p.role === 'CLIPPER'
+                        ? 'outline'
+                        : 'secondary'
+                    }
+                  >
+                    {roleLabel(p.role)}
+                  </Badge>
+                  {p.role === 'CLIPPER' && (
+                    <ClipperChannels
+                      channels={channelsOf(p)}
+                      onClick={editChannels(p)}
+                    />
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-muted-foreground tabular-nums max-md:hidden">
                 {dayjs(p.createdAt).format('DD.MM.YYYY')}
@@ -514,6 +817,12 @@ export const UsersComponent = () => {
                     <MoreHorizontalIcon />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
+                    {p.role === 'CLIPPER' && (
+                      <DropdownMenuItem onClick={editChannels(p)}>
+                        <RadioTowerIcon />
+                        {t('clipper_channels_edit')}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={resetPassword(p)}>
                       <KeyRoundIcon />
                       {t('reset_password')}

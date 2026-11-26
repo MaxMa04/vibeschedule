@@ -31,6 +31,55 @@ yargs(hideBin(process.argv))
     }
   )
   .command(
+    'integrations:sync',
+    'Bei Post for Me verbundene Konten als Kanäle übernehmen',
+    {},
+    async () => {
+      print(await request('/integrations/sync', { method: 'POST' }));
+    }
+  )
+  .command(
+    'integrations:connect-url <platform>',
+    'Link erzeugen, mit dem der Besitzer ein Konto verbindet',
+    (y) =>
+      y
+        .positional('platform', {
+          describe: 'Plattform, z. B. tiktok',
+          type: 'string',
+          demandOption: true,
+        })
+        .example(
+          '$0 integrations:connect-url tiktok',
+          'Link öffnen lassen, danach integrations:sync'
+        ),
+    async (argv) => {
+      print(await request(`/integrations/connect-url/${enc(argv.platform)}`));
+    }
+  )
+  .command(
+    'integrations:manual-only <id>',
+    'Kanal auf „Nur manuell“ stellen: nichts geht mehr an die Plattform',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('off', {
+          describe: 'Automatisches Posten wieder erlauben',
+          type: 'boolean',
+        }),
+    async (argv) => {
+      print(
+        await request(`/integrations/${enc(argv.id)}/manual-only`, {
+          method: 'PUT',
+          body: { manualOnly: !argv.off },
+        })
+      );
+    }
+  )
+  .command(
     'integrations:settings <id>',
     'Einstellungen und Limits eines Kanals anzeigen',
     (y) =>
@@ -132,6 +181,11 @@ yargs(hideBin(process.argv))
           describe: 'Format des Posts, ID oder Name (siehe formats:list)',
           type: 'string',
         })
+        .option('manual', {
+          describe:
+            'Manuell posten: bekommt einen Termin, geht aber nicht an die Plattform. Jemand postet selbst in der App.',
+          type: 'boolean',
+        })
         .option('json', {
           alias: 'j',
           describe:
@@ -165,6 +219,10 @@ yargs(hideBin(process.argv))
         .example(
           '$0 posts:create -c "Hook" -i abc123 -t draft -f "Storytime"',
           'Entwurf im Format "Storytime"'
+        )
+        .example(
+          '$0 posts:create -c "Caption" -m https://…/01.jpg,https://…/02.jpg -i abc123 -s 2026-12-01T17:00:00Z --manual',
+          'Slideshow zum manuellen Posten einplanen'
         )
         .example('$0 posts:create -j ./post.json', 'Request aus JSON-Datei'),
     async (argv) => {

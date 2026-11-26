@@ -6,6 +6,7 @@ import {
   HttpException,
   Param,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -20,6 +21,7 @@ import { GetPostsDto } from '@vibeschedule/nestjs-libraries/dtos/posts/get.posts
 import { CreatePostDto } from '@vibeschedule/nestjs-libraries/dtos/posts/create.post.dto';
 import { UploadDto } from '@vibeschedule/nestjs-libraries/dtos/media/upload.dto';
 import { GetMediaDto } from '@vibeschedule/nestjs-libraries/dtos/media/get.media.dto';
+import { ManualOnlyDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/manual.only.dto';
 import { streamUploadOptions } from '@vibeschedule/nestjs-libraries/upload/multer.stream.engine';
 import { assertValidPosts } from '@vibeschedule/backend/api/routes/posts.validation.exception';
 import { analyticsDays } from '@vibeschedule/backend/api/routes/analytics.controller';
@@ -47,11 +49,39 @@ export class PublicIntegrationsController {
         identifier: integration.providerIdentifier,
         picture: integration.picture,
         disabled: integration.disabled,
+        // posts of this channel are published by hand, never through PfM
+        manualOnly: integration.manualOnly,
         profile: integration.profile,
         app: integration.app
           ? { id: integration.app.id, name: integration.app.name }
           : null,
       }));
+  }
+
+  // Takes over the accounts connected in PfM, e.g. after somebody finished
+  // a connect link in a browser without a login
+  @Post('/integrations/sync')
+  syncIntegrations(@GetOrgFromRequest() org: Organization) {
+    return this._integrationService.sync(org.id);
+  }
+
+  // The link the owner of an account opens to connect it
+  @Get('/integrations/connect-url/:identifier')
+  getConnectUrl(
+    @GetOrgFromRequest() org: Organization,
+    @Param('identifier') identifier: string
+  ) {
+    return this._integrationService.getConnectUrl(org.id, identifier, {});
+  }
+
+  // nothing of a manual-only channel goes to PfM, people post it themselves
+  @Put('/integrations/:id/manual-only')
+  setManualOnly(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ManualOnlyDto
+  ) {
+    return this._postsService.setChannelManualOnly(org.id, id, body.manualOnly);
   }
 
   @Get('/integration-settings/:id')

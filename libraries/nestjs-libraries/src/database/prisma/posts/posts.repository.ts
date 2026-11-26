@@ -30,6 +30,7 @@ const postInclude = {
       ...listIntegrationSelect,
       internalId: true,
       profile: true,
+      manualOnly: true,
     },
   },
   tags: activeTags,
@@ -80,6 +81,7 @@ export class PostsRepository {
         error: true,
         group: true,
         creationMethod: true,
+        manual: true,
         settings: true,
         tags: activeTags,
         integration: { select: listIntegrationSelect },
@@ -132,6 +134,7 @@ export class PostsRepository {
           state: true,
           group: true,
           creationMethod: true,
+          manual: true,
           tags: activeTags,
           integration: { select: listIntegrationSelect },
         },
@@ -198,7 +201,8 @@ export class PostsRepository {
     body: PostBody,
     tags: { value: string; label: string }[],
     creationMethod: CreationMethod,
-    batchId: string
+    batchId: string,
+    manual: boolean
   ) {
     const [value] = body.value;
     const existing = value.id
@@ -215,9 +219,17 @@ export class PostsRepository {
       image: JSON.stringify(value.image),
       settings: JSON.stringify(body.settings || {}),
       formatId: body.formatId || null,
+      manual,
       // a saved draft or a queued post starts over
       ...(state
-        ? { state, error: null, releaseURL: null, releaseId: null }
+        ? {
+            state,
+            error: null,
+            releaseURL: null,
+            releaseId: null,
+            postedAt: null,
+            postedById: null,
+          }
         : {}),
     };
 
@@ -272,7 +284,14 @@ export class PostsRepository {
       data: {
         publishDate: dayjs(date).toDate(),
         ...(state
-          ? { state, error: null, releaseId: null, releaseURL: null }
+          ? {
+              state,
+              error: null,
+              releaseId: null,
+              releaseURL: null,
+              postedAt: null,
+              postedById: null,
+            }
           : {}),
       },
       include: postInclude,
@@ -283,7 +302,14 @@ export class PostsRepository {
     id: string,
     data: Pick<
       Prisma.PostUpdateInput,
-      'state' | 'pfmPostId' | 'releaseURL' | 'releaseId' | 'error'
+      | 'state'
+      | 'pfmPostId'
+      | 'releaseURL'
+      | 'releaseId'
+      | 'error'
+      | 'manual'
+      | 'postedAt'
+      | 'postedById'
     >
   ) {
     await this._post.model.post.update({
@@ -326,6 +352,116 @@ export class PostsRepository {
       },
       select: { id: true },
     });
+  }
+
+  // what people post by hand: open posts around today and the ones posted
+  // lately. `integrationIds` limits it to the channels of a clipper.
+  getManualPosts(
+    orgId: string,
+    integrationIds: string[] | undefined,
+    range: { openFrom: Date; openTo: Date; postedSince: Date }
+  ) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        manual: true,
+        deletedAt: null,
+        integration: {
+          deletedAt: null,
+          ...(integrationIds ? { id: { in: integrationIds } } : {}),
+        },
+        OR: [
+          {
+            state: State.QUEUE,
+            publishDate: { gte: range.openFrom, lte: range.openTo },
+          },
+          { state: State.PUBLISHED, postedAt: { gte: range.postedSince } },
+        ],
+      },
+      orderBy: { publishDate: 'asc' },
+      include: postInclude,
+    });
+  }
+
+  getManualPost(
+    orgId: string,
+    id: string,
+    integrationIds: string[] | undefined
+  ) {
+    return this._post.model.post.findFirst({
+      where: {
+        id,
+        organizationId: orgId,
+        manual: true,
+        deletedAt: null,
+        state: { in: [State.QUEUE, State.PUBLISHED] },
+        integration: {
+          deletedAt: null,
+          ...(integrationIds ? { id: { in: integrationIds } } : {}),
+        },
+      },
+      include: postInclude,
+    });
+  }
+
+  // posted by hand, but the post on the platform is not known yet
+  getUnlinkedManualPosts(orgId: string, postedSince: Date) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        manual: true,
+        state: State.PUBLISHED,
+        releaseId: null,
+        postedAt: { gte: postedSince },
+        deletedAt: null,
+        integration: { deletedAt: null, disabled: false },
+      },
+      orderBy: { postedAt: 'asc' },
+      take: 50,
+      include: postInclude,
+    });
+  }
+
+  // the platform posts of a channel that already belong to one of our posts
+  async getReleaseIds(integrationId: string, ids?: string[]) {
+    const posts = await this._post.model.post.findMany({
+      where: {
+        integrationId,
+        deletedAt: null,
+        releaseId: ids ? { in: ids } : { not: null },
+      },
+      select: { id: true, releaseId: true },
+    });
+    return posts as { id: string; releaseId: string }[];
+  }
+
+  // what PfM still has scheduled for a channel
+  getScheduledAtPfm(orgId: string, integrationId: string) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        integrationId,
+        deletedAt: null,
+        state: State.QUEUE,
+        pfmPostId: { not: null },
+      },
+      select: { id: true, pfmPostId: true },
+    });
+  }
+
+  // the open posts of a channel that turns manual
+  async makeChannelManual(orgId: string, integrationId: string) {
+    const { count } = await this._post.model.post.updateMany({
+      where: {
+        organizationId: orgId,
+        integrationId,
+        deletedAt: null,
+        manual: false,
+        state: { in: [State.QUEUE, State.DRAFT] },
+      },
+      data: { manual: true, pfmPostId: null },
+    });
+    return count;
   }
 
   // the posting times of that day that are still ahead and not taken

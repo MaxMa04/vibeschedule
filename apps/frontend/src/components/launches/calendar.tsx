@@ -51,6 +51,7 @@ import {
 } from '@vibeschedule/frontend/components/layout/set.timezone';
 import { RenderAnalytics } from '@vibeschedule/frontend/components/platform-analytics/render.analytics';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import { ManualBadge } from '@vibeschedule/frontend/components/launches/manual.badge';
 import {
   editorModalOptions,
   useCreatePost,
@@ -282,6 +283,7 @@ const PostPreview: FC<{ post: CalendarPost; onEdit: () => void }> = ({
             {date.format('dddd, D. MMMM YYYY · HH:mm')}
           </div>
         </div>
+        {post.manual && <ManualBadge />}
         <StatusBadge state={post.state} />
       </div>
       {post.state === 'ERROR' && (
@@ -488,6 +490,12 @@ const PostChip: FC<{
             )}
           />
         )}
+        {post.manual && variant !== 'day' && (
+          <ManualBadge
+            variant="inline"
+            className={cn(variant === 'month' && 'max-md:hidden')}
+          />
+        )}
         {variant === 'week' && (
           <span className="min-w-0 truncate text-muted-foreground">
             {post.integration.name}
@@ -509,6 +517,7 @@ const PostChip: FC<{
         {post.state === 'DRAFT' && `${t('draft')}: `}
         {text || t('no_content')}
       </span>
+      {variant === 'day' && post.manual && <ManualBadge />}
       {variant === 'day' && <StatusBadge state={post.state} />}
       <PostActionsMenu
         post={post}
@@ -957,7 +966,10 @@ const PostRow: FC<{ post: CalendarPost }> = ({ post }) => {
             </div>
           )}
         </div>
-        <StatusBadge state={post.state} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {post.manual && <ManualBadge />}
+          <StatusBadge state={post.state} />
+        </div>
       </div>
       <PostActionsMenu post={post} />
     </div>

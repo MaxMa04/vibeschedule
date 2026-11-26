@@ -15,14 +15,21 @@ import {
   SessionUser,
 } from '@vibeschedule/nestjs-libraries/user/user.from.request';
 import { OrganizationService } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.service';
-import { AddTeamMemberDto } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
+import {
+  AddTeamMemberDto,
+  UserChannelsDto,
+} from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
+import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 import { SetPasswordDto } from '@vibeschedule/nestjs-libraries/dtos/settings/set.password.dto';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 
 @Controller('/settings')
 @UseGuards(AdminGuard)
 export class SettingsController {
-  constructor(private _organizationService: OrganizationService) {}
+  constructor(
+    private _organizationService: OrganizationService,
+    private _postsService: PostsService
+  ) {}
 
   @Get('/team')
   getTeam(@GetOrgFromRequest() org: Organization) {
@@ -30,11 +37,38 @@ export class SettingsController {
   }
 
   @Post('/team/users')
-  addTeamMember(
+  async addTeamMember(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AddTeamMemberDto
   ) {
-    return this._organizationService.addTeamMember(org.id, body);
+    const user = await this._organizationService.addTeamMember(org.id, body);
+    if (body.role !== 'CLIPPER') {
+      return { ...user, channels: [] };
+    }
+    return { ...user, ...(await this.assign(org.id, user.id, body.channels)) };
+  }
+
+  @Put('/team/users/:id/channels')
+  setChannels(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: UserChannelsDto
+  ) {
+    return this.assign(org.id, id, body.channels);
+  }
+
+  // A clipper posts by hand, so a channel handed to one stops publishing
+  // through PfM
+  private async assign(orgId: string, userId: string, channels: string[] = []) {
+    const { added, ...result } = await this._organizationService.setChannels(
+      orgId,
+      userId,
+      channels
+    );
+    for (const id of added) {
+      await this._postsService.setChannelManualOnly(orgId, id, true);
+    }
+    return result;
   }
 
   @Put('/team/users/:id/password')

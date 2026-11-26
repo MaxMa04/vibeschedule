@@ -20,6 +20,7 @@ import { TimezoneDto } from '@vibeschedule/nestjs-libraries/dtos/users/timezone.
 import { ChangePasswordDto } from '@vibeschedule/nestjs-libraries/dtos/users/change.password.dto';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 import { clearAuthCookie } from '@vibeschedule/backend/services/auth/auth.cookie';
+import { AllowClipper } from '@vibeschedule/backend/services/auth/clipper.guard';
 
 @Controller('/user')
 export class UsersController {
@@ -29,6 +30,7 @@ export class UsersController {
   ) {}
 
   @Get('/self')
+  @AllowClipper()
   getSelf(
     @GetUserFromRequest() user: SessionUser,
     @GetOrgFromRequest() organization: Organization
@@ -43,6 +45,7 @@ export class UsersController {
   }
 
   @Post('/password')
+  @AllowClipper()
   @HttpCode(200)
   changePassword(
     @GetUserFromRequest() user: SessionUser,
@@ -52,6 +55,7 @@ export class UsersController {
   }
 
   @Post('/timezone')
+  @AllowClipper()
   updateTimezone(
     @GetUserFromRequest() user: SessionUser,
     @Body() body: TimezoneDto
@@ -66,6 +70,7 @@ export class UsersController {
   }
 
   @Post('/logout')
+  @AllowClipper()
   logout(@Res({ passthrough: true }) response: Response) {
     clearAuthCookie(response);
   }
