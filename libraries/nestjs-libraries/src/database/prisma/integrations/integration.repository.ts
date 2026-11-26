@@ -77,7 +77,7 @@ export class IntegrationRepository {
     picture: string | null
   ) {
     const name = account.username || account.platform;
-    await this._integration.model.integration.upsert({
+    return this._integration.model.integration.upsert({
       where: {
         organizationId_internalId: {
           organizationId: org,
@@ -211,6 +211,90 @@ export class IntegrationRepository {
       where: { id, organizationId: org },
       data: { manualOnly },
     });
+  }
+
+  // adds one responsible user, returns whether the user is new on the channel
+  async addUserChannel(userId: string, integrationId: string) {
+    const { count } =
+      await this._userIntegration.model.userIntegration.createMany({
+        data: [{ userId, integrationId }],
+        skipDuplicates: true,
+      });
+    return count > 0;
+  }
+
+  // the accounts of one user as the clipper sees them on the posting page
+  getUserChannels(org: string, userId: string) {
+    return this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        deletedAt: null,
+        users: { some: { userId } },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        customName: true,
+        picture: true,
+        providerIdentifier: true,
+        disabled: true,
+      },
+    });
+  }
+
+  // every channel a clipper is responsible for, deleted ones included, so a
+  // lost account still shows up in the month it was paid
+  getClipperChannels(org: string) {
+    const clipper = { organizationId: org, role: 'CLIPPER' as const };
+    return this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        users: { some: { user: { organizations: { some: clipper } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        customName: true,
+        picture: true,
+        providerIdentifier: true,
+        disabled: true,
+        deletedAt: true,
+        clipFeeCents: true,
+        clipPostsPerDay: true,
+        users: {
+          where: { user: { organizations: { some: clipper } } },
+          orderBy: { createdAt: 'asc' },
+          select: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+  }
+
+  // when every post of these channels went out, for the clipper pay
+  getPostedTimes(org: string, integrationIds: string[]) {
+    return this._posts.model.post.findMany({
+      where: {
+        organizationId: org,
+        integrationId: { in: integrationIds },
+        deletedAt: null,
+        postedAt: { not: null },
+      },
+      select: { integrationId: true, postedAt: true },
+    });
+  }
+
+  async setClipPay(
+    org: string,
+    id: string,
+    data: { clipFeeCents: number | null; clipPostsPerDay: number }
+  ) {
+    const { count } = await this._integration.model.integration.updateMany({
+      where: { id, organizationId: org },
+      data,
+    });
+    return count > 0;
   }
 
   // the channels a user is responsible for; for a clipper also the only

@@ -57,6 +57,8 @@ import {
   ManualMedia,
   useManualMedia,
 } from '@vibeschedule/frontend/components/manual/use.manual.media';
+import { ClipperAccounts } from '@vibeschedule/frontend/components/manual/clipper.accounts';
+import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 
 interface ManualPost {
   id: string;
@@ -201,6 +203,7 @@ const ManualList: FC<{
   onOpen: (id: string) => void;
 }> = ({ posts, failed, onOpen }) => {
   const t = useT();
+  const user = useUser();
   const { ready, params, setParams } = usePersistedFilters('manual', TAB_KEYS);
   const tab = params.get('tab') === 'posted' ? 'posted' : 'open';
   const open = useMemo(
@@ -309,6 +312,7 @@ const ManualList: FC<{
           );
         })
       )}
+      {user?.role === 'CLIPPER' && <ClipperAccounts />}
     </PageBody>
   );
 };

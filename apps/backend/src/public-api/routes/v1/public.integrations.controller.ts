@@ -26,7 +26,12 @@ import { streamUploadOptions } from '@vibeschedule/nestjs-libraries/upload/multe
 import { assertValidPosts } from '@vibeschedule/backend/api/routes/posts.validation.exception';
 import { analyticsDays } from '@vibeschedule/backend/api/routes/analytics.controller';
 import { IntegrationAppDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
-import { ChannelUsersDto } from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
+import {
+  AddTeamMemberDto,
+  ChannelUsersDto,
+} from '@vibeschedule/nestjs-libraries/dtos/settings/add.team.member.dto';
+import { OrganizationService } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.service';
+import { ClipperPayService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/clipper.pay.service';
 import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
 import { toTeamUsers } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { channelFilter } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
@@ -37,12 +42,39 @@ export class PublicIntegrationsController {
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
     private _mediaService: MediaService,
-    private _channelUsersService: ChannelUsersService
+    private _channelUsersService: ChannelUsersService,
+    private _organizationService: OrganizationService,
+    private _clipperPayService: ClipperPayService
   ) {}
 
   @Get('/users')
   listUsers(@GetOrgFromRequest() org: Organization) {
     return this._channelUsersService.team(org.id);
+  }
+
+  // same as Settings > Nutzer: a login for a team member or a clipper
+  @Post('/users')
+  async createUser(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: AddTeamMemberDto
+  ) {
+    const user = await this._organizationService.addTeamMember(org.id, body);
+    return {
+      ...user,
+      ...(await this._channelUsersService.setUserChannels(
+        org.id,
+        user.id,
+        body.channels || []
+      )),
+    };
+  }
+
+  @Get('/clippers/pay')
+  clipperPay(
+    @GetOrgFromRequest() org: Organization,
+    @Query('month') month?: string
+  ) {
+    return this._clipperPayService.month(org.id, month);
   }
 
   @Get('/integrations')
@@ -95,7 +127,7 @@ export class PublicIntegrationsController {
   // a connect link in a browser without a login
   @Post('/integrations/sync')
   syncIntegrations(@GetOrgFromRequest() org: Organization) {
-    return this._integrationService.sync(org.id);
+    return this._channelUsersService.sync(org.id);
   }
 
   // The link the owner of an account opens to connect it

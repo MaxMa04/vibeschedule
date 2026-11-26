@@ -160,6 +160,10 @@ model Integration {
   additionalSettings String?             @default("[]")
   /// nothing of this channel ever goes to PfM, people post it themselves
   manualOnly         Boolean             @default(false)
+  /// what a clipper earns for this account per month, in cents; null: not paid
+  clipFeeCents       Int?
+  /// posts a clipper owes per day on this account
+  clipPostsPerDay    Int                 @default(1)
   app                App?                @relation(fields: [appId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id])
   posts              Post[]

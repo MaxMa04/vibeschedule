@@ -14,6 +14,7 @@ import { MediaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/
 import { FormatsService } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.service';
 import { FormatsRepository } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.repository';
 import { ChannelUsersService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.users.service';
+import { ClipperPayService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/clipper.pay.service';
 import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
 
 @Global()
@@ -28,6 +29,7 @@ import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.clien
     IntegrationService,
     IntegrationRepository,
     ChannelUsersService,
+    ClipperPayService,
     PostsService,
     PostsRepository,
     ManualPostsService,

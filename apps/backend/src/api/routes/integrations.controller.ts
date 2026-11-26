@@ -65,7 +65,7 @@ export class IntegrationsController {
 
   @Post('/sync')
   sync(@GetOrgFromRequest() org: Organization) {
-    return this._integrationService.sync(org.id);
+    return this._channelUsersService.sync(org.id);
   }
 
   @Put('/:id/app')
