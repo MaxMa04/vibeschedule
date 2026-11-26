@@ -6,7 +6,7 @@ export default function IntegrationLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="bg-newBgColor text-newTextColor flex flex-1 items-center justify-center min-h-screen w-screen">
+    <div className="flex min-h-svh w-full items-center justify-center bg-background p-4 text-foreground">
       {children}
     </div>
   );

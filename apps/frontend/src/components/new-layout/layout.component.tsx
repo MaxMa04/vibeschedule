@@ -4,10 +4,9 @@ import React, { ReactNode, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-import { ToolTip } from '@vibeschedule/frontend/components/layout/top.tip';
 import { Toaster } from '@vibeschedule/react/toaster/toaster';
 import { ContextWrapper } from '@vibeschedule/frontend/components/layout/user.context';
-import { MantineWrapper } from '@vibeschedule/react/helpers/mantine.wrapper';
+import { ModalProvider } from '@vibeschedule/frontend/components/layout/new-modal';
 import { setUserTimezone } from '@vibeschedule/frontend/components/layout/set.timezone';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
@@ -55,9 +54,8 @@ export const LayoutComponent = ({
 
   return (
     <ContextWrapper user={user}>
-      <MantineWrapper>
+      <ModalProvider>
         <TooltipProvider delay={300}>
-          <ToolTip />
           <Toaster />
           <SidebarProvider defaultOpen={sidebarOpen}>
             <AppSidebar />
@@ -74,7 +72,7 @@ export const LayoutComponent = ({
             </SidebarInset>
           </SidebarProvider>
         </TooltipProvider>
-      </MantineWrapper>
+      </ModalProvider>
     </ContextWrapper>
   );
 };

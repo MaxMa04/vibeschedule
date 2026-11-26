@@ -4,12 +4,46 @@ import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.service';
 
+// 1 to 90 days, 7 when missing: longer ranges page through too much feed
+export const analyticsDays = (days?: string) =>
+  Number(days) > 0 ? Math.min(Math.floor(Number(days)), 90) : 7;
+
 @Controller('/analytics')
 export class AnalyticsController {
   constructor(
     private _integrationService: IntegrationService,
     private _postsService: PostsService
   ) {}
+
+  @Get('/overview')
+  getOverview(
+    @GetOrgFromRequest() org: Organization,
+    @Query('days') days: string,
+    @Query('app') app?: string,
+    @Query('fresh') fresh?: string
+  ) {
+    return this._integrationService.analyticsOverview(
+      org.id,
+      analyticsDays(days),
+      app || undefined,
+      fresh === '1'
+    );
+  }
+
+  @Get('/account/:integration')
+  getAccount(
+    @GetOrgFromRequest() org: Organization,
+    @Param('integration') integration: string,
+    @Query('days') days: string,
+    @Query('fresh') fresh?: string
+  ) {
+    return this._integrationService.accountAnalytics(
+      org.id,
+      integration,
+      analyticsDays(days),
+      fresh === '1'
+    );
+  }
 
   @Get('/:integration')
   getIntegration(

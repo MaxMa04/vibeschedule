@@ -22,6 +22,7 @@ import { UploadDto } from '@vibeschedule/nestjs-libraries/dtos/media/upload.dto'
 import { GetMediaDto } from '@vibeschedule/nestjs-libraries/dtos/media/get.media.dto';
 import { streamUploadOptions } from '@vibeschedule/nestjs-libraries/upload/multer.stream.engine';
 import { assertValidPosts } from '@vibeschedule/backend/api/routes/posts.validation.exception';
+import { analyticsDays } from '@vibeschedule/backend/api/routes/analytics.controller';
 
 @Controller('/public/v1')
 export class PublicIntegrationsController {
@@ -144,6 +145,36 @@ export class PublicIntegrationsController {
     @Param('id') id: string
   ) {
     return { date: await this._postsService.findFreeDateTime(org.id, id) };
+  }
+
+  @Get('/analytics/overview')
+  getAnalyticsOverview(
+    @GetOrgFromRequest() org: Organization,
+    @Query('days') days: string,
+    @Query('app') app?: string,
+    @Query('fresh') fresh?: string
+  ) {
+    return this._integrationService.analyticsOverview(
+      org.id,
+      analyticsDays(days),
+      app || undefined,
+      fresh === '1'
+    );
+  }
+
+  @Get('/analytics/account/:integration')
+  getAccountAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Param('integration') integration: string,
+    @Query('days') days: string,
+    @Query('fresh') fresh?: string
+  ) {
+    return this._integrationService.accountAnalytics(
+      org.id,
+      integration,
+      analyticsDays(days),
+      fresh === '1'
+    );
   }
 
   @Get('/analytics/:integration')

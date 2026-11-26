@@ -1,7 +1,7 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { apiUrl, request, uploadFile } from './api';
-import { buildPost } from './posts';
+import { buildPost, resolveFormat } from './posts';
 
 const print = (data: unknown) => console.log(JSON.stringify(data, null, 2));
 const enc = encodeURIComponent;
@@ -127,6 +127,11 @@ yargs(hideBin(process.argv))
             'Plattform-Einstellungen als JSON, gilt für alle Kanäle (siehe PLATFORM_SETTINGS.md)',
           type: 'string',
         })
+        .option('format', {
+          alias: 'f',
+          describe: 'Format des Posts, ID oder Name (siehe formats:list)',
+          type: 'string',
+        })
         .option('json', {
           alias: 'j',
           describe:
@@ -157,12 +162,20 @@ yargs(hideBin(process.argv))
           '$0 posts:create -c "Entwurf" -i abc123,def456 -s 2026-12-01T09:00:00Z -t draft',
           'Entwurf für zwei Kanäle'
         )
+        .example(
+          '$0 posts:create -c "Hook" -i abc123 -t draft -f "Storytime"',
+          'Entwurf im Format "Storytime"'
+        )
         .example('$0 posts:create -j ./post.json', 'Request aus JSON-Datei'),
     async (argv) => {
+      const formatId =
+        argv.format && !argv.json
+          ? resolveFormat(argv.format, await request('/formats'))
+          : undefined;
       print(
         await request('/posts', {
           method: 'POST',
-          body: buildPost(argv),
+          body: buildPost({ ...argv, formatId }),
         })
       );
     }
@@ -233,6 +246,89 @@ yargs(hideBin(process.argv))
       }),
     async (argv) => {
       print(await request(`/find-slot/${enc(argv.id)}`));
+    }
+  )
+  .command(
+    'formats:list',
+    'Formate mit den Kanälen, auf denen sie laufen',
+    {},
+    async () => {
+      print(await request('/formats'));
+    }
+  )
+  .command(
+    'formats:overview',
+    'Pro Kanal: Formate mit Posts, Aufrufen und Likes im Zeitraum',
+    (y) =>
+      y
+        .option('app', {
+          describe: 'Nur Kanäle dieser App (App-ID, "none" für ohne App)',
+          type: 'string',
+        })
+        .option('days', {
+          alias: 'd',
+          describe: 'Zeitraum in Tagen',
+          type: 'number',
+          default: 30,
+        }),
+    async (argv) => {
+      const query = new URLSearchParams({ days: String(argv.days) });
+      if (argv.app) query.set('app', argv.app);
+      print(await request(`/formats/overview?${query}`));
+    }
+  )
+  .command(
+    'analytics:overview',
+    'Kennzahlen aller Kanäle mit Vergleich zum Zeitraum davor',
+    (y) =>
+      y
+        .option('days', {
+          alias: 'd',
+          describe: 'Zeitraum in Tagen (1–90)',
+          type: 'number',
+          default: 7,
+        })
+        .option('app', {
+          describe: 'Nur Kanäle dieser App-ID',
+          type: 'string',
+        })
+        .option('fresh', {
+          describe: 'Cache umgehen und den Feed neu laden',
+          type: 'boolean',
+          default: false,
+        }),
+    async (argv) => {
+      const query = new URLSearchParams({ days: String(argv.days) });
+      if (argv.app) query.set('app', argv.app);
+      if (argv.fresh) query.set('fresh', '1');
+      print(await request(`/analytics/overview?${query}`));
+    }
+  )
+  .command(
+    'analytics:account <id>',
+    'Kennzahlen, Tagesverlauf und Posts eines Kanals',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('days', {
+          alias: 'd',
+          describe: 'Zeitraum in Tagen (1–90)',
+          type: 'number',
+          default: 7,
+        })
+        .option('fresh', {
+          describe: 'Cache umgehen und den Feed neu laden',
+          type: 'boolean',
+          default: false,
+        }),
+    async (argv) => {
+      const query = new URLSearchParams({ days: String(argv.days) });
+      if (argv.fresh) query.set('fresh', '1');
+      print(await request(`/analytics/account/${enc(argv.id)}?${query}`));
     }
   )
   .command(

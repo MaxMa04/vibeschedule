@@ -45,8 +45,14 @@ vibeschedule auth:check
 | `posts:delete <post-id>` | Post mit allen Kanälen seiner Gruppe löschen |
 | `posts:delete-group <gruppe>` | Alle Posts einer Gruppe löschen |
 | `posts:find-slot <kanal-id>` | Nächster freier Zeitslot des Kanals |
+| `formats:list` | Formate mit ID, Beschreibung und den Kanälen, auf denen sie laufen (`status` ACTIVE, TESTING oder PAUSED) |
+| `formats:overview [--app <id>] [-d <tage>]` | Pro Kanal seine Formate mit Posts, Aufrufen und Likes im Zeitraum (Standard 30 Tage), dazu `feed.withoutFormat`: veröffentlichte Posts ohne Format. `--app none` zeigt Kanäle ohne App |
+| `analytics:overview [-d <tage>] [--app <id>] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
+| `analytics:account <kanal-id> [-d <tage>] [--fresh]` | Ein Kanal: Kennzahlen mit Vergleich, `series` pro Tag und alle Posts des Zeitraums mit Metriken, Link, Vorschaubild und zugehörigem vibeschedule-Post samt Format |
 | `analytics:channel <kanal-id> [-d <tage>]` | Statistiken eines Kanals, Standard 7 Tage |
 | `analytics:post <post-id>` | Statistiken eines veröffentlichten Posts |
+
+Analytics-Zahlen sind die aktuellen Gesamtwerte der Posts, die im Zeitraum veröffentlicht wurden (Tage in Europe/Berlin). Ein Tag in `series` zeigt also die Aufrufe der Posts dieses Tages, nicht die Aufrufe an diesem Tag. Der Feed wird pro Kanal 5 Minuten zwischengespeichert.
 
 ### posts:create
 
@@ -58,9 +64,10 @@ vibeschedule auth:check
 | `-s, --date` | Zeitpunkt in ISO 8601, z. B. `2026-12-01T09:00:00Z` |
 | `-t, --type` | `schedule` (Standard), `draft` oder `now` |
 | `--settings` | Plattform-Einstellungen als JSON für alle Kanäle, siehe [PLATFORM_SETTINGS.md](PLATFORM_SETTINGS.md) |
+| `-f, --format` | Format des Posts, ID oder Name aus `formats:list`. Gilt für alle Kanäle |
 | `-j, --json` | Kompletten Request aus einer Datei senden, z. B. für eigene Texte oder Einstellungen je Kanal |
 
-`--date` ist Pflicht, außer bei `--type now`. Entwürfe bleiben in vibeschedule und gehen erst beim Einplanen an die Plattform.
+`--date` ist Pflicht, außer bei `--type now`. Im JSON-Request (`--json`) steht das Format als `formatId` (ID, nicht Name) in jedem Eintrag von `posts[]`. Entwürfe bleiben in vibeschedule und gehen erst beim Einplanen an die Plattform.
 
 ## Beispiele
 

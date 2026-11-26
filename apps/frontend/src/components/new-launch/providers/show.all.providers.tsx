@@ -10,11 +10,8 @@ import PinterestProvider from '@vibeschedule/frontend/components/new-launch/prov
 import ThreadsProvider from '@vibeschedule/frontend/components/new-launch/providers/threads/threads.provider';
 import BlueskyProvider from '@vibeschedule/frontend/components/new-launch/providers/bluesky/bluesky.provider';
 import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
-import { useShallow } from 'zustand/react/shallow';
-import React, { FC, forwardRef, useImperativeHandle } from 'react';
-import { GeneralPreviewComponent } from '@vibeschedule/frontend/components/launches/general.preview.component';
-import { IntegrationContext } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
-import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { ProviderHandle } from '@vibeschedule/frontend/components/new-launch/providers/high.order.provider';
+import React, { forwardRef, useImperativeHandle } from 'react';
 
 // keyed by PfM platform
 export const Providers = [
@@ -30,83 +27,47 @@ export const Providers = [
   { identifier: 'bluesky', component: BlueskyProvider },
 ];
 
-export const ShowAllProviders = forwardRef((props, ref) => {
-  const { date, current, global, selectedIntegrations, allIntegrations } =
-    useLaunchStore(
-      useShallow((state) => ({
-        date: state.date,
-        selectedIntegrations: state.selectedIntegrations,
-        allIntegrations: state.integrations,
-        current: state.current,
-        global: state.global,
-      }))
+export const providerFor = (identifier?: string) =>
+  Providers.find((provider) => provider.identifier === identifier)?.component;
+
+export interface ShowAllProvidersHandle {
+  checkAllValid: () => Promise<Awaited<ReturnType<ProviderHandle['isValid']>>[]>;
+}
+
+// one settings form per selected channel; the forms render their settings
+// and the preview into the editor layout (see slots.ts)
+export const ShowAllProviders = forwardRef<ShowAllProvidersHandle>(
+  (_props, ref) => {
+    const selectedIntegrations = useLaunchStore(
+      (state) => state.selectedIntegrations
     );
 
-  const t = useT();
+    useImperativeHandle(ref, () => ({
+      checkAllValid: () =>
+        Promise.all(
+          selectedIntegrations.map((p) => p.ref!.current.isValid())
+        ),
+    }));
 
-  useImperativeHandle(ref, () => ({
-    checkAllValid: async () => {
-      return Promise.all(
-        selectedIntegrations.map(async (p) => await p.ref?.current.isValid())
-      );
-    },
-    getAllValues: async () => {
-      return Promise.all(
-        selectedIntegrations.map(async (p) => await p.ref?.current.getValues())
-      );
-    },
-    triggerAll: () => {
-      return selectedIntegrations.map(
-        async (p) => await p.ref?.current.trigger()
-      );
-    },
-  }));
+    return (
+      <>
+        {selectedIntegrations.map((integration) => {
+          const ProviderComponent = providerFor(
+            integration.integration.identifier
+          );
+          if (!ProviderComponent) {
+            return null;
+          }
 
-  return (
-    <div className="w-full flex flex-col flex-1">
-      {current === 'global' && (
-        <IntegrationContext.Provider
-          value={{
-            date,
-            integration:
-              selectedIntegrations?.[0]?.integration || allIntegrations?.[0],
-            allIntegrations: selectedIntegrations.map((p) => p.integration),
-            value: global.map((p) => ({
-              id: p.id,
-              content: p.content,
-              image: p.media,
-            })),
-          }}
-        >
-          {global?.[0]?.content?.length === 0 ? (
-            <div>{t('start_writing_your_post')}</div>
-          ) : (
-            <div className="border border-borderPreview rounded-[20px] shadow-previewShadow">
-              <GeneralPreviewComponent maximumCharacters={100000000} />
-            </div>
-          )}
-        </IntegrationContext.Provider>
-      )}
-      {selectedIntegrations.map((integration) => {
-        const { component: ProviderComponent } = Providers.find(
-          (provider) =>
-            provider.identifier === integration.integration.identifier
-        ) || {
-          component: Empty,
-        };
-
-        return (
-          <ProviderComponent
-            ref={integration.ref}
-            key={integration.integration.id}
-            id={integration.integration.id}
-          />
-        );
-      })}
-    </div>
-  );
-});
-
-export const Empty: FC = () => {
-  return null;
-};
+          return (
+            <ProviderComponent
+              ref={integration.ref}
+              key={integration.integration.id}
+              id={integration.integration.id}
+            />
+          );
+        })}
+      </>
+    );
+  }
+);

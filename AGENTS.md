@@ -7,7 +7,7 @@ Internes Social-Media-Scheduling für VibeLabs: Kalender, Post-Editor, Medien, A
 | Ort | Inhalt |
 |---|---|
 | `apps/backend` | NestJS-API (Port 3000), Routen in `src/api/routes`, öffentliche API in `src/public-api` |
-| `apps/frontend` | Next.js-App (Port 4200), nur Deutsch |
+| `apps/frontend` | Next.js-App (Port 4200), nur Deutsch. shadcn `base-nova` (Base UI) in `src/components/ui`, Tailwind v4, Theme in `src/app/globals.css` |
 | `apps/cli` | `vibeschedule`-CLI für die öffentliche API, Doku in `apps/cli/README.md` |
 | `libraries/nestjs-libraries` | Services, Repositories, Prisma-Schema, PfM-Client (`src/integrations/pfm.client.ts`), Plattformkatalog (`src/integrations/pfm.platforms.ts`), R2-Upload |
 | `libraries/react-shared-libraries` | UI-Bausteine, Übersetzungen (`src/translation/locales/de`) |
@@ -24,7 +24,8 @@ pnpm über corepack (`corepack pnpm@10.6.1 …`), Node 22.
 corepack pnpm@10.6.1 install
 corepack pnpm@10.6.1 run prisma-db-push   # Schema in die DB aus .env schreiben
 corepack pnpm@10.6.1 run dev              # Backend :3000 + Frontend :4200
-corepack pnpm@10.6.1 run typecheck        # Gate: Backend, Frontend, CLI
+corepack pnpm@10.6.1 run typecheck        # Gate: Backend, Frontend, CLI + scripts/check-frontend.mjs
+corepack pnpm@10.6.1 test                 # Unit-Tests (scripts/test-unit.mjs)
 corepack pnpm@10.6.1 run build
 ```
 
@@ -39,6 +40,8 @@ Lokale Konfiguration steht in `.env` (Vorlage `.env.example`), beide Apps lesen 
 - Medien nur auf R2, öffentliche URLs unter `CLOUDFLARE_BUCKET_URL`. PfM lädt sie von dort.
 - Ein Workspace: genau eine `Organization`, Nutzer legt ein Admin unter Einstellungen an. Keine Selbstregistrierung. Der erste Admin entsteht beim Start aus `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`, wenn noch kein Nutzer existiert.
 - UI-Texte nur über `t()` mit Eintrag in `de/translation.json`, du-Form.
+- UI nur aus shadcn-Komponenten (`src/components/ui`, Base UI: `render={<Link />}` statt `asChild`) und Theme-Tokens. Nach `shadcn add` den `cn`-Import auf `@vibeschedule/frontend/lib/utils` umstellen; `scripts/check-frontend.mjs` prüft das.
+- Apps gruppieren Kanäle (Modell `App`, Tabelle `Customer`, `Integration.appId`). Formate laufen pro Kanal (`IntegrationFormat`, Status Aktiv/Test/Pausiert), ein Post kann sein Format tragen (`Post.formatId`). Analytics und Formate ordnen Feed-Posts über `Post.pfmPostId`/`releaseId` zu.
 - Schema-Änderungen per `prisma db push` (keine Migrationshistorie). Der Container führt das beim Start aus; keine destruktiven Schemaänderungen ohne Freigabe.
 - Lizenz AGPL-3.0 bleibt, ebenso der Hinweis auf Postiz in `README.md`.
 

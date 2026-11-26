@@ -44,8 +44,17 @@ export class PostsRepository {
   constructor(
     private _post: PrismaRepository<'post'>,
     private _tags: PrismaRepository<'tags'>,
-    private _tagsPosts: PrismaRepository<'tagsPosts'>
+    private _tagsPosts: PrismaRepository<'tagsPosts'>,
+    private _format: PrismaRepository<'format'>
   ) {}
+
+  async getFormatIds(orgId: string, ids: string[]) {
+    const formats = await this._format.model.format.findMany({
+      where: { orgId, id: { in: ids }, deletedAt: null },
+      select: { id: true },
+    });
+    return formats.map((format) => format.id);
+  }
 
   getPosts(orgId: string, query: GetPostsDto) {
     return this._post.model.post.findMany({
@@ -205,6 +214,7 @@ export class PostsRepository {
       content: value.content,
       image: JSON.stringify(value.image),
       settings: JSON.stringify(body.settings || {}),
+      formatId: body.formatId || null,
       // a saved draft or a queued post starts over
       ...(state
         ? { state, error: null, releaseURL: null, releaseId: null }

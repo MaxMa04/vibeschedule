@@ -1,15 +1,29 @@
 'use client';
 
-import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import React, { FC, useCallback, useMemo, useState } from 'react';
+import useSWR from 'swr';
+import { toast } from 'sonner';
+import { ArrowLeftIcon, PlusIcon, RefreshCwIcon } from 'lucide-react';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-import { Input } from '@vibeschedule/react/form/input';
-import { FieldValues, FormProvider, useForm } from 'react-hook-form';
-import { Button } from '@vibeschedule/react/form/button';
-import { useToaster } from '@vibeschedule/react/toaster/toaster';
-import { object, string } from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Input } from '@vibeschedule/frontend/components/ui/input';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '@vibeschedule/frontend/components/ui/field';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@vibeschedule/frontend/components/ui/tooltip';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
 interface CustomField {
   key: string;
@@ -27,227 +41,266 @@ interface SocialProvider {
   customFields?: CustomField[];
 }
 
-// PfM returns the browser to /integrations/social/postforme after the consent
+// PfM sends the browser back to /integrations/social/postforme after the consent
 const useConnect = () => {
   const fetch = useFetch();
-  const toaster = useToaster();
   const t = useT();
-  return useCallback(async (identifier: string, fields?: FieldValues) => {
-    const query = fields
-      ? `?code=${encodeURIComponent(
-          Buffer.from(JSON.stringify(fields)).toString('base64')
-        )}`
-      : '';
-    const response = await fetch(`/integrations/social/${identifier}${query}`);
-    const { url } = await response.json().catch(() => ({}));
-    if (!response.ok || !url) {
-      toaster.show(t('could_not_connect_to_platform'), 'warning');
-      return;
-    }
-    window.location.href = url;
-  }, []);
+  return useCallback(
+    async (identifier: string, fields?: Record<string, string>) => {
+      const query = fields
+        ? `?code=${encodeURIComponent(
+            Buffer.from(JSON.stringify(fields)).toString('base64')
+          )}`
+        : '';
+      const response = await fetch(
+        `/integrations/social/${identifier}${query}`
+      );
+      const { url } = await response.json().catch(() => ({}));
+      if (!response.ok || !url) {
+        toast.error(t('could_not_connect_to_platform'));
+        return false;
+      }
+      window.location.href = url;
+      return true;
+    },
+    [fetch, t]
+  );
 };
 
-export const useAddProvider = () => {
-  const modal = useModals();
-  const fetch = useFetch();
-  const t = useT();
-  return useCallback(async () => {
-    const data = await (await fetch('/integrations')).json();
-    modal.openModal({
-      title: t('add_channel'),
-      withCloseButton: true,
-      children: <AddProviderComponent social={data.social} />,
-    });
-  }, []);
+const toRegex = (validation: string) => {
+  const parts = validation.split('/');
+  return new RegExp(parts.slice(1, -1).join('/'), parts.pop());
 };
 
-export const AddProviderButton: FC<{
-  update: () => void;
-}> = ({ update }) => {
-  const add = useAddProvider();
-  const fetch = useFetch();
-  const toaster = useToaster();
+const CustomFieldsForm: FC<{
+  provider: SocialProvider;
+  onBack: () => void;
+}> = ({ provider, onBack }) => {
   const t = useT();
-  const [syncing, setSyncing] = useState(false);
+  const connect = useConnect();
+  const fields = provider.customFields || [];
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((f) => [f.key, f.defaultValue || '']))
+  );
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const invalid = useMemo(
+    () =>
+      Object.fromEntries(
+        fields.map((f) => [
+          f.key,
+          !values[f.key] || !toRegex(f.validation).test(values[f.key]),
+        ])
+      ),
+    [fields, values]
+  );
 
-  const sync = useCallback(async () => {
-    setSyncing(true);
-    const response = await fetch('/integrations/sync', { method: 'POST' });
-    setSyncing(false);
-    if (!response.ok) {
-      toaster.show(t('channel_sync_failed'), 'warning');
-      return;
-    }
-    const { total, added, disabled } = await response.json();
-    toaster.show(t('channel_sync_done', { total, added, disabled }), 'success');
-    update();
-  }, [update]);
+  const submit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setTouched(true);
+      if (Object.values(invalid).some(Boolean)) {
+        return;
+      }
+      setBusy(true);
+      if (!(await connect(provider.identifier, values))) {
+        setBusy(false);
+      }
+    },
+    [invalid, connect, provider.identifier, values]
+  );
 
   return (
-    <div className="flex group-[.sidebar]:flex-col gap-[8px]">
-      <button
-        className="flex-1 group-[.sidebar]:w-[100%] group-[.sidebar]:flex-none text-btnText bg-btnSimple h-[44px] px-[12px] justify-center items-center flex rounded-[12px] gap-[6px] whitespace-nowrap"
-        onClick={add}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 20 20"
-          fill="none"
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onBack}
+          aria-label={t('calendar_back')}
         >
-          <path
-            d="M1.66675 10.0417C3.35907 10.2299 4.93698 10.9884 6.14101 12.1924C7.34504 13.3964 8.10353 14.9743 8.29175 16.6667M1.66675 13.4167C2.46749 13.58 3.20253 13.9751 3.7804 14.553C4.35827 15.1309 4.75344 15.8659 4.91675 16.6667M1.66675 16.6667H1.67508M11.6667 17.5H14.3334C15.7335 17.5 16.4336 17.5 16.9684 17.2275C17.4388 16.9878 17.8212 16.6054 18.0609 16.135C18.3334 15.6002 18.3334 14.9001 18.3334 13.5V6.5C18.3334 5.09987 18.3334 4.3998 18.0609 3.86502C17.8212 3.39462 17.4388 3.01217 16.9684 2.77248C16.4336 2.5 15.7335 2.5 14.3334 2.5H5.66675C4.26662 2.5 3.56655 2.5 3.03177 2.77248C2.56137 3.01217 2.17892 3.39462 1.93923 3.86502C1.66675 4.3998 1.66675 5.09987 1.66675 6.5V6.66667"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="text-start text-[14px] group-[.sidebar]:hidden">
-          {t('add_channel')}
-        </div>
-      </button>
-      <button
-        onClick={sync}
-        disabled={syncing}
-        data-tooltip-id="tooltip"
-        data-tooltip-content={t('sync_channels')}
-        aria-label={t('sync_channels')}
-        className="min-h-[44px] min-w-[44px] text-btnText bg-btnSimple justify-center items-center flex rounded-[12px] cursor-pointer disabled:opacity-50"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          className={syncing ? 'animate-spin' : ''}
-        >
-          <path
-            d="M20 11A8 8 0 0 0 5.3 6.7L4 8M4 4v4h4M4 13a8 8 0 0 0 14.7 4.3L20 16M20 20v-4h-4"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
+          <ArrowLeftIcon />
+        </Button>
+        <img
+          src={`/icons/platforms/${provider.identifier}.png`}
+          alt=""
+          className="size-6 rounded-full"
+        />
+        <span className="font-medium">{provider.name}</span>
+      </div>
+      <FieldGroup className="gap-4">
+        {fields.map((field) => {
+          const showError = touched && invalid[field.key];
+          return (
+            <Field key={field.key} data-invalid={showError || undefined}>
+              <FieldLabel htmlFor={`custom-${field.key}`}>
+                {field.label}
+              </FieldLabel>
+              <Input
+                id={`custom-${field.key}`}
+                type={field.type === 'text' ? 'text' : 'password'}
+                value={values[field.key]}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [field.key]: e.target.value }))
+                }
+                autoComplete="off"
+                aria-invalid={showError || undefined}
+                className="h-10 md:h-9"
+              />
+              {!!field.hint && (
+                <FieldDescription>{field.hint}</FieldDescription>
+              )}
+              {showError && (
+                <FieldError>
+                  {t('field_is_invalid', { field: field.label })}
+                </FieldError>
+              )}
+            </Field>
+          );
+        })}
+      </FieldGroup>
+      <Button type="submit" disabled={busy} className="h-10 md:h-9">
+        {busy && <Spinner data-icon="inline-start" />}
+        {t('connect')}
+      </Button>
+    </form>
+  );
+};
+
+export const AddProviderComponent: FC = () => {
+  const t = useT();
+  const fetch = useFetch();
+  const connect = useConnect();
+  const [selected, setSelected] = useState<SocialProvider | null>(null);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const { data, isLoading } = useSWR('/integrations', async (path: string) =>
+    (await fetch(path)).json()
+  );
+  const social: SocialProvider[] = data?.social || [];
+
+  const select = useCallback(
+    (item: SocialProvider) => async () => {
+      if (item.customFields?.length) {
+        setSelected(item);
+        return;
+      }
+      setConnecting(item.identifier);
+      if (!(await connect(item.identifier))) {
+        setConnecting(null);
+      }
+    },
+    [connect]
+  );
+
+  if (selected) {
+    return (
+      <CustomFieldsForm provider={selected} onBack={() => setSelected(null)} />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        {t('calendar_add_channel_description')}
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {isLoading
+          ? Array.from({ length: 9 }, (_, i) => (
+              <Skeleton key={i} className="h-14 rounded-lg" />
+            ))
+          : social.map((item) => (
+              <button
+                key={item.identifier}
+                type="button"
+                onClick={select(item)}
+                disabled={!!connecting}
+                className={cn(
+                  'flex h-14 items-center gap-3 rounded-lg border bg-card px-3 text-start text-sm font-medium transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60',
+                  connecting === item.identifier && 'bg-muted'
+                )}
+              >
+                <img
+                  src={`/icons/platforms/${item.identifier}.png`}
+                  alt=""
+                  className="size-7 shrink-0 rounded-full"
+                />
+                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                {connecting === item.identifier && <Spinner />}
+              </button>
+            ))}
+      </div>
     </div>
   );
 };
 
-export const CustomVariables: FC<{
-  variables: CustomField[];
-  identifier: string;
-}> = ({ identifier, variables }) => {
-  const connect = useConnect();
+export const useAddProvider = () => {
+  const modal = useModals();
   const t = useT();
-  const schema = useMemo(() => {
-    return object(
-      variables.reduce((acc, item) => {
-        const splitter = item.validation.split('/');
-        const regex = new RegExp(
-          splitter.slice(1, -1).join('/'),
-          splitter.pop()
-        );
-        return {
-          ...acc,
-          [item.key]: string()
-            .matches(regex, t('field_is_invalid', { field: item.label }))
-            .required(),
-        };
-      }, {})
-    );
-  }, [variables]);
-  const methods = useForm({
-    mode: 'onChange',
-    resolver: yupResolver(schema),
-    values: variables.reduce(
-      (acc, item) =>
-        item.defaultValue ? { ...acc, [item.key]: item.defaultValue } : acc,
-      {}
-    ),
-  });
-
-  return (
-    <FormProvider {...methods}>
-      <form
-        className="gap-[8px] flex flex-col pt-[10px]"
-        onSubmit={methods.handleSubmit((data) => connect(identifier, data))}
-      >
-        {variables.map((variable) => (
-          <div key={variable.key} className="flex flex-col gap-[4px]">
-            {!!variable.hint && (
-              <div className="text-[12px] text-textItemBlur">
-                {variable.hint}
-              </div>
-            )}
-            <Input
-              label={variable.label}
-              name={variable.key}
-              type={variable.type === 'text' ? 'text' : 'password'}
-            />
-          </div>
-        ))}
-        <div>
-          <Button type="submit">{t('connect')}</Button>
-        </div>
-      </form>
-    </FormProvider>
-  );
+  return useCallback(() => {
+    modal.openModal({
+      title: t('add_channel'),
+      size: 'lg',
+      withCloseButton: true,
+      children: <AddProviderComponent />,
+    });
+  }, [modal, t]);
 };
 
-export const AddProviderComponent: FC<{
-  social: SocialProvider[];
-}> = ({ social }) => {
-  const modal = useModals();
-  const connect = useConnect();
+// asks PfM for the connected accounts and adds, updates or disables channels
+export const useSyncChannels = (onDone: () => void) => {
+  const fetch = useFetch();
   const t = useT();
-
-  const select = useCallback(
-    (item: SocialProvider) => () => {
-      if (item.customFields?.length) {
-        modal.openModal({
-          title: item.name,
-          withCloseButton: true,
-          children: (
-            <CustomVariables
-              identifier={item.identifier}
-              variables={item.customFields}
-            />
-          ),
-        });
+  const [syncing, setSyncing] = useState(false);
+  const sync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('/integrations/sync', { method: 'POST' });
+      if (!response.ok) {
+        toast.error(t('channel_sync_failed'));
         return;
       }
-      connect(item.identifier);
-    },
-    []
-  );
+      const { total, added, disabled } = await response.json();
+      toast.success(t('channel_sync_done', { total, added, disabled }));
+      onDone();
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetch, t, onDone]);
+  return { sync, syncing };
+};
+
+export const AddProviderButton: FC<{
+  update: () => void;
+  className?: string;
+}> = ({ update, className }) => {
+  const add = useAddProvider();
+  const t = useT();
+  const { sync, syncing } = useSyncChannels(update);
 
   return (
-    <div className="grid grid-cols-5 gap-[10px] mobile:!grid-cols-3">
-      {social.map((item) => (
-        <button
-          key={item.identifier}
-          onClick={select(item)}
-          {...(item.toolTip
-            ? {
-                'data-tooltip-id': 'tooltip',
-                'data-tooltip-content': item.toolTip,
-              }
-            : {})}
-          className="flex flex-col p-[10px] h-[100px] justify-center items-center gap-[10px] w-full text-[14px] mobile:text-[13px] rounded-[12px] bg-newTableHeader text-textColor hover:bg-boxHover"
+    <div className={cn('flex gap-2', className)}>
+      <Button variant="outline" className="h-9 flex-1 md:h-8" onClick={add}>
+        <PlusIcon data-icon="inline-start" />
+        {t('add_channel')}
+      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9 md:size-8"
+              onClick={sync}
+              disabled={syncing}
+              aria-label={t('sync_channels')}
+            />
+          }
         >
-          <img
-            className="w-[32px] h-[32px] rounded-full"
-            src={`/icons/platforms/${item.identifier}.png`}
-            alt=""
-          />
-          <div className="text-center whitespace-pre-wrap">{item.name}</div>
-        </button>
-      ))}
+          {syncing ? <Spinner /> : <RefreshCwIcon />}
+        </TooltipTrigger>
+        <TooltipContent>{t('sync_channels')}</TooltipContent>
+      </Tooltip>
     </div>
   );
 };

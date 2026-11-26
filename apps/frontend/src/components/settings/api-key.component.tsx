@@ -3,13 +3,36 @@
 import { useCallback, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import copy from 'copy-to-clipboard';
+import {
+  CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
+  RefreshCwIcon,
+  TerminalIcon,
+} from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import { useVariables } from '@vibeschedule/react/helpers/variable.context';
 import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
-import { Button } from '@vibeschedule/react/form/button';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@vibeschedule/frontend/components/ui/card';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@vibeschedule/frontend/components/ui/input-group';
 
 export const ApiKeyComponent = () => {
   const user = useUser();
@@ -40,8 +63,7 @@ export const ApiKeyComponent = () => {
         t('rotate_api_key_confirm'),
         t('rotate_api_key'),
         t('rotate_api_key'),
-        t('cancel'),
-        true
+        t('cancel')
       ))
     ) {
       return;
@@ -58,60 +80,87 @@ export const ApiKeyComponent = () => {
   }, [fetch, mutate, t, toaster]);
 
   return (
-    <div className="flex flex-col gap-[16px] max-w-[640px]">
-      <div className="flex flex-col gap-[4px]">
-        <h3 className="text-[20px] font-[600]">{t('label_api_key')}</h3>
-        <div className="text-[14px] text-textItemBlur">
-          {t('api_key_description')}
-        </div>
-      </div>
-      <div className="flex flex-col gap-[16px] rounded-[20px] border border-newBorder p-[24px]">
-        {apiKey ? (
-          <div className="flex gap-[8px] mobile:flex-col">
-            <div className="flex-1 min-w-0 h-[40px] px-[16px] flex items-center rounded-[12px] border border-newTableBorder font-mono text-[14px] overflow-x-auto whitespace-nowrap">
-              {shownKey}
-            </div>
-            <div className="flex gap-[8px]">
-              <Button secondary={true} onClick={() => setVisible(!visible)}>
-                {visible ? t('hide') : t('reveal')}
-              </Button>
-              <Button
-                secondary={true}
-                onClick={copyText(apiKey, t('api_key_copied'))}
-              >
-                {t('copy')}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-[14px] text-textItemBlur">{t('no_api_key')}</div>
-        )}
-        <div className="flex">
-          <Button loading={rotating} onClick={rotate}>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('label_api_key')}</CardTitle>
+          <CardDescription>{t('api_key_description')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {apiKey ? (
+            <InputGroup className="h-10 md:h-9">
+              <InputGroupInput
+                readOnly
+                value={shownKey}
+                aria-label={t('label_api_key')}
+                className="font-mono"
+                onFocus={(e) => visible && e.target.select()}
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={visible ? t('hide') : t('reveal')}
+                  onClick={() => setVisible(!visible)}
+                >
+                  {visible ? <EyeOffIcon /> : <EyeIcon />}
+                </InputGroupButton>
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={t('copy')}
+                  onClick={copyText(apiKey, t('api_key_copied'))}
+                >
+                  <CopyIcon />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('no_api_key')}</p>
+          )}
+        </CardContent>
+        <CardFooter className="flex-wrap gap-2">
+          <p className="mr-auto text-sm text-muted-foreground">
+            {t('rotate_api_key_hint')}
+          </p>
+          <Button
+            variant="outline"
+            className="h-10 w-full sm:w-fit md:h-8"
+            disabled={rotating}
+            onClick={rotate}
+          >
+            {rotating ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <RefreshCwIcon data-icon="inline-start" />
+            )}
             {t('rotate_api_key')}
           </Button>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
       {!!apiKey && (
-        <div className="flex flex-col gap-[12px] rounded-[20px] border border-newBorder p-[24px]">
-          <div className="flex items-center gap-[12px]">
-            <div className="flex-1 text-[16px] font-[600]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TerminalIcon className="size-4 text-muted-foreground" />
               {t('cli_title')}
-            </div>
-            <Button
-              secondary={true}
-              onClick={copyText(commands(apiKey), t('commands_copied'))}
-            >
-              {t('copy_commands')}
-            </Button>
-          </div>
-          <div className="text-[14px] text-textItemBlur">
-            {t('cli_description')}
-          </div>
-          <pre className="rounded-[12px] bg-newBgColor p-[16px] text-[13px] font-mono overflow-x-auto whitespace-pre">
-            {commands(shownKey)}
-          </pre>
-        </div>
+            </CardTitle>
+            <CardDescription>{t('cli_description')}</CardDescription>
+            <CardAction>
+              <Button
+                variant="outline"
+                className="h-10 md:h-8"
+                onClick={copyText(commands(apiKey), t('commands_copied'))}
+              >
+                <CopyIcon data-icon="inline-start" />
+                <span className="max-sm:sr-only">{t('copy_commands')}</span>
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre">
+              {commands(shownKey)}
+            </pre>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

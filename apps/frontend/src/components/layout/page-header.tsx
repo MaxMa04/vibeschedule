@@ -22,6 +22,6 @@ export function PageHeader({
   )
 }
 
-export function PageBody({ className, ...props }: React.ComponentProps<"main">) {
-  return <main className={cn("mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-4 p-3 sm:p-4 md:p-6", className)} {...props} />
+export function PageBody({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn("mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-4 p-3 sm:p-4 md:p-6", className)} {...props} />
 }

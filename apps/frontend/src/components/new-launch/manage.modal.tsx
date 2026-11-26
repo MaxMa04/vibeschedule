@@ -5,305 +5,370 @@ import React, {
   ReactNode,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
-import { AddEditModalProps } from '@vibeschedule/frontend/components/new-launch/add.edit.modal';
-import clsx from 'clsx';
-import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { PicksSocialsComponent } from '@vibeschedule/frontend/components/new-launch/picks.socials.component';
-import { EditorWrapper } from '@vibeschedule/frontend/components/new-launch/editor';
-import { SelectCurrent } from '@vibeschedule/frontend/components/new-launch/select.current';
-import {
-  Providers,
-  ShowAllProviders,
-} from '@vibeschedule/frontend/components/new-launch/providers/show.all.providers';
-import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
-import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
-import {
-  DatePicker,
-  DatePickerPanel,
-} from '@vibeschedule/frontend/components/launches/helpers/date.picker';
 import { useShallow } from 'zustand/react/shallow';
-import { TagsComponent } from '@vibeschedule/frontend/components/launches/tags.component';
-import { useToaster } from '@vibeschedule/react/toaster/toaster';
-import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { SendIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { makeId } from '@vibeschedule/nestjs-libraries/services/make.is';
-import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
-import { SelectCustomer } from '@vibeschedule/frontend/components/launches/select.customer';
-import {
-  SettingsIcon,
-  SettingsOutlineIcon,
-  ChevronDownIcon,
-  CloseIcon,
-  TrashIcon,
-  DropdownArrowSmallIcon,
-  PlusIcon,
-  EyeIcon,
-  TagIcon,
-} from '@vibeschedule/frontend/components/ui/icons';
-import {
-  MobileTopBar,
-  MobileTopBarAction,
-} from '@vibeschedule/frontend/components/new-launch/mobile.top.bar';
-import {
-  BottomSheet,
-  BottomSheetButton,
-  BottomSheetHeader,
-  BottomSheetRow,
-} from '@vibeschedule/frontend/components/ui/bottom.sheet.component';
-import { useHasScroll } from '@vibeschedule/frontend/components/ui/is.scroll.hook';
-import dayjs from 'dayjs';
-import { Button } from '@vibeschedule/react/form/button';
 import { stripHtmlValidation } from '@vibeschedule/helpers/utils/strip.html.validation';
 import { countLength } from '@vibeschedule/helpers/utils/count.length';
-import { useClickOutside } from '@mantine/hooks';
+import { AddEditModalProps } from '@vibeschedule/frontend/components/new-launch/add.edit.modal';
+import { PicksSocialsComponent } from '@vibeschedule/frontend/components/new-launch/picks.socials.component';
+import { ContentEditor } from '@vibeschedule/frontend/components/new-launch/editor';
+import {
+  providerFor,
+  ShowAllProviders,
+  ShowAllProvidersHandle,
+} from '@vibeschedule/frontend/components/new-launch/providers/show.all.providers';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
+import {
+  useEditorSlots,
+  usePreviewSlotRef,
+  useSettingsSlotRef,
+} from '@vibeschedule/frontend/components/new-launch/slots';
+import { DateTimePicker } from '@vibeschedule/frontend/components/new-launch/date.time.picker';
+import { FormatSelect } from '@vibeschedule/frontend/components/new-launch/format.select';
+import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { newDayjs } from '@vibeschedule/frontend/components/layout/set.timezone';
+import {
+  areYouSure,
+  useModals,
+} from '@vibeschedule/frontend/components/layout/new-modal';
+import {
+  PageBody,
+  PageHeader,
+} from '@vibeschedule/frontend/components/layout/page-header';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@vibeschedule/frontend/components/ui/card';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from '@vibeschedule/frontend/components/ui/field';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import { Badge } from '@vibeschedule/frontend/components/ui/badge';
+import { cn } from '@vibeschedule/frontend/lib/utils';
+import dayjs from 'dayjs';
+
+type SaveType = 'draft' | 'now' | 'schedule';
+
+const plainText = (html: string) => stripHtmlValidation('normal', html, true);
+
+const ChannelHeading: FC<{ integration: Integrations }> = ({ integration }) => (
+  <div className="flex min-w-0 items-center gap-2">
+    <ChannelAvatar
+      picture={integration.picture}
+      identifier={integration.identifier}
+      name={integration.name}
+      size="sm"
+    />
+    <span className="truncate text-sm font-medium">{integration.name}</span>
+  </div>
+);
+
+// the place a channel's settings form renders into
+const SettingsSection: FC<{ integration: Integrations }> = ({
+  integration,
+}) => {
+  const ref = useSettingsSlotRef(integration.id);
+  return (
+    <section className="flex flex-col gap-3 border-t pt-4 first:border-t-0 first:pt-0">
+      <ChannelHeading integration={integration} />
+      <div ref={ref} />
+    </section>
+  );
+};
+
+const SettingsCard: FC = () => {
+  const t = useT();
+  const selectedIntegrations = useLaunchStore(
+    (state) => state.selectedIntegrations
+  );
+  const withSettings = selectedIntegrations.filter(
+    (p) => providerFor(p.integration.identifier)?.hasSettings
+  );
+
+  if (!withSettings.length) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('editor_platform_settings')}</CardTitle>
+        <CardDescription>{t('editor_platform_settings_hint')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {withSettings.map(({ integration }) => (
+          <SettingsSection key={integration.id} integration={integration} />
+        ))}
+      </CardContent>
+    </Card>
+  );
+};
+
+const PreviewCard: FC = () => {
+  const t = useT();
+  const previewRef = usePreviewSlotRef();
+  const { current, selectedIntegrations } = useLaunchStore(
+    useShallow((state) => ({
+      current: state.current,
+      selectedIntegrations: state.selectedIntegrations,
+    }))
+  );
+  const { previewId, setPreviewId } = useEditorSlots(
+    useShallow((state) => ({
+      previewId: state.previewId,
+      setPreviewId: state.setPreviewId,
+    }))
+  );
+
+  // the preview follows the channel being edited
+  useEffect(() => {
+    if (current !== 'global') {
+      setPreviewId(current);
+      return;
+    }
+    if (!selectedIntegrations.some((p) => p.integration.id === previewId)) {
+      setPreviewId(selectedIntegrations[0]?.integration.id || null);
+    }
+  }, [current, selectedIntegrations]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('post_preview')}</CardTitle>
+        {selectedIntegrations.length > 1 && (
+          <CardAction className="flex gap-1">
+            {selectedIntegrations.map(({ integration }) => (
+              <button
+                key={integration.id}
+                type="button"
+                title={integration.name}
+                aria-pressed={previewId === integration.id}
+                onClick={() => setPreviewId(integration.id)}
+                className={cn(
+                  'cursor-pointer rounded-full p-0.5 ring-2 transition-opacity',
+                  previewId === integration.id
+                    ? 'ring-primary'
+                    : 'opacity-60 ring-transparent hover:opacity-100'
+                )}
+              >
+                <ChannelAvatar
+                  picture={integration.picture}
+                  identifier={integration.identifier}
+                  name={integration.name}
+                  size="xs"
+                />
+              </button>
+            ))}
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardContent>
+        {!selectedIntegrations.length && (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            {t('editor_preview_pick_channel')}
+          </p>
+        )}
+        <div
+          ref={previewRef}
+          className={cn(
+            'overflow-hidden rounded-lg border',
+            !selectedIntegrations.length && 'hidden'
+          )}
+        />
+      </CardContent>
+    </Card>
+  );
+};
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
   const fetch = useFetch();
-  const ref = useRef(null);
-  const existingData = useExistingData();
-  const [loading, setLoading] = useState(false);
-  const toaster = useToaster();
+  const router = useRouter();
   const modal = useModals();
-  const [showSettings, setShowSettings] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit');
-  const [mobileSheet, setMobileSheet] = useState<
-    'channels' | 'settings' | 'tags' | 'date' | null
-  >(null);
-  const [showPostNow, setShowPostNow] = useState(false);
-  const postNowRef = useClickOutside<HTMLDivElement>(() => {
-    setShowPostNow(false);
-  });
+  const existingData = useExistingData();
+  const ref = useRef<ShowAllProvidersHandle>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState<SaveType | 'delete' | null>(null);
+  const variant = props.variant || 'modal';
   const { mutate } = props;
 
   const {
     selectedIntegrations,
-    hide,
     date,
     setDate,
     tags,
-    setTags,
-    integrations,
-    setSelectedIntegrations,
     locked,
     current,
-    setHide,
+    setCurrent,
     channelDates,
     setChannelDate,
+    internal,
+    formatId,
+    errors,
+    setErrors,
+    clearError,
   } = useLaunchStore(
     useShallow((state) => ({
-      hide: state.hide,
-      setHide: state.setHide,
       date: state.date,
       setDate: state.setDate,
       channelDates: state.channelDates,
       setChannelDate: state.setChannelDate,
       current: state.current,
+      setCurrent: state.setCurrent,
       tags: state.tags,
-      setTags: state.setTags,
       selectedIntegrations: state.selectedIntegrations,
-      integrations: state.integrations,
-      setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
+      internal: state.internal,
+      formatId: state.formatId,
+      errors: state.errors,
+      setErrors: state.setErrors,
+      clearError: state.clearError,
     }))
   );
+
   // the other channels of an existing post show and move only their own date
   const channelDate = channelDates[current];
   const pickerDate = channelDate || date;
   const setPickerDate = useCallback(
     (newDate: dayjs.Dayjs) => {
+      clearError('date');
       if (channelDate) {
         return setChannelDate(current, newDate);
       }
-
       setDate(newDate);
     },
     [channelDate, current]
   );
 
-  // the date sheet applies its changes only on save
-  const [dateDraft, setDateDraft] = useState(date);
-
   // the channels the post already has, each with its own post
-  const existingPosts = [existingData, ...(existingData.siblings || [])];
-  // the channel in view, or the one that was opened
-  const channel =
-    existingPosts.find((p) => p.integration === current) || existingData;
-
-  useEffect(() => {
-    if (hide) {
-      setHide(false);
-    }
-  }, [hide]);
-
-  const currentIntegrationText = useMemo(() => {
-    if (current === 'global') {
-      return (
-        <div className="flex items-center gap-[10px]">
-          <div className="relative mobile:hidden">
-            <SettingsIcon size={15} />
-          </div>
-          <div>{t('settings')}</div>
-        </div>
-      );
-    }
-
-    const currentIntegration = integrations.find((p) => p.id === current)!;
-
-    return (
-      <div className="flex items-center gap-[10px]">
-        <div className="relative mobile:hidden">
-          <img
-            src={`/icons/platforms/${currentIntegration.identifier}.png`}
-            className="w-[20px] h-[20px] rounded-[4px]"
-            alt={currentIntegration.identifier}
-          />
-          <SettingsIcon
-            size={15}
-            className="absolute -end-[5px] -bottom-[5px]"
-          />
-        </div>
-        <div>
-          {currentIntegration.name} {t('channel_settings')}
-        </div>
-      </div>
-    );
-  }, [current]);
-
-  const changeCustomer = useCallback(
-    (customer: string) => {
-      const neededIntegrations = integrations.filter(
-        (p) => p?.customer?.id === customer
-      );
-      setSelectedIntegrations(
-        neededIntegrations.map((p) => ({
-          settings: {},
-          selectedIntegrations: p,
-        }))
-      );
-    },
-    [integrations]
+  const existingPosts = existingData.integration
+    ? [existingData, ...(existingData.siblings || [])]
+    : [];
+  const isPublished = existingPosts.some(
+    (p) => p.posts?.[0]?.state === 'PUBLISHED'
   );
+  const isDraft = existingData.posts?.[0]?.state === 'DRAFT';
 
-  const askClose = useCallback(async () => {
+  const close = useCallback(async () => {
     if (
-      await deleteDialog(
-        t('are_you_sure_you_want_to_close_this_modal_all_data_will_be_lost'),
-        t('yes_close_it')
-      )
+      await areYouSure({
+        description: t(
+          'are_you_sure_you_want_to_close_this_modal_all_data_will_be_lost'
+        ),
+        approveLabel: t('yes_close_it'),
+        destructive: false,
+      })
     ) {
       modal.closeAll();
     }
   }, []);
 
   const deletePost = useCallback(async () => {
-    setLoading(true);
+    const channel =
+      existingPosts.find((p) => p.integration === current) || existingData;
+    let groups: string[] = [];
+
     if (existingData.siblings?.length) {
-      const groups = await new Promise<string[]>((resolve) => {
+      const name = selectedIntegrations.find(
+        (p) => p.integration.id === channel.integration
+      )?.integration.name;
+      groups = await new Promise<string[]>((resolve) => {
         modal.openModal({
           id: 'delete-post-channels',
           title: t('delete_post'),
+          description: t('delete_post_from_all_channels_question'),
+          size: 'sm',
           onClose: () => resolve([]),
-          children: (
-            <div className="flex flex-col">
-              <div className="text-[20px] mb-[20px]">
-                {t('delete_post_from_all_channels_question')}
-              </div>
-              <div className="flex w-full gap-[10px]">
-                <div className="flex-1 flex">
-                  <Button
-                    type="button"
-                    className="flex-1"
-                    onClick={() => {
-                      modal.closeById('delete-post-channels');
-                      resolve(existingPosts.map((p) => p.group!));
-                    }}
-                  >
-                    {t('delete_from_all_channels')}
-                  </Button>
-                </div>
-                <div className="flex-1 flex">
-                  <Button
-                    type="button"
-                    secondary
-                    className="flex-1"
-                    onClick={() => {
-                      modal.closeById('delete-post-channels');
-                      resolve([channel.group!]);
-                    }}
-                  >
-                    {t('delete_only_from')}{' '}
-                    {
-                      integrations.find((p) => p.id === channel.integration)
-                        ?.name
-                    }
-                  </Button>
-                </div>
-              </div>
+          children: (closeDialog) => (
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resolve([channel.group!]);
+                  modal.closeById('delete-post-channels');
+                }}
+              >
+                {t('delete_only_from')} {name}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  resolve(existingPosts.map((p) => p.group!));
+                  modal.closeById('delete-post-channels');
+                }}
+              >
+                {t('delete_from_all_channels')}
+              </Button>
+              <Button variant="ghost" onClick={closeDialog}>
+                {t('cancel')}
+              </Button>
             </div>
           ),
         });
       });
+    } else if (
+      await areYouSure({
+        description: t('are_you_sure_you_want_to_delete_post'),
+        approveLabel: t('yes_delete_it'),
+      })
+    ) {
+      groups = [existingData.group!];
+    }
 
-      if (!groups.length) {
-        setLoading(false);
-        return;
+    if (!groups.length) {
+      return;
+    }
+
+    setLoading('delete');
+    await Promise.all(
+      groups.map((group) => fetch(`/posts/${group}`, { method: 'DELETE' }))
+    );
+    setLoading(null);
+    mutate();
+    toast.success(t('post_deleted_successfully'));
+    modal.closeAll();
+  }, [existingData, mutate, current, selectedIntegrations]);
+
+  const validate = useCallback(
+    async (type: SaveType) => {
+      if (!selectedIntegrations.length) {
+        return { found: { form: t('editor_pick_channel') } };
       }
 
-      await Promise.all(
-        groups.map((group) =>
-          fetch(`/posts/${group}`, {
-            method: 'DELETE',
-          })
-        )
-      );
-      mutate();
-      modal.closeAll();
-      return;
-    }
+      const results = await ref.current!.checkAllValid();
+      const found: Record<string, string> = {};
+      let invalidSettings: string | undefined;
+      const isInternal = (id: string) =>
+        internal.some((p) => p.integration.id === id);
 
-    if (
-      !(await deleteDialog(
-        t('are_you_sure_you_want_to_delete_post'),
-        t('yes_delete_it')
-      ))
-    ) {
-      setLoading(false);
-      return;
-    }
-    await fetch(`/posts/${existingData.group}`, {
-      method: 'DELETE',
-    });
-    mutate();
-    modal.closeAll();
-    return;
-  }, [existingData, mutate, modal, current, integrations]);
-
-  const schedule = useCallback(
-    (type: 'draft' | 'now' | 'schedule') => async () => {
-      const checkAllValid = await ref.current.checkAllValid();
-
-      for (const item of checkAllValid) {
-        const integration = selectedIntegrations.find(
+      for (const item of results) {
+        const name = selectedIntegrations.find(
           (p) => p.integration.id === item.id
-        );
-        const content = stripHtmlValidation(
-          'normal',
-          item.values[0]?.content || '',
-          true
-        );
+        )!.integration.name;
+        const key = isInternal(item.id) ? item.id : 'global';
+        const content = plainText(item.values[0]?.content || '');
 
         if (!content.trim() && !item.values[0]?.media?.length) {
-          toaster.show(
-            `${item.integration.name}: ${t('post_needs_content_or_image')}`,
-            'warning'
-          );
-          integration?.ref?.current?.preview();
-          return;
+          found[key] ||= t('post_needs_content_or_image');
+          continue;
         }
 
         // a draft gets these checks once it is scheduled
@@ -311,44 +376,88 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           continue;
         }
 
-        if (!item.valid) {
-          toaster.show(
-            `${item.integration.name}: ${t('please_fix_your_settings')}`,
-            'warning'
-          );
-          integration?.ref?.current?.fix();
-          setShowSettings(true);
-          return;
+        const length = countLength(item.identifier, content);
+        if (length > item.maximumCharacters) {
+          found[key] ||= t('editor_too_long', {
+            name,
+            max: item.maximumCharacters.toLocaleString('de-DE'),
+          });
         }
 
-        if (countLength(item.identifier, content) > item.maximumCharacters) {
-          toaster.show(
-            `${item.integration.name}: ${t('post_is_too_long')}`,
-            'warning'
-          );
-          integration?.ref?.current?.preview();
-          return;
+        if (!item.valid && !invalidSettings) {
+          invalidSettings = item.id;
+          found.form = t('editor_fix_settings', { name });
         }
       }
 
       if (
-        type !== 'draft' &&
-        existingPosts.some((p) => p.posts?.[0]?.state === 'PUBLISHED') &&
-        !(await deleteDialog(
-          t('post_already_published_republish_warning'),
-          t('republish_the_post')
-        ))
+        type === 'schedule' &&
+        !isPublished &&
+        pickerDate.isBefore(newDayjs().subtract(1, 'minute'))
+      ) {
+        found.date = t('editor_date_in_past');
+      }
+
+      return { found, invalidSettings };
+    },
+    [selectedIntegrations, internal, pickerDate, isPublished]
+  );
+
+  const save = useCallback(
+    (type: SaveType) => async () => {
+      setErrors({});
+      const { found, invalidSettings } = await validate(type);
+      if (Object.keys(found).length) {
+        setErrors(found);
+        const channel = Object.keys(found).find(
+          (key) => !['form', 'date'].includes(key)
+        );
+        if (channel) {
+          setCurrent(channel);
+        }
+        requestAnimationFrame(() =>
+          bodyRef.current
+            ?.querySelector('[data-slot=field-error]')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        );
+        if (invalidSettings && !channel) {
+          selectedIntegrations
+            .find((p) => p.integration.id === invalidSettings)
+            ?.ref?.current?.fix();
+        }
+        return;
+      }
+
+      if (
+        type === 'now' &&
+        !(await areYouSure({
+          title: t('post_now'),
+          description: t('editor_post_now_confirm', {
+            count: selectedIntegrations.length,
+          }),
+          approveLabel: t('post_now'),
+          destructive: false,
+        }))
       ) {
         return;
       }
 
-      setLoading(true);
+      if (
+        type !== 'draft' &&
+        isPublished &&
+        !(await areYouSure({
+          description: t('post_already_published_republish_warning'),
+          approveLabel: t('republish_the_post'),
+        }))
+      ) {
+        return;
+      }
 
+      setLoading(type);
+      const results = await ref.current!.checkAllValid();
       const group = existingData.group || makeId(10);
-      const posts = checkAllValid.map((post: any) => ({
-        integration: {
-          id: post.id,
-        },
+      const posts = results.map((post) => ({
+        integration: { id: post.id },
         // every channel of an existing post updates its own post
         group:
           existingPosts.find((p) => p.integration === post.id)?.group || group,
@@ -358,10 +467,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             }
           : {}),
         settings: post.settings,
-        value: post.values.slice(0, 1).map((value: any) => ({
+        formatId,
+        value: post.values.slice(0, 1).map((value) => ({
           ...(value.id ? { id: value.id } : {}),
           content: value.content,
-          image: value.media.map(({ id, path }: any) => ({ id, path })),
+          image: value.media.map(({ id, path }) => ({ id, path })),
         })),
       }));
 
@@ -374,491 +484,269 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           posts,
         }),
       });
+      setLoading(null);
 
       if (!response.ok) {
         const { message } = await response.json().catch(() => ({}));
-        toaster.show(
-          typeof message === 'string' ? message : t('post_save_failed'),
-          'warning'
-        );
-        setLoading(false);
+        setErrors({
+          form: Array.isArray(message)
+            ? message.join(', ')
+            : typeof message === 'string'
+            ? message
+            : t('post_save_failed'),
+        });
         return;
       }
 
+      const failed = (
+        (await response.json().catch(() => [])) as {
+          error?: string;
+        }[]
+      ).find((p) => p.error);
+
       mutate();
-      toaster.show(
-        !existingData.integration
-          ? t('added_successfully')
-          : t('updated_successfully')
-      );
-      modal.closeAll();
+      const message =
+        type === 'draft'
+          ? t('editor_saved_draft')
+          : type === 'now'
+          ? t('editor_posted_now')
+          : existingData.integration
+          ? t('updated_successfully')
+          : t('editor_scheduled');
+
+      if (failed?.error) {
+        toast.warning(failed.error);
+      } else if (variant === 'page') {
+        toast.success(message, {
+          action: {
+            label: t('editor_open_calendar'),
+            onClick: () => router.push('/launches'),
+          },
+        });
+      } else {
+        toast.success(message);
+      }
+
+      if (variant === 'page') {
+        props.onSaved?.();
+      } else {
+        modal.closeAll();
+      }
     },
-    [tags, date, channelDates, selectedIntegrations, existingData]
+    [
+      validate,
+      tags,
+      date,
+      channelDates,
+      selectedIntegrations,
+      existingData,
+      formatId,
+      variant,
+    ]
   );
 
-  const scheduleLabel = !existingData?.integration
-    ? t('add_to_calendar')
-    : existingData?.posts?.[0]?.state === 'DRAFT'
-    ? t('schedule')
+  const busy = !!loading || locked;
+  const scheduleLabel = !existingData.integration
+    ? t('editor_schedule')
+    : isDraft
+    ? t('editor_schedule')
     : t('update');
 
-  const mobileActions: MobileTopBarAction[] = [
-    {
-      label: scheduleLabel,
-      variant: 'primary',
-      onClick: schedule('schedule'),
-    },
-    {
-      label: t('post_now'),
-      variant: 'secondary',
-      onClick: schedule('now'),
-    },
-    {
-      label: t('save_as_draft'),
-      variant: 'tertiary',
-      onClick: schedule('draft'),
-    },
-  ];
-
-  // the settings sheet links to the channel settings only when there are any
-  const hasChannelSettings = useMemo(() => {
-    const identifiers =
-      current === 'global'
-        ? selectedIntegrations.map((p) => p.integration.identifier)
-        : [integrations.find((p) => p.id === current)?.identifier];
-
-    return identifiers.some(
-      (identifier) =>
-        Providers.find((p) => p.identifier === identifier)?.component
-          .hasSettings
-    );
-  }, [current, selectedIntegrations, integrations]);
-
-  // on phones, the settings, tags and delete live in a settings sheet
-  const settingsButton = (
-    <div
-      onClick={() => setMobileSheet('settings')}
-      className="hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer text-textItemBlur"
-    >
-      <SettingsOutlineIcon />
-    </div>
-  );
-
-  // phones have no room for the preview column, it replaces the editor instead
-  const previewButton = (
-    <div
-      onClick={() => setMobileTab(mobileTab === 'preview' ? 'edit' : 'preview')}
-      className={clsx(
-        'hidden mobile:flex shrink-0 w-[32px] h-[44px] justify-end items-center cursor-pointer',
-        mobileTab === 'preview' ? 'text-teal' : 'text-textItemBlur'
-      )}
-    >
-      <EyeIcon />
-    </div>
-  );
-
-  return (
-    <div className="w-full h-full flex-1 p-[40px] mobile:p-0 mobile:h-auto mobile:min-h-full flex relative">
-      <div className="flex flex-1 min-w-0 bg-newBgColorInner rounded-[20px] mobile:rounded-none flex-col">
-        <MobileTopBar
-          onBack={askClose}
-          actions={mobileActions}
-          disabled={selectedIntegrations.length === 0 || loading || locked}
-          loading={loading}
-        >
-          <DatePicker
-            onChange={setPickerDate}
+  const publishCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('editor_publishing')}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <FormatSelect />
+        <Field data-invalid={!!errors.date}>
+          <FieldLabel>{t('editor_date')}</FieldLabel>
+          <DateTimePicker
             date={pickerDate}
-            onOpen={() => {
-              setDateDraft(pickerDate);
-              setMobileSheet('date');
-            }}
+            onChange={setPickerDate}
+            invalid={!!errors.date}
           />
-        </MobileTopBar>
-        <div className="flex-1 flex mobile:contents">
-          <div
-            className={clsx(
-              'flex flex-col flex-1 min-w-0 border-e border-newBorder mobile:border-e-0',
-              mobileTab === 'preview' && 'mobile:flex-none'
-            )}
+          {!!channelDate && (
+            <FieldDescription>
+              {t('editor_channel_own_date', {
+                name: selectedIntegrations.find(
+                  (p) => p.integration.id === current
+                )?.integration.name,
+              })}
+            </FieldDescription>
+          )}
+          <FieldError>{errors.date}</FieldError>
+        </Field>
+        <FieldError>{errors.form}</FieldError>
+        <div className="flex flex-col gap-2">
+          <Button
+            size="lg"
+            disabled={busy}
+            onClick={save('schedule')}
+            className="w-full"
           >
-            <div className="bg-newBgColor h-[65px] rounded-s-[20px] !rounded-b-[0] mobile:hidden flex items-center gap-[12px] px-[20px] text-[20px] font-display font-bold tracking-tight">
-              {t('create_post_title')}
-            </div>
-            <div className="flex-1 flex flex-col gap-[16px]">
-              <div
-                className={clsx(
-                  // mobile:flex wins over hidden, the settings sheet opens above the editor on phones
-                  'flex-1 relative mobile:flex mobile:flex-col',
-                  showSettings && 'hidden'
-                )}
-              >
-                <div
-                  id="social-content"
-                  className="gap-[32px] mobile:gap-[16px] flex flex-col pe-[8px] pt-[20px] ps-[20px] mobile:px-[16px] mobile:pt-[12px] mobile:static mobile:flex-1 absolute top-0 left-0 w-full h-full mobile:h-auto overflow-x-hidden overflow-y-scroll mobile:overflow-y-visible scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
-                >
-                  <div
-                    className={clsx(
-                      'flex w-full',
-                      !existingData.integration && 'mobile:hidden'
-                    )}
-                  >
-                    <div className="flex flex-1">
-                      <PicksSocialsComponent toolTip={true} />
-                    </div>
-                    <div className="mobile:hidden">
-                      {/* an existing post keeps its channels */}
-                      {!existingData.integration && (
-                        <SelectCustomer
-                          onChange={changeCustomer}
-                          integrations={integrations}
-                        />
-                      )}
-                    </div>
-                    {!!existingData.integration && (
-                      <>
-                        {previewButton}
-                        {settingsButton}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex flex-1 gap-[6px] mobile:gap-[16px] flex-col">
-                    <div className="flex mobile:items-center mobile:gap-[4px]">
-                      <div className="flex-1 mobile:flex-initial mobile:min-w-0">
-                        {(!existingData.integration ||
-                          !!existingData.siblings?.length) && <SelectCurrent />}
-                      </div>
-                      {!existingData.integration && (
-                        <>
-                          <div
-                            onClick={() => setMobileSheet('channels')}
-                            className="hidden mobile:flex shrink-0 w-[44px] h-[44px] rounded-[8px] bg-btnSimple justify-center items-center cursor-pointer"
-                          >
-                            <PlusIcon size={24} />
-                          </div>
-                          <div className="hidden mobile:block flex-1" />
-                          {previewButton}
-                          {settingsButton}
-                        </>
-                      )}
-                    </div>
-                    <div
-                      className={clsx(
-                        'flex-1 flex',
-                        mobileTab === 'preview' && 'mobile:hidden'
-                      )}
-                    >
-                      {!hide && <EditorWrapper />}
-                    </div>
-                    <div
-                      id="social-empty"
-                      className={clsx(
-                        'pb-[16px] mobile:pb-0'
-                        // current !== 'global' && 'hidden'
-                      )}
-                    />
-                  </div>
-                </div>
-              </div>
-              {/* on phones the settings open as a bottom sheet */}
-              <div
-                className={clsx('contents', !showSettings && 'mobile:hidden')}
-              >
-                {showSettings && (
-                  <div
-                    onClick={() => setShowSettings(false)}
-                    className="hidden mobile:block fixed inset-0 z-[599] bg-popup backdrop-blur-[8px] animate-fadeIn touch-none"
-                  />
-                )}
-                <div
-                  id="wrapper-settings"
-                  className={clsx(
-                    'pb-[20px] px-[20px] select-none',
-                    showSettings &&
-                      'flex-1 flex pt-[20px] mobile:fixed mobile:inset-x-0 mobile:bottom-0 mobile:z-[600] mobile:max-h-[90%] mobile:p-0',
-                    current === 'global' && 'hidden'
-                  )}
-                >
-                  <div className="flex-1 flex flex-col rounded-[12px] gap-[12px] overflow-hidden bg-newSettings mobile:rounded-none mobile:rounded-t-[24px] mobile:gap-0 mobile:pt-[8px] mobile:pb-[24px] mobile:bg-newBgColorInner mobile:animate-fade">
-                    <div className="hidden mobile:contents">
-                      <BottomSheetHeader
-                        title={currentIntegrationText}
-                        onClose={() => setShowSettings(false)}
-                      />
-                    </div>
-                    <div
-                      onClick={() => setShowSettings(!showSettings)}
-                      className={clsx(
-                        'bg-btnSimple rounded-[12px] flex items-center gap-[8px] cursor-pointer p-[12px] mobile:hidden',
-                        showSettings ? '!rounded-b-none' : ''
-                      )}
-                    >
-                      <div className="flex-1 text-[14px] font-[600] text-btnText">
-                        {currentIntegrationText}
-                      </div>
-                      <div>
-                        <ChevronDownIcon
-                          rotated={showSettings}
-                          className="text-btnText"
-                        />
-                      </div>
-                    </div>
-                    <div
-                      className={clsx(
-                        !showSettings ? 'hidden' : 'flex-1',
-                        'text-[14px] text-textColor font-[500] relative mobile:min-h-0 mobile:overflow-y-auto mobile:overscroll-contain'
-                      )}
-                    >
-                      <div className="absolute mobile:static left-0 top-0 w-full h-full mobile:h-auto flex flex-col overflow-x-hidden overflow-y-auto scrollbar scrollbar-thumb-newBgColorInner scrollbar-track-newColColor">
-                        <div
-                          id="social-settings"
-                          className="flex flex-col gap-[20px] bg-newBgColor mobile:bg-transparent"
-                        />
-                      </div>
-                    </div>
-                    <div className="hidden mobile:contents">
-                      <BottomSheetButton
-                        label={t('done')}
-                        onClick={() => setShowSettings(false)}
-                      />
-                    </div>
-                    <style>
-                      {`#social-settings [data-id="${current}"] {display: block !important;}`}
-                    </style>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div
-            className={clsx(
-              'w-[580px] tablet:w-[440px] mobile:!w-full flex flex-col mobile:flex-1',
-              mobileTab === 'edit' && 'mobile:hidden'
-            )}
-          >
-            <div className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] mobile:hidden flex items-center px-[20px] text-[20px] font-[600]">
-              <div className="flex-1 font-display font-bold tracking-tight">
-                {t('post_preview')}
-              </div>
-              <div className="cursor-pointer mobile:hidden">
-                <CloseIcon onClick={askClose} className="text-textItemBlur" />
-              </div>
-            </div>
-            <div className="flex-1 relative">
-              <Scrollable
-                scrollClasses="!pe-[20px]"
-                className="absolute mobile:static top-0 p-[20px] pe-[8px] mobile:p-[16px] left-0 w-full h-full mobile:h-auto overflow-x-hidden overflow-y-scroll mobile:overflow-y-visible scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
-              >
-                <ShowAllProviders ref={ref} />
-              </Scrollable>
-            </div>
-          </div>
-        </div>
-        <div className="select-none h-[84px] py-[20px] border-t border-newBorder flex items-center mobile:hidden">
-          <div className="flex-1 flex ps-[20px] gap-[8px]">
-            {/* keep a single tags component mounted, the tags sheet has its own */}
-            {mobileSheet !== 'tags' && (
-              <TagsComponent
-                name="tags"
-                label={t('tags')}
-                initial={tags}
-                onChange={(e) => {
-                  setTags(e.target.value);
-                }}
-              />
-            )}
-          </div>
-          <div className="pe-[20px] flex items-center justify-end gap-[8px]">
-            {existingData?.integration && (
-              <button
-                onClick={deletePost}
-                className="cursor-pointer flex text-error gap-[8px] items-center text-[15px] font-[600]"
-              >
-                <div>
-                  <TrashIcon />
-                </div>
-                <div>{t('delete_post')}</div>
-              </button>
-            )}
-            <DatePicker onChange={setPickerDate} date={pickerDate} />
-            <button
-              disabled={selectedIntegrations.length === 0 || loading || locked}
-              onClick={schedule('draft')}
-              className="relative cursor-pointer disabled:cursor-not-allowed px-[20px] h-[44px] border border-newBorder bg-transparent justify-center items-center flex rounded-[12px] text-[15px] font-[600]"
+            {loading === 'schedule' && <Spinner />}
+            {scheduleLabel}
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={busy}
+              onClick={save('draft')}
             >
-              {loading && (
-                <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                  <div className="animate-spin h-[20px] w-[20px] border-4 border-textColor border-t-transparent rounded-full" />
-                </div>
-              )}
-              <div className={clsx(loading && 'invisible')}>
-                {t('save_as_draft')}
-              </div>
-            </button>
-            <div ref={postNowRef} className="group cursor-pointer relative">
-              <button
-                disabled={
-                  selectedIntegrations.length === 0 || loading || locked
-                }
-                onClick={schedule('schedule')}
-                className="text-surface relative min-w-[180px] disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[12px] bg-ink ps-[20px] pe-[16px]"
-              >
-                {loading && (
-                  <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                    <div className="animate-spin h-[20px] w-[20px] border-4 border-surface border-t-transparent rounded-full" />
-                  </div>
-                )}
-                <div
-                  className={clsx(
-                    'text-[15px] font-[600]',
-                    loading && 'invisible'
-                  )}
-                >
-                  {selectedIntegrations.length === 0
-                    ? t('check_circles_above')
-                    : scheduleLabel}
-                </div>
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowPostNow(!showPostNow);
-                  }}
-                  className="flex justify-center items-center h-[20px] w-[20px] pt-[4px]"
-                >
-                  <DropdownArrowSmallIcon
-                    className={clsx(
-                      'group-hover:rotate-180 text-surface',
-                      showPostNow && 'rotate-180'
-                    )}
-                  />
-                </div>
-              </button>
-              <button
-                onClick={schedule('now')}
-                disabled={
-                  selectedIntegrations.length === 0 || loading || locked
-                }
-                className={clsx(
-                  'rounded-[12px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner border border-newBorder',
-                  showPostNow ? 'flex' : 'hidden group-hover:flex'
-                )}
-              >
-                <div className="text-white rounded-[12px] bg-coral hover:bg-coral-hover h-[44px] w-full flex justify-center items-center">
-                  {t('post_now')}
-                </div>
-              </button>
-            </div>
+              {loading === 'draft' && <Spinner />}
+              {t('editor_save_draft')}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={busy}
+              onClick={save('now')}
+            >
+              {loading === 'now' ? <Spinner /> : <SendIcon />}
+              {t('editor_post_now')}
+            </Button>
           </div>
+          {!!existingData.integration && (
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={deletePost}
+              className="text-destructive hover:text-destructive"
+            >
+              {loading === 'delete' ? <Spinner /> : <Trash2Icon />}
+              {t('delete_post')}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // narrow layouts show the publish card last, so the main actions stay reachable at the bottom
+  const actionBar = (
+    <div className="sticky bottom-3 z-10 mt-4 flex gap-2 rounded-xl border bg-background/95 p-2 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80 @4xl:hidden">
+      <Button
+        variant="outline"
+        size="lg"
+        disabled={busy}
+        onClick={save('draft')}
+        className="flex-1"
+      >
+        {loading === 'draft' && <Spinner />}
+        {t('editor_save_draft')}
+      </Button>
+      <Button
+        size="lg"
+        disabled={busy}
+        onClick={save('schedule')}
+        className="flex-1"
+      >
+        {loading === 'schedule' && <Spinner />}
+        {scheduleLabel}
+      </Button>
+    </div>
+  );
+
+  const body = (
+    <div ref={bodyRef} className="@container">
+      <div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+        <ShowAllProviders ref={ref} />
+        <div className="flex min-w-0 flex-col gap-4">
+          {!existingData.integration && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('editor_channels')}</CardTitle>
+                <CardDescription>{t('editor_channels_hint')}</CardDescription>
+                {!!selectedIntegrations.length && (
+                  <CardAction>
+                    <Badge variant="secondary">
+                      {t('editor_selected', {
+                        count: selectedIntegrations.length,
+                      })}
+                    </Badge>
+                  </CardAction>
+                )}
+              </CardHeader>
+              <CardContent>
+                <PicksSocialsComponent />
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('editor_content')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ContentEditor />
+            </CardContent>
+          </Card>
+          <SettingsCard />
+        </div>
+        <div
+          className={cn(
+            'flex min-w-0 flex-col gap-4 @4xl:sticky',
+            variant === 'page' ? '@4xl:top-16' : '@4xl:top-0'
+          )}
+        >
+          {publishCard}
+          <PreviewCard />
         </div>
       </div>
-      {mobileSheet === 'channels' && (
-        <BottomSheet
-          title={t('select_channels')}
-          onClose={() => setMobileSheet(null)}
-          button={{
-            label: t('done'),
-            onClick: () => setMobileSheet(null),
-            disabled: selectedIntegrations.length === 0,
-          }}
-        >
-          <div className="flex pb-[8px] empty:hidden">
-            <SelectCustomer
-              onChange={changeCustomer}
-              integrations={integrations}
-            />
-          </div>
-          <PicksSocialsComponent list={true} />
-        </BottomSheet>
-      )}
-      {mobileSheet === 'settings' && (
-        <BottomSheet title={t('settings')} onClose={() => setMobileSheet(null)}>
-          <div className="flex flex-col gap-[12px] pb-[30px]">
-            {hasChannelSettings && (
-              <BottomSheetRow
-                icon={<SettingsOutlineIcon size={24} />}
-                label={
-                  current === 'global'
-                    ? t('channels_settings')
-                    : `${integrations.find((p) => p.id === current)?.name} ${t(
-                        'channel_settings'
-                      )}`
-                }
-                onClick={() => {
-                  setMobileSheet(null);
-                  setShowSettings(true);
-                }}
-              />
-            )}
-            <BottomSheetRow
-              icon={<TagIcon width={24} height={24} />}
-              label={t('add_tag')}
-              onClick={() => setMobileSheet('tags')}
-            />
-            {existingData?.integration && (
-              <div
-                onClick={deletePost}
-                className="flex items-center gap-[12px] py-[8px] cursor-pointer text-error"
-              >
-                <TrashIcon size={24} />
-                <div className="text-[15px] font-[600]">{t('delete_post')}</div>
-              </div>
-            )}
-          </div>
-        </BottomSheet>
-      )}
-      {mobileSheet === 'tags' && (
-        <BottomSheet
-          title={t('add_tag')}
-          onClose={() => setMobileSheet(null)}
-          button={{
-            label: t('done'),
-            onClick: () => setMobileSheet(null),
-          }}
-        >
-          <TagsComponent
-            name="tags"
-            label={t('tags')}
-            initial={tags}
-            onChange={(e) => {
-              setTags(e.target.value);
-            }}
-            list={true}
-          />
-        </BottomSheet>
-      )}
-      {mobileSheet === 'date' && (
-        <BottomSheet
-          title={t('change_date_or_time')}
-          onClose={() => setMobileSheet(null)}
-          button={{
-            label: t('save'),
-            onClick: () => {
-              setPickerDate(dateDraft);
-              setMobileSheet(null);
-            },
-          }}
-        >
-          <DatePickerPanel
-            date={dateDraft}
-            onChange={setDateDraft}
-            sheet={true}
-          />
-        </BottomSheet>
-      )}
+      {actionBar}
     </div>
+  );
+
+  if (variant === 'page') {
+    return (
+      <PageBody>
+        <PageHeader
+          title={t('compose')}
+          description={t('editor_page_description')}
+        />
+        {body}
+      </PageBody>
+    );
+  }
+
+  return (
+    <ModalFrame
+      title={
+        existingData.integration
+          ? t('editor_edit_post')
+          : t('create_post_title')
+      }
+      onClose={close}
+    >
+      {body}
+    </ModalFrame>
   );
 };
 
-const Scrollable: FC<{
-  className: string;
-  scrollClasses: string;
+const ModalFrame: FC<{
+  title: string;
+  onClose: () => void;
   children: ReactNode;
-}> = ({ className, scrollClasses, children }) => {
-  const ref = useRef(undefined);
-  const hasScroll = useHasScroll(ref);
+}> = ({ title, onClose, children }) => {
+  const t = useT();
   return (
-    <div className={clsx(className, hasScroll && scrollClasses)} ref={ref}>
-      {children}
+    <div className="flex h-full min-h-0 w-full flex-col bg-background">
+      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
+        <h2 className="font-heading text-base font-semibold">{title}</h2>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('close')}
+          onClick={onClose}
+          className="ms-auto"
+        >
+          <XIcon />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 p-3 md:p-5">
+        {children}
+      </div>
     </div>
   );
 };

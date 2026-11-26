@@ -67,6 +67,11 @@ export class Post {
   @IsOptional()
   @IsObject()
   settings?: Record<string, any>;
+
+  // a format of the organization (GET /formats), null or missing: none
+  @IsOptional()
+  @IsString()
+  formatId?: string | null;
 }
 
 export class ValidatePostsDto {

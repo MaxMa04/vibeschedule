@@ -1,455 +1,424 @@
+'use client';
+
 import i18next from '@vibeschedule/react/translation/i18next';
 import { create } from 'zustand';
-import { makeId } from '@vibeschedule/nestjs-libraries/services/make.is';
 import { useShallow } from 'zustand/react/shallow';
-import React, {
+import {
   createContext,
   FC,
-  memo,
   ReactNode,
   useCallback,
   useContext,
   useEffect,
-  useMemo,
 } from 'react';
-import { Button } from '@vibeschedule/react/form/button';
-import { useHotkeys } from 'react-hotkeys-hook';
-import clsx from 'clsx';
-import { EventEmitter } from 'events';
+import { makeId } from '@vibeschedule/nestjs-libraries/services/make.is';
+import { cn } from '@vibeschedule/frontend/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@vibeschedule/frontend/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@vibeschedule/frontend/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@vibeschedule/frontend/components/ui/alert-dialog';
 
-interface OpenModalInterface {
-  title?: any;
+/**
+ * - `sm` | `md` (default) | `lg` | `xl`: centered dialog of that width
+ * - `full`: large workspace (post editor, media library), full screen on phones
+ * Any other value (old pixel or percent sizes) is treated as `xl`.
+ */
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+export interface OpenModalInterface {
+  title?: ReactNode;
+  description?: ReactNode;
+  /** `sheet` slides in from the right, for admin forms */
+  variant?: 'dialog' | 'sheet';
+  size?: ModalSize | string | number;
   closeOnClickOutside?: boolean;
-  removeLayout?: boolean;
-  fullScreen?: boolean;
-  top?: string | number;
   closeOnEscape?: boolean;
+  /** no header and no padding, the children render the whole surface */
+  removeLayout?: boolean;
+  /** same as `size: 'full'` */
+  fullScreen?: boolean;
   withCloseButton?: boolean;
   destructive?: boolean;
+  /** asks before closing by Escape, outside click or the close button */
   askClose?: boolean;
   onClose?: () => void;
   children: ReactNode | ((close: () => void) => ReactNode);
-  classNames?: {
-    modal?: string;
-  };
-  size?: string | number;
-  maxSize?: string | number;
-  height?: string | number;
   id?: string;
+  /** @deprecated ignored, use `size` */
+  classNames?: { modal?: string };
+  /** @deprecated ignored */
+  top?: string | number;
+  /** @deprecated ignored, use `size: 'full'` */
+  height?: string | number;
+  /** @deprecated ignored */
+  maxSize?: string | number;
 }
 
-interface ModalManagerStoreInterface {
-  closeById(id: string): void;
-  openModal(params: OpenModalInterface): void;
+export interface ConfirmOptions {
+  title?: ReactNode;
+  description?: ReactNode;
+  approveLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onlyApprove?: boolean;
+}
+
+type StackEntry = { id: string; closing?: boolean } & (
+  | ({ kind: 'modal' } & OpenModalInterface)
+  | { kind: 'confirm'; options: ConfirmOptions; resolve: (v: boolean) => void }
+);
+
+interface ModalStore {
+  stack: StackEntry[];
+  push(entry: StackEntry): void;
+  close(id: string): void;
   closeAll(): void;
+  remove(id: string): void;
 }
 
-interface State extends ModalManagerStoreInterface {
-  modalManager: Array<{ id: string } & OpenModalInterface>;
-}
+// closing a layer also closes everything stacked on top of it
+const fromIndex = (stack: StackEntry[], id: string, closing?: boolean) =>
+  stack.findIndex(
+    (p) => p.id === id && (closing === undefined || !!p.closing === closing)
+  );
 
-const useModalStore = create<State>((set) => ({
-  modalManager: [],
-  openModal: (params) => {
-    const newId = params.id || makeId(20);
+const useModalStore = create<ModalStore>((set, get) => ({
+  stack: [],
+  push: (entry) =>
+    set((state) =>
+      state.stack.some((p) => p.id === entry.id && !p.closing)
+        ? state
+        : {
+            stack: [...state.stack.filter((p) => p.id !== entry.id), entry],
+          }
+    ),
+  close: (id) => {
+    const index = fromIndex(get().stack, id, false);
+    if (index === -1) {
+      return;
+    }
     set((state) => ({
-      modalManager: [
-        ...state.modalManager,
-        ...(!state.modalManager.some((p) => p.id === newId)
-          ? [{ id: newId, ...params }]
-          : []),
-      ],
+      stack: state.stack.map((p, i) =>
+        i >= index ? { ...p, closing: true } : p
+      ),
     }));
+    // in case the exit animation never reports back
+    setTimeout(() => get().remove(id), 500);
   },
-  closeById: (id) =>
+  closeAll: () => {
+    const ids = get().stack.map((p) => p.id);
     set((state) => ({
-      modalManager: state.modalManager.filter((modal) => modal.id !== id),
-    })),
-  closeAll: () => set({ modalManager: [] }),
+      stack: state.stack.map((p) => ({ ...p, closing: true })),
+    }));
+    setTimeout(() => ids.forEach((id) => get().remove(id)), 500);
+  },
+  remove: (id) =>
+    set((state) => {
+      const index = fromIndex(state.stack, id, true);
+      return index === -1 ? state : { stack: state.stack.slice(0, index) };
+    }),
 }));
 
 const CurrentModalContext = createContext({ id: '' });
 
-interface ModalManagerInterface extends ModalManagerStoreInterface {
-  closeCurrent(): void;
-}
-
 export const useModals = () => {
-  const { closeAll, openModal, closeById } = useModalStore(
+  const { push, close, closeAll } = useModalStore(
     useShallow((state) => ({
-      openModal: state.openModal,
-      closeById: state.closeById,
+      push: state.push,
+      close: state.close,
       closeAll: state.closeAll,
     }))
   );
+  const current = useContext(CurrentModalContext);
 
-  const modalContext = useContext(CurrentModalContext);
-
-  return {
-    openModal,
-    closeAll,
-    closeById,
-    closeCurrent: () => {
-      if (modalContext.id) {
-        closeById(modalContext.id);
-      }
-    },
-  } satisfies ModalManagerInterface;
-};
-
-export const Component: FC<{
-  closeModal: (id: string) => void;
-  zIndex: number;
-  isLast: boolean;
-  modal: { id: string } & OpenModalInterface;
-}> = memo(({ isLast, modal, closeModal, zIndex }) => {
-  const decision = useDecisionModal();
-  const closeModalFunction = useCallback(async () => {
-    if (modal.askClose) {
-      const open = await decision.open();
-      if (!open) {
-        return;
-      }
-    }
-    modal?.onClose?.();
-    closeModal(modal.id);
-  }, [modal.id, closeModal]);
-
-  const RenderComponent = useMemo(() => {
-    return typeof modal.children === 'function'
-      ? modal.children(closeModalFunction)
-      : modal.children;
-  }, [modal, closeModalFunction]);
-
-  useHotkeys(
-    'Escape',
-    () => {
-      if (isLast) {
-        closeModalFunction();
-      }
-    },
-    [isLast, closeModalFunction]
+  const openModal = useCallback(
+    (params: OpenModalInterface) =>
+      push({ ...params, kind: 'modal', id: params.id || makeId(20) }),
+    [push]
   );
 
-  if (modal.removeLayout) {
+  const closeCurrent = useCallback(() => {
+    if (current.id) {
+      close(current.id);
+    }
+  }, [close, current.id]);
+
+  return { openModal, closeAll, closeById: close, closeCurrent };
+};
+
+export const areYouSure = (options: ConfirmOptions = {}): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
+    useModalStore.getState().push({
+      kind: 'confirm',
+      id: makeId(20),
+      options,
+      resolve,
+    });
+  });
+
+export const useDecisionModal = () => {
+  const open = useCallback(
+    (options: ConfirmOptions = {}) => areYouSure(options),
+    []
+  );
+  return { open };
+};
+
+const sizeClass = (entry: OpenModalInterface): ModalSize => {
+  if (entry.fullScreen || entry.removeLayout) {
+    return 'full';
+  }
+  if (
+    entry.size === 'sm' ||
+    entry.size === 'md' ||
+    entry.size === 'lg' ||
+    entry.size === 'full'
+  ) {
+    return entry.size;
+  }
+  return entry.size ? 'xl' : 'md';
+};
+
+const dialogSizes: Record<ModalSize, string> = {
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-lg',
+  lg: 'sm:max-w-2xl',
+  xl: 'sm:max-w-5xl',
+  full: 'flex flex-col h-[calc(100dvh-2rem)] sm:w-[min(calc(100%-2rem),1400px)] sm:max-w-none max-sm:top-0 max-sm:left-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none',
+};
+
+const ModalLayer: FC<{
+  entry: Extract<StackEntry, { kind: 'modal' }>;
+  index: number;
+}> = ({ entry, index }) => {
+  const close = useModalStore((state) => state.close);
+  const remove = useModalStore((state) => state.remove);
+
+  const requestClose = useCallback(async () => {
+    if (entry.askClose && !(await areYouSure())) {
+      return;
+    }
+    entry.onClose?.();
+    close(entry.id);
+  }, [entry, close]);
+
+  const onOpenChange = useCallback(
+    (open: boolean, details: { reason: string }) => {
+      if (open) {
+        return;
+      }
+      if (details.reason === 'escape-key' && entry.closeOnEscape === false) {
+        return;
+      }
+      if (
+        details.reason === 'outside-press' &&
+        entry.closeOnClickOutside === false
+      ) {
+        return;
+      }
+      requestClose();
+    },
+    [entry, requestClose]
+  );
+
+  const onOpenChangeComplete = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        remove(entry.id);
+      }
+    },
+    [entry.id, remove]
+  );
+
+  const body =
+    typeof entry.children === 'function'
+      ? entry.children(requestClose)
+      : entry.children;
+  const showClose = entry.withCloseButton !== false && !entry.removeLayout;
+  const size = sizeClass(entry);
+  const stacked = <ModalStack index={index + 1} />;
+
+  if (entry.variant === 'sheet') {
     return (
-      <div
-        style={{ zIndex }}
-        className={clsx(
-          !modal.fullScreen
-            ? 'pb-[50px] min-w-full min-h-full'
-            : 'w-full h-full mobile:block',
-          'fixed flex left-0 top-0 bg-popup transition-all animate-fadeIn overflow-y-auto text-newTextColor',
-          !isLast && '!overflow-hidden'
-        )}
-      >
-        <div
-          className={clsx(
-            modal.fullScreen && 'flex mobile:min-h-full',
-            'relative flex-1 mobile:min-w-0'
-          )}
+      <CurrentModalContext.Provider value={{ id: entry.id }}>
+        <Sheet
+          open={!entry.closing}
+          onOpenChange={onOpenChange}
+          onOpenChangeComplete={onOpenChangeComplete}
+          disablePointerDismissal={entry.closeOnClickOutside === false}
         >
-          <div
-            className={clsx(
-              modal.fullScreen
-                ? 'flex flex-1 mobile:min-w-0'
-                : 'absolute top-0 left-0 min-w-full min-h-full'
-            )}
+          <SheetContent
+            showCloseButton={showClose}
+            className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
           >
-            <div
-              className={clsx(
-                modal.fullScreen
-                  ? 'w-full h-full flex-1 mobile:min-w-0 mobile:h-auto'
-                  : 'mx-auto py-[48px] mobile:max-w-[100vw] mobile:py-[16px]'
-              )}
-              {...(modal.size && { style: { width: modal.size } })}
-            >
-              {typeof modal.children === 'function'
-                ? modal.children(closeModalFunction)
-                : modal.children}
+            {(!!entry.title || !!entry.description) && (
+              <SheetHeader className="border-b pe-12">
+                {!!entry.title && <SheetTitle>{entry.title}</SheetTitle>}
+                {!!entry.description && (
+                  <SheetDescription>{entry.description}</SheetDescription>
+                )}
+              </SheetHeader>
+            )}
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+              {body}
             </div>
-          </div>
-        </div>
-      </div>
+          </SheetContent>
+          {stacked}
+        </Sheet>
+      </CurrentModalContext.Provider>
     );
   }
 
   return (
-    <CurrentModalContext.Provider value={{ id: modal.id }}>
-      <div
-        onClick={closeModalFunction}
-        style={{ zIndex }}
-        className={clsx(
-          'fixed flex left-0 top-0 min-w-full min-h-full bg-popup transition-all animate-fadeIn overflow-y-auto text-newTextColor',
-          !modal.fullScreen && 'pb-[50px]'
-        )}
+    <CurrentModalContext.Provider value={{ id: entry.id }}>
+      <Dialog
+        open={!entry.closing}
+        onOpenChange={onOpenChange}
+        onOpenChangeComplete={onOpenChangeComplete}
+        disablePointerDismissal={entry.closeOnClickOutside === false}
       >
-        <div className="relative flex-1">
-          <div
-            style={
-              modal.top
-                ? { paddingTop: modal.top, paddingBottom: modal.top }
-                : {}
-            }
-            className={clsx(
-              'absolute min-w-full mobile:w-full',
-              !modal.fullScreen
-                ? modal.top
-                  ? ''
-                  : 'min-h-full pt-[100px] pb-[100px] mobile:pt-[24px] mobile:pb-[24px] mobile:px-[8px]'
-                : 'h-screen mobile:h-dvh',
-              modal.size && modal.height
-                ? 'flex justify-center items-center'
-                : 'top-0 left-0'
-            )}
-          >
-            <div
-              className={clsx(
-                !modal.removeLayout &&
-                  'gap-[40px] p-[32px] mobile:gap-[24px] mobile:p-[16px]',
-                'bg-newBgColorInner mx-auto flex flex-col w-fit rounded-[24px] mobile:rounded-[16px] relative mobile:!max-w-full',
-                modal.destructive && 'border-2 border-error',
-                modal.size ? '' : 'min-w-[600px] mobile:min-w-0 mobile:w-full',
-                modal.fullScreen && 'h-full'
+        <DialogContent
+          showCloseButton={showClose}
+          className={cn(
+            'max-h-[calc(100dvh-2rem)]',
+            dialogSizes[size],
+            size !== 'full' && 'overflow-y-auto',
+            entry.removeLayout && 'gap-0 overflow-hidden p-0',
+            entry.destructive && 'ring-destructive/40'
+          )}
+        >
+          {!entry.removeLayout && (!!entry.title || !!entry.description) && (
+            <DialogHeader className={cn(showClose && 'pe-8')}>
+              {!!entry.title && (
+                <DialogTitle className="text-lg font-semibold">
+                  {entry.title}
+                </DialogTitle>
               )}
-              {...((!!modal.size || !!modal.height || !!modal.maxSize) && {
-                style: {
-                  ...(modal.size ? { width: modal.size } : {}),
-                  ...(modal.height ? { height: modal.height } : {}),
-                  ...(modal.maxSize ? { maxWidth: modal.maxSize } : {}),
-                },
-              })}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center">
-                <div className="text-[24px] mobile:text-[20px] mobile:pe-[28px] font-[600] flex-1">
-                  {modal.title}
-                </div>
-                {typeof modal.withCloseButton === 'undefined' ||
-                modal.withCloseButton ? (
-                  <div className="cursor-pointer">
-                    <button
-                      className="outline-none absolute end-[20px] top-[20px] mobile:end-[12px] mobile:top-[12px] mantine-UnstyledButton-root mantine-ActionIcon-root hover:bg-tableBorder cursor-pointer mantine-Modal-close mantine-1dcetaa"
-                      type="button"
-                      onClick={closeModalFunction}
-                    >
-                      <svg
-                        viewBox="0 0 15 15"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                      >
-                        <path
-                          d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z"
-                          fill="currentColor"
-                          fillRule="evenodd"
-                          clipRule="evenodd"
-                        ></path>
-                      </svg>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              <div
-                className={clsx(
-                  'whitespace-pre-line',
-                  !!modal.height && !!modal.size && 'flex flex-1 flex-col'
-                )}
-              >
-                {RenderComponent}
-              </div>
+              {!!entry.description && (
+                <DialogDescription>{entry.description}</DialogDescription>
+              )}
+            </DialogHeader>
+          )}
+          {size === 'full' ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {body}
             </div>
-          </div>
-        </div>
-      </div>
+          ) : (
+            body
+          )}
+        </DialogContent>
+        {stacked}
+      </Dialog>
     </CurrentModalContext.Provider>
   );
-});
+};
 
-export const ModalManagerInner: FC = () => {
-  const { closeModal, modalManager } = useModalStore(
-    useShallow((state) => ({
-      closeModal: state.closeById,
-      modalManager: state.modalManager,
-    }))
+const ConfirmLayer: FC<{
+  entry: Extract<StackEntry, { kind: 'confirm' }>;
+  index: number;
+}> = ({ entry, index }) => {
+  const close = useModalStore((state) => state.close);
+  const remove = useModalStore((state) => state.remove);
+  const {
+    title = i18next.t('are_you_sure'),
+    description = i18next.t('are_you_sure_you_want_to_close_the_window'),
+    approveLabel = i18next.t('yes'),
+    cancelLabel = i18next.t('no'),
+    destructive,
+    onlyApprove,
+  } = entry.options;
+
+  const answer = useCallback(
+    (value: boolean) => {
+      if (entry.closing) {
+        return;
+      }
+      entry.resolve(value);
+      close(entry.id);
+    },
+    [entry, close]
   );
 
-  useEffect(() => {
-    if (modalManager.length > 0) {
-      document.querySelector('body')?.classList.add('overflow-hidden');
-      Array.from(document.querySelectorAll('.blurMe') || []).map((p) =>
-        p.classList.add('blur-xs', 'pointer-events-none')
-      );
-    } else {
-      document.querySelector('body')?.classList.remove('overflow-hidden');
-      Array.from(document.querySelectorAll('.blurMe') || []).map((p) =>
-        p.classList.remove('blur-xs', 'pointer-events-none')
-      );
-    }
-  }, [modalManager]);
+  return (
+    <AlertDialog
+      open={!entry.closing}
+      onOpenChange={(open) => !open && answer(false)}
+      onOpenChangeComplete={(open) => !open && remove(entry.id)}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {!!description && (
+            <AlertDialogDescription className="whitespace-pre-line">
+              {description}
+            </AlertDialogDescription>
+          )}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          {!onlyApprove && (
+            <AlertDialogCancel
+              className="h-10 md:h-8"
+              onClick={() => answer(false)}
+            >
+              {cancelLabel}
+            </AlertDialogCancel>
+          )}
+          <AlertDialogAction
+            autoFocus
+            className="h-10 md:h-8"
+            variant={destructive ? 'destructive' : 'default'}
+            onClick={() => answer(true)}
+          >
+            {approveLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+      <ModalStack index={index + 1} />
+    </AlertDialog>
+  );
+};
 
-  if (modalManager.length === 0) {
+// each layer renders the next one inside its root, so Base UI treats the
+// stack as nested dialogs (Escape and outside clicks reach only the top one)
+const ModalStack: FC<{ index: number }> = ({ index }) => {
+  const entry = useModalStore((state) => state.stack[index]);
+  if (!entry) {
     return null;
   }
+  return entry.kind === 'confirm' ? (
+    <ConfirmLayer key={entry.id} entry={entry} index={index} />
+  ) : (
+    <ModalLayer key={entry.id} entry={entry} index={index} />
+  );
+};
 
+export const ModalProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  // a page change leaves nothing open
+  useEffect(() => () => useModalStore.getState().closeAll(), []);
   return (
     <>
-      <style>{`body, html { overflow: hidden !important; }`}</style>
-      {modalManager.map((modal, index) => (
-        <Component
-          isLast={modalManager.length - 1 === index}
-          key={modal.id}
-          modal={modal}
-          zIndex={200 + index}
-          closeModal={closeModal}
-        />
-      ))}
+      {children}
+      <ModalStack index={0} />
     </>
   );
-};
-export const ModalManager: FC<{ children: ReactNode }> = ({ children }) => {
-  return (
-    <div>
-      <ModalManagerEmitter />
-      <ModalManagerInner />
-      <div className="transition-all w-full">{children}</div>
-    </div>
-  );
-};
-
-const emitter = new EventEmitter();
-export const showModalEmitter = (params: ModalManagerInterface) => {
-  emitter.emit('show', params);
-};
-
-export const ModalManagerEmitter: FC = () => {
-  const { showModal } = useModalStore(
-    useShallow((state) => ({
-      showModal: state.openModal,
-    }))
-  );
-
-  useEffect(() => {
-    emitter.on('show', (params: OpenModalInterface) => {
-      showModal(params);
-    });
-
-    return () => {
-      emitter.removeAllListeners('show');
-    };
-  }, []);
-  return null;
-};
-
-export const DecisionModal: FC<{
-  description: string;
-  approveLabel: string;
-  cancelLabel: string;
-  onlyApprove: boolean;
-  destructive?: boolean;
-  resolution: (value: boolean) => void;
-}> = ({
-  description,
-  cancelLabel,
-  approveLabel,
-  resolution,
-  onlyApprove,
-  destructive,
-}) => {
-  const { closeCurrent } = useModals();
-  return (
-    <div className="flex flex-col">
-      <div className="max-w-[600px]">{description}</div>
-      <div className="flex gap-[12px] mt-[16px]">
-        <Button
-          className={destructive ? '!bg-error' : undefined}
-          onClick={() => {
-            resolution(true);
-            closeCurrent();
-          }}
-        >
-          {approveLabel}
-        </Button>
-        {!onlyApprove && (
-          <Button
-            onClick={() => {
-              resolution(false);
-              closeCurrent();
-            }}
-          >
-            {cancelLabel}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const decisionModalEmitter = new EventEmitter();
-
-export const areYouSure = ({
-  title = i18next.t('are_you_sure'),
-  description = i18next.t('are_you_sure_you_want_to_close_the_window') as any,
-  approveLabel = i18next.t('yes'),
-  cancelLabel = i18next.t('no'),
-  destructive = false,
-} = {}): Promise<boolean> => {
-  return new Promise<boolean>((newRes) => {
-    decisionModalEmitter.emit('open', {
-      title,
-      description,
-      approveLabel,
-      cancelLabel,
-      destructive,
-      newRes,
-    });
-  });
-};
-
-export const DecisionEverywhere: FC = () => {
-  const decision = useDecisionModal();
-  useEffect(() => {
-    decisionModalEmitter.on('open', decision.open);
-  }, []);
-  return null;
-};
-
-export const useDecisionModal = () => {
-  const modals = useModals();
-  const open = useCallback(
-    ({
-      title = i18next.t('are_you_sure'),
-      description = i18next.t(
-        'are_you_sure_you_want_to_close_the_window'
-      ) as any,
-      onlyApprove = false,
-      approveLabel = i18next.t('yes'),
-      cancelLabel = i18next.t('no'),
-      destructive = false,
-      newRes = undefined as any,
-    } = {}) => {
-      return new Promise<boolean>((res) => {
-        modals.openModal({
-          title,
-          askClose: false,
-          destructive,
-          onClose: () => res(false),
-          children: (
-            <DecisionModal
-              onlyApprove={onlyApprove}
-              destructive={destructive}
-              resolution={(value) => (newRes ? newRes(value) : res(value))}
-              description={description}
-              approveLabel={approveLabel}
-              cancelLabel={cancelLabel}
-            />
-          ),
-        });
-      });
-    },
-    [modals]
-  );
-
-  return { open };
 };

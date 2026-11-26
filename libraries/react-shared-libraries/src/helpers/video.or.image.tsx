@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { clsx } from 'clsx';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 import { hasExtension } from '@vibeschedule/helpers/utils/has.extension';
 export const VideoOrImage: FC<{
   src: string;
@@ -14,7 +14,7 @@ export const VideoOrImage: FC<{
       <video
         src={src}
         autoPlay={autoplay}
-        className={clsx('w-full h-full', videoClassName)}
+        className={cn('size-full', videoClassName)}
         muted={true}
         loop={true}
       />
@@ -22,9 +22,9 @@ export const VideoOrImage: FC<{
   }
   return (
     <img
-      className={clsx(
+      className={cn(
         isContain ? 'object-contain' : 'object-cover',
-        'w-full h-full',
+        'size-full',
         imageClassName
       )}
       src={src}

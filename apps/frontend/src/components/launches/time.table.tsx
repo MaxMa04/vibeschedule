@@ -1,219 +1,161 @@
 'use client';
 
 import React, { FC, useCallback, useMemo, useState } from 'react';
-import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
 import dayjs from 'dayjs';
-import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
-import { Select } from '@vibeschedule/react/form/select';
-import { Button } from '@vibeschedule/react/form/button';
 import utc from 'dayjs/plugin/utc';
+import { toast } from 'sonner';
+import { ClockIcon, PlusIcon, XIcon } from 'lucide-react';
+import { sortBy, uniqBy } from 'lodash';
+import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-// @ts-ignore
-import useKeypress from 'react-use-keypress';
-import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
-import { sortBy } from 'lodash';
-import { usePreventWindowUnload } from '@vibeschedule/react/helpers/use.prevent.window.unload';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import {
   fromUtc,
   newDayjs,
 } from '@vibeschedule/frontend/components/layout/set.timezone';
-import clsx from 'clsx';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Input } from '@vibeschedule/frontend/components/ui/input';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 import {
-  TrashIcon,
-  PlusIcon,
-  DelayIcon,
-} from '@vibeschedule/frontend/components/ui/icons';
+  Field,
+  FieldDescription,
+  FieldLabel,
+} from '@vibeschedule/frontend/components/ui/field';
 
 dayjs.extend(utc);
 
-const hours = [...Array(24).keys()].map((i) => ({
-  value: i,
-}));
+// posting times are stored as minutes of the UTC day
+const toUtcMinutes = (value: string) => {
+  const [hour, minute] = value.split(':').map(Number);
+  const minutes = hour * 60 + minute - newDayjs().utcOffset();
+  return ((minutes % 1440) + 1440) % 1440;
+};
 
-const minutes = [...Array(60).keys()].map((i) => ({
-  value: i,
-}));
+const formatMinutes = (minutes: number) =>
+  fromUtc(dayjs.utc().startOf('day').add(minutes, 'minutes')).format('HH:mm');
 
 export const TimeTable: FC<{
   integration: Integrations;
   mutate: () => void;
-}> = (props) => {
+  close?: () => void;
+}> = ({ integration, mutate, close }) => {
   const t = useT();
-  const {
-    integration: { time },
-    mutate,
-  } = props;
-  const [currentTimes, setCurrentTimes] = useState([...time]);
-  const [hour, setHour] = useState(0);
-  const [minute, setMinute] = useState(0);
   const fetch = useFetch();
-  const modal = useModals();
-  usePreventWindowUnload(true);
+  const [currentTimes, setCurrentTimes] = useState(() =>
+    integration.time.map(({ time }) => time)
+  );
+  const [value, setValue] = useState('09:00');
+  const [busy, setBusy] = useState(false);
 
-  const askClose = useCallback(async () => {
-    if (
-      !(await deleteDialog(
-        t('are_you_sure_you_want_to_close_the_window'),
-        t('yes_close')
-      ))
-    ) {
-      return;
-    }
-    modal.closeAll();
-  }, []);
-
-  useKeypress('Escape', askClose);
-
-  const removeSlot = useCallback(
-    (index: number) => async () => {
-      if (
-        !(await deleteDialog(t('are_you_sure_you_want_to_delete_this_slot')))
-      ) {
-        return;
-      }
-      setCurrentTimes((prev) => prev.filter((_, i) => i !== index));
-    },
-    []
+  const times = useMemo(
+    () =>
+      sortBy(
+        uniqBy(
+          currentTimes.map((time) => ({ time, label: formatMinutes(time) })),
+          'label'
+        ),
+        'label'
+      ),
+    [currentTimes]
   );
 
-  const addHour = useCallback(() => {
-    const calculateMinutes =
-      newDayjs()
-        .utc()
-        .startOf('day')
-        .add(hour, 'hours')
-        .add(minute, 'minutes')
-        .diff(newDayjs().utc().startOf('day'), 'minutes') -
-      newDayjs().utcOffset();
-    setCurrentTimes((prev) => [
-      ...prev,
-      {
-        time: calculateMinutes,
-      },
-    ]);
-  }, [hour, minute]);
-
-  const times = useMemo(() => {
-    return sortBy(
-      currentTimes.map(({ time }) => ({
-        value: time,
-        formatted: fromUtc(
-          dayjs.utc().startOf('day').add(time, 'minutes')
-        ).format('HH:mm'),
-      })),
-      (p) => p.value
-    );
-  }, [currentTimes]);
+  const add = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!value) {
+        return;
+      }
+      setCurrentTimes((prev) => [...prev, toUtcMinutes(value)]);
+    },
+    [value]
+  );
 
   const save = useCallback(async () => {
-    await fetch(`/integrations/${props.integration.id}/time`, {
+    setBusy(true);
+    const response = await fetch(`/integrations/${integration.id}/time`, {
       method: 'POST',
       body: JSON.stringify({
-        time: currentTimes,
+        time: times.map(({ time }) => ({ time })),
       }),
     });
+    setBusy(false);
+    if (!response.ok) {
+      toast.error(t('calendar_save_failed'));
+      return;
+    }
+    toast.success(t('calendar_times_saved'));
     mutate();
-    modal.closeAll();
-  }, [currentTimes]);
+    close?.();
+  }, [fetch, integration.id, times, mutate, close, t]);
 
   return (
-    <div className="relative w-full max-w-[400px] mx-auto">
-      {/* Add Time Slot Section */}
-      <div className="bg-newBgColorInner rounded-[12px] p-[20px] border border-newTableBorder">
-        <div className="text-[15px] font-semibold mb-[16px] flex items-center gap-[8px]">
-          <DelayIcon size={18} className="text-teal" />
-          {t('add_time_slot')}
-        </div>
-
-        <div className="flex gap-[12px] items-end">
-          <div className="flex-1">
-            <Select
-              label={t('hour')}
-              name="hour"
-              disableForm={true}
-              hideErrors={true}
-              value={hour}
-              onChange={(e) => setHour(Number(e.target.value))}
-            >
-              {hours.map((h) => (
-                <option key={h.value} value={h.value}>
-                  {h.value.toString().padStart(2, '0')}
-                </option>
-              ))}
-            </Select>
+    <div className="flex flex-col gap-5">
+      <form onSubmit={add}>
+        <Field>
+          <FieldLabel htmlFor="posting-time">{t('add_time_slot')}</FieldLabel>
+          <div className="flex gap-2">
+            <Input
+              id="posting-time"
+              type="time"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="h-10 flex-1 md:h-9"
+            />
+            <Button type="submit" variant="outline" className="h-10 md:h-9">
+              <PlusIcon data-icon="inline-start" />
+              {t('add')}
+            </Button>
           </div>
-          <div className="flex-1">
-            <Select
-              label={t('minutes')}
-              name="minutes"
-              disableForm={true}
-              hideErrors={true}
-              value={minute}
-              onChange={(e) => setMinute(Number(e.target.value))}
-            >
-              {minutes.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.value.toString().padStart(2, '0')}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <button
-            type="button"
-            onClick={addHour}
-            className="h-[42px] px-[16px] bg-ink hover:opacity-90 transition-colors rounded-[12px] flex items-center gap-[6px] text-surface text-[14px] font-medium"
-          >
-            <PlusIcon size={14} />
-            {t('add')}
-          </button>
-        </div>
-      </div>
+          <FieldDescription>{t('calendar_times_hint')}</FieldDescription>
+        </Field>
+      </form>
 
-      {/* Time Slots List */}
-      <div className="mt-[20px]">
-        <div className="text-[14px] text-newTextColor/60 mb-[12px]">
-          {t('scheduled_times')} ({times.length})
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium">
+          {t('scheduled_times')}{' '}
+          <span className="text-muted-foreground">({times.length})</span>
         </div>
-
         {times.length === 0 ? (
-          <div className="text-center py-[32px] text-newTextColor/40 text-[14px] border border-dashed border-newTableBorder rounded-[12px]">
+          <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
             {t('no_time_slots')}
           </div>
         ) : (
-          <div className="flex flex-col gap-[8px]">
-            {times.map((timeSlot, index) => (
-              <div
-                key={`${timeSlot.value}-${index}`}
-                className={clsx(
-                  'group flex items-center justify-between',
-                  'h-[48px] px-[16px] rounded-[8px]',
-                  'bg-newBgColorInner border border-newTableBorder',
-                  'hover:border-teal/40 transition-colors'
-                )}
+          <div className="flex flex-wrap gap-2">
+            {times.map((slot) => (
+              <span
+                key={slot.label}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-card ps-2.5 pe-1 text-sm tabular-nums"
               >
-                <div className="flex items-center gap-[12px]">
-                  <div className="w-[8px] h-[8px] rounded-full bg-teal" />
-                  <span className="text-[15px] font-medium tabular-nums">
-                    {timeSlot.formatted}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeSlot(index)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-error/10 rounded-[6px] text-error hover:opacity-80"
+                <ClockIcon className="size-3.5 text-muted-foreground" />
+                {slot.label}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t('delete')}
+                  onClick={() =>
+                    setCurrentTimes((prev) =>
+                      prev.filter(
+                        (time) => formatMinutes(time) !== slot.label
+                      )
+                    )
+                  }
                 >
-                  <TrashIcon size={16} />
-                </button>
-              </div>
+                  <XIcon />
+                </Button>
+              </span>
             ))}
           </div>
         )}
       </div>
 
-      {/* Save Button */}
-      <div className="mt-[24px]">
-        <Button type="button" className="w-full rounded-[8px]" onClick={save}>
+      <div className="flex justify-end gap-2">
+        {!!close && (
+          <Button variant="outline" className="h-10 md:h-8" onClick={close}>
+            {t('cancel')}
+          </Button>
+        )}
+        <Button className="h-10 md:h-8" onClick={save} disabled={busy}>
+          {busy && <Spinner data-icon="inline-start" />}
           {t('save_changes')}
         </Button>
       </div>

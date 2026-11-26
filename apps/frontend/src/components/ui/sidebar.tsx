@@ -4,7 +4,7 @@ import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@vibeschedule/frontend/lib/utils"
 
 import { useIsMobile } from "@vibeschedule/frontend/hooks/use-mobile"
 import { Button } from "@vibeschedule/frontend/components/ui/button"

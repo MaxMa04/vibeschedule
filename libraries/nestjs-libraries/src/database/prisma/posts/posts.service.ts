@@ -184,6 +184,8 @@ export class PostsService {
     body: CreatePostDto,
     creationMethod: CreationMethod
   ) {
+    await this.assertFormats(orgId, body.posts);
+
     const ids = body.posts
       .flatMap((p) => p.value.map((v) => v.id))
       .filter((id): id is string => !!id);
@@ -263,6 +265,21 @@ export class PostsService {
     }
 
     return postList;
+  }
+
+  private async assertFormats(orgId: string, posts: CreatePostDto['posts']) {
+    const formatIds = [
+      ...new Set(posts.map((post) => post.formatId).filter((id) => !!id)),
+    ] as string[];
+    if (!formatIds.length) {
+      return;
+    }
+
+    const found = await this._postRepository.getFormatIds(orgId, formatIds);
+    const missing = formatIds.find((id) => !found.includes(id));
+    if (missing) {
+      throw new BadRequestException(`Format ${missing} nicht gefunden`);
+    }
   }
 
   // Keeps the PfM copy of a post in line with the local row: drafts and

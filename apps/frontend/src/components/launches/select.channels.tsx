@@ -1,143 +1,141 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
-import clsx from 'clsx';
-import { uniqBy } from 'lodash';
-import { useClickOutside } from '@mantine/hooks';
+import React, { FC, useCallback, useMemo } from 'react';
+import { ListFilterIcon } from 'lucide-react';
+import { orderBy } from 'lodash';
 import { useCalendar } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { Checkbox } from '@vibeschedule/react/form/checkbox';
-import { FilterIcon } from '@vibeschedule/frontend/components/ui/icons';
-import { Check } from '@vibeschedule/frontend/components/launches/tags.component';
-import { IntegrationListRow } from '@vibeschedule/frontend/components/new-launch/picks.socials.component';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Checkbox } from '@vibeschedule/frontend/components/ui/checkbox';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@vibeschedule/frontend/components/ui/popover';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
-export const SelectChannels: FC<{
-  list?: boolean;
-}> = ({ list }) => {
-  const { integrations, customer, selectedChannels, setSelectedChannels } =
+// the channels of the selected app, and which of them the calendar shows
+export const useChannelFilter = () => {
+  const { integrations, app, selectedChannels, setSelectedChannels } =
     useCalendar();
-  const t = useT();
-  const [pos, setPos] = useState<any>({});
-  const [open, setOpen] = useState(false);
-  const ref = useClickOutside(() => {
-    if (open) {
-      setOpen(false);
-    }
-  });
-
   const channels = useMemo(
-    () => integrations.filter((i) => !customer || i.customer?.id === customer),
-    [integrations, customer]
+    () =>
+      orderBy(
+        integrations.filter((i) => !app || i.app?.id === app),
+        (i) => i.name.toLowerCase()
+      ),
+    [integrations, app]
   );
-
   const selectedIds = selectedChannels ?? channels.map((c) => c.id);
   const allSelected = channels.every((c) => selectedIds.includes(c.id));
 
-  const openClose = useCallback(() => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-
-    const { x, y, height } = ref.current?.getBoundingClientRect();
-    setPos({ top: y + height, left: Math.min(x, window.innerWidth - 270) });
-    setOpen(true);
-  }, [open]);
-
   const toggleAll = useCallback(() => {
     setSelectedChannels(allSelected ? [] : null);
-  }, [allSelected]);
+  }, [allSelected, setSelectedChannels]);
 
   const toggle = useCallback(
-    (id: string) => () => {
+    (id: string) => {
       const next = selectedIds.includes(id)
         ? selectedIds.filter((s) => s !== id)
         : [...selectedIds, id];
       setSelectedChannels(next.length === channels.length ? null : next);
     },
-    [selectedIds, channels]
+    [selectedIds, channels, setSelectedChannels]
   );
+
+  return {
+    channels,
+    selectedIds,
+    allSelected,
+    active: !!selectedChannels,
+    toggle,
+    toggleAll,
+  };
+};
+
+const ChannelChecklist: FC = () => {
+  const t = useT();
+  const { channels, selectedIds, allSelected, toggle, toggleAll } =
+    useChannelFilter();
+  return (
+    <div className="flex flex-col gap-0.5">
+      <label className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-sm font-medium hover:bg-muted">
+        <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+        {t('select_all')}
+      </label>
+      {channels.map((channel) => (
+        <label
+          key={channel.id}
+          className="flex h-10 cursor-pointer items-center gap-2.5 rounded-md px-2 text-sm hover:bg-muted"
+        >
+          <Checkbox
+            checked={selectedIds.includes(channel.id)}
+            onCheckedChange={() => toggle(channel.id)}
+          />
+          <ChannelAvatar
+            size="xs"
+            picture={channel.picture}
+            identifier={channel.identifier}
+            name={channel.name}
+            disabled={channel.disabled}
+          />
+          <span className="min-w-0 flex-1 truncate">{channel.name}</span>
+        </label>
+      ))}
+    </div>
+  );
+};
+
+export const SelectChannels: FC<{
+  list?: boolean;
+  className?: string;
+}> = ({ list, className }) => {
+  const t = useT();
+  const { channels, selectedIds, active } = useChannelFilter();
 
   if (channels.length <= 1) {
     return null;
   }
 
   if (list) {
-    // the customers are listed above the channels when there are any
-    const hasCustomers =
-      uniqBy(integrations, (i) => i?.customer?.id).length > 1;
     return (
-      <div className="flex flex-col gap-[4px]">
-        {hasCustomers && (
-          <div className="text-[14px] font-[600] text-textItemBlur">
-            {t('channels')}
-          </div>
-        )}
-        <div
-          onClick={toggleAll}
-          className="flex items-center gap-[12px] py-[8px] cursor-pointer select-none"
-        >
-          <div className="flex-1 text-[14px] font-[600]">{t('select_all')}</div>
-          <Check onChange={() => {}} value={allSelected} />
+      <div className={cn('flex flex-col gap-1', className)}>
+        <div className="px-1 text-xs font-medium text-muted-foreground">
+          {t('channels')}
         </div>
-        {channels.map((p) => (
-          <IntegrationListRow
-            key={p.id}
-            integration={p}
-            selected={selectedIds.includes(p.id)}
-            onClick={toggle(p.id)}
-          />
-        ))}
+        <ChannelChecklist />
       </div>
     );
   }
 
   return (
-    <div className="relative select-none z-[100]" ref={ref}>
-      <div
-        data-tooltip-id="tooltip"
-        data-tooltip-content={t('select_channels_tooltip')}
-        onClick={openClose}
-        className={clsx(
-          'relative z-[20] cursor-pointer h-[42px] rounded-[8px] px-[12px] border flex items-center',
-          open || !allSelected ? 'border-teal' : 'border-newColColor'
-        )}
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            className={cn(
+              'h-9 md:h-8',
+              active && 'border-primary/40 bg-muted',
+              className
+            )}
+          />
+        }
       >
-        <FilterIcon />
-      </div>
-      {open && (
-        <div
-          style={pos}
-          className="flex flex-col fixed py-[12px] bg-newBgColorInner menu-shadow min-w-[250px] max-h-[320px] overflow-y-auto"
-        >
-          <div className="p-[12px] hover:bg-newBgColor text-[14px] font-[600] flex items-center">
-            <Checkbox
-              disableForm={true}
-              checked={allSelected}
-              onChange={toggleAll}
-              label={t('select_all')}
-            />
-          </div>
-          {channels.map((p) => (
-            <div
-              key={p.id}
-              className="p-[12px] hover:bg-newBgColor text-[14px] font-[500] flex items-center gap-[10px]"
-            >
-              <Checkbox
-                disableForm={true}
-                checked={selectedIds.includes(p.id)}
-                onChange={toggle(p.id)}
-              />
-              <img
-                className="w-[24px] h-[24px] rounded-full"
-                src={p.picture || '/no-picture.jpg'}
-                alt=""
-              />
-              <div className="truncate">{p.name}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        <ListFilterIcon data-icon="inline-start" />
+        <span className={cn(!active && 'max-2xl:sr-only')}>
+          {active
+            ? t('calendar_channels_selected', {
+                count: selectedIds.length,
+                total: channels.length,
+              })
+            : t('calendar_all_channels')}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="max-h-96 w-64 overflow-y-auto p-1">
+        <ChannelChecklist />
+      </PopoverContent>
+    </Popover>
   );
 };

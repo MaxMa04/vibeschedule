@@ -9,6 +9,7 @@ import { PostsController } from '@vibeschedule/backend/api/routes/posts.controll
 import { MediaController } from '@vibeschedule/backend/api/routes/media.controller';
 import { RootController } from '@vibeschedule/backend/api/routes/root.controller';
 import { AppsController } from '@vibeschedule/backend/api/routes/apps.controller';
+import { FormatsController } from '@vibeschedule/backend/api/routes/formats.controller';
 import { PfmWebhookController } from '@vibeschedule/backend/api/routes/pfm.webhook.controller';
 
 const authenticatedControllers = [
@@ -16,6 +17,7 @@ const authenticatedControllers = [
   AnalyticsController,
   IntegrationsController,
   AppsController,
+  FormatsController,
   SettingsController,
   PostsController,
   MediaController,

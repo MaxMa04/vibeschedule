@@ -1,5 +1,4 @@
 import '../globals.css';
-import 'react-tooltip/dist/react-tooltip.css';
 import { ReactNode } from 'react';
 import { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';

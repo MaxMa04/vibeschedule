@@ -1,12 +1,13 @@
 import i18next from '@vibeschedule/react/translation/i18next';
 import { areYouSure } from '@vibeschedule/frontend/components/layout/new-modal';
 
+// resolves true when the user confirms
 export const deleteDialog = async (
   message: string,
   confirmButton?: string,
   title?: string,
   cancelButton?: string,
-  destructive?: boolean
+  destructive = true
 ) => {
   return areYouSure({
     title: title || i18next.t('are_you_sure'),

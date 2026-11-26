@@ -1,11 +1,26 @@
 'use client';
 
-import { useForm, SubmitHandler, FormProvider } from 'react-hook-form';
+import { useId, useState } from 'react';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import { CircleAlertIcon } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-import { Button } from '@vibeschedule/react/form/button';
-import { Input } from '@vibeschedule/react/form/input';
-import { useState } from 'react';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@vibeschedule/frontend/components/ui/card';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Input } from '@vibeschedule/frontend/components/ui/input';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import { Alert, AlertTitle } from '@vibeschedule/frontend/components/ui/alert';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from '@vibeschedule/frontend/components/ui/field';
 
 type Inputs = {
   email: string;
@@ -14,55 +29,79 @@ type Inputs = {
 
 export function Login() {
   const t = useT();
+  const id = useId();
   const [loading, setLoading] = useState(false);
-  const form = useForm<Inputs>();
+  const [failed, setFailed] = useState(false);
+  const form = useForm<Inputs>({ defaultValues: { email: '', password: '' } });
   const fetchData = useFetch();
 
+  // a successful login answers with a "reload" header, the fetch wrapper
+  // then navigates away, so loading stays on
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
+    setFailed(false);
     const login = await fetchData('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ ...data, provider: 'LOCAL' }),
     });
     if (login.status >= 400) {
-      form.setError('email', { message: t('login_failed') });
+      setFailed(true);
       setLoading(false);
     }
   };
 
   return (
-    <FormProvider {...form}>
-      <form
-        className="flex flex-col gap-[20px]"
-        onSubmit={form.handleSubmit(onSubmit)}
-      >
-        <h1 className="text-[28px] font-display font-bold tracking-tight">
-          {t('sign_in')}
-        </h1>
-        <div className="flex flex-col gap-[12px]">
-          <Input
-            label={t('label_email')}
-            {...form.register('email', { required: true })}
-            type="email"
-            autoComplete="email"
-            placeholder={t('email_address')}
-          />
-          <Input
-            label={t('label_password')}
-            {...form.register('password', { required: true })}
-            type="password"
-            autoComplete="current-password"
-            placeholder={t('label_password')}
-          />
-        </div>
-        <Button
-          type="submit"
-          className="rounded-[12px] !h-[48px]"
-          loading={loading}
-        >
-          {t('sign_in_1')}
-        </Button>
-      </form>
-    </FormProvider>
+    <Card>
+      <CardHeader className="text-center">
+        <CardTitle className="text-lg font-semibold">{t('sign_in')}</CardTitle>
+        <CardDescription>{t('sign_in_description')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <FieldGroup className="gap-5">
+            {failed && (
+              <Alert variant="destructive">
+                <CircleAlertIcon />
+                <AlertTitle>{t('login_failed')}</AlertTitle>
+              </Alert>
+            )}
+            <Field>
+              <FieldLabel htmlFor={`${id}-email`}>
+                {t('label_email')}
+              </FieldLabel>
+              <Input
+                id={`${id}-email`}
+                type="email"
+                autoComplete="email"
+                autoFocus
+                required
+                placeholder={t('email_placeholder')}
+                className="h-10"
+                aria-invalid={failed || undefined}
+                {...form.register('email', { required: true })}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`${id}-password`}>
+                {t('label_password')}
+              </FieldLabel>
+              <Input
+                id={`${id}-password`}
+                type="password"
+                autoComplete="current-password"
+                required
+                className="h-10"
+                aria-invalid={failed || undefined}
+                {...form.register('password', { required: true })}
+              />
+            </Field>
+            <Button type="submit" className="h-10 w-full" disabled={loading}>
+              {loading && <Spinner data-icon="inline-start" />}
+              {t('sign_in_1')}
+            </Button>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

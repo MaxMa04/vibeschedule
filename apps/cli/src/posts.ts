@@ -9,6 +9,26 @@ export interface CreatePostArgs {
   date?: string;
   type: 'draft' | 'schedule' | 'now';
   settings?: string;
+  formatId?: string;
+}
+
+// --format takes a format ID or its name (names are unique per workspace)
+export function resolveFormat(
+  value: string,
+  formats: { id: string; name: string }[]
+) {
+  const wanted = value.trim().toLowerCase();
+  const format =
+    formats.find((f) => f.id === value.trim()) ||
+    formats.find((f) => f.name.trim().toLowerCase() === wanted);
+  if (!format) {
+    throw new Error(
+      `Format "${value}" nicht gefunden. Vorhandene Formate: ${
+        formats.map((f) => f.name).join(', ') || 'keine'
+      }`
+    );
+  }
+  return format.id;
 }
 
 function parseJson(text: string, label: string) {
@@ -48,6 +68,7 @@ export function buildPost(args: CreatePostArgs) {
         integration: { id },
         value: [{ content: args.content || '', image }],
         settings,
+        ...(args.formatId ? { formatId: args.formatId } : {}),
       })),
   };
 }

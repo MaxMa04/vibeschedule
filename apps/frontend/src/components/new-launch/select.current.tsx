@@ -1,218 +1,94 @@
 'use client';
 
-import { FC, RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import {
-  SelectedIntegrations,
-  useLaunchStore,
-} from '@vibeschedule/frontend/components/new-launch/store';
-import clsx from 'clsx';
-import SafeImage from '@vibeschedule/react/helpers/safe.image';
+import { FC } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { GlobalIcon } from '@vibeschedule/frontend/components/ui/icons';
-import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { GlobeIcon } from 'lucide-react';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
-import {
-  useDecisionModal,
-  useModals,
-} from '@vibeschedule/frontend/components/layout/new-modal';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
-export function useHasScroll(ref: RefObject<HTMLElement | null>): boolean {
-  const [hasHorizontalScroll, setHasHorizontalScroll] = useState(false);
+const tabClass = (active: boolean) =>
+  cn(
+    'inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+    active
+      ? 'border-foreground/15 bg-muted text-foreground'
+      : 'border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+  );
 
-  useEffect(() => {
-    if (!ref.current) return;
-
-    const checkScroll = () => {
-      const el = ref.current;
-      if (el) {
-        setHasHorizontalScroll(el.scrollWidth > el.clientWidth);
-      }
-    };
-
-    checkScroll(); // initial check
-
-    const resizeObserver = new ResizeObserver(checkScroll);
-    resizeObserver.observe(ref.current);
-
-    const mutationObserver = new MutationObserver(checkScroll);
-    mutationObserver.observe(ref.current, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    return () => {
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [ref]);
-
-  return hasHorizontalScroll;
-}
-
+// which text is being edited: the shared one or a channel's own
 export const SelectCurrent: FC = () => {
-  const modals = useDecisionModal();
+  const t = useT();
   const existingData = useExistingData();
-  const {
-    selectedIntegrations,
-    current,
-    setCurrent,
-    locked,
-    setHide,
-    addOrRemoveSelectedIntegration,
-  } = useLaunchStore(
-    useShallow((state) => ({
-      selectedIntegrations: state.selectedIntegrations,
-      addOrRemoveSelectedIntegration: state.addOrRemoveSelectedIntegration,
-      current: state.current,
-      setCurrent: state.setCurrent,
-      locked: state.locked,
-      setHide: state.setHide,
-    }))
-  );
+  const { selectedIntegrations, current, setCurrent, internal, errors } =
+    useLaunchStore(
+      useShallow((state) => ({
+        selectedIntegrations: state.selectedIntegrations,
+        current: state.current,
+        setCurrent: state.setCurrent,
+        internal: state.internal,
+        errors: state.errors,
+      }))
+    );
 
-  const contentRef = useRef<HTMLDivElement>(null);
-  const hasScroll = useHasScroll(contentRef);
-  const t = useT();
-
-  const removeSocial = useCallback(
-    (sIntegration: Integrations) => async (e: any) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const open = await modals.open({
-        title: t('remove_channel'),
-        description: t('remove_channel_from_post'),
-      });
-
-      if (!open) {
-        return;
-      }
-
-      addOrRemoveSelectedIntegration(sIntegration, {});
-    },
-    []
-  );
-
-  return (
-    <>
-      <div className="select-none left-0 absolute w-full z-[100] px-[20px] mobile:static mobile:px-0">
-        <div
-          ref={contentRef}
-          className={clsx(
-            'flex gap-[6px] mobile:gap-[4px] w-full overflow-x-auto scrollbar scrollbar-thumb-tableBorder scrollbar-track-secondary mobile:scrollbar-none',
-            locked && 'opacity-50 pointer-events-none'
-          )}
-        >
-          {/* an existing post opens on its channels, without the global mode */}
-          {!existingData.integration && (
-            <div
-              onClick={() => {
-                setHide(true);
-                setCurrent('global');
-              }}
-              className={clsx(
-                'cursor-pointer flex gap-[8px] rounded-[8px] w-[40px] h-[40px] mobile:w-[44px] mobile:h-[44px] mobile:shrink-0 justify-center items-center bg-newBgLineColor mobile:bg-newSettings',
-                current !== 'global'
-                  ? 'text-textItemBlur'
-                  : 'border mobile:border-[1.5px] border-teal text-teal'
-              )}
-            >
-              <div>
-                <GlobalIcon className="mobile:w-[24px] mobile:h-[24px]" />
-              </div>
-            </div>
-          )}
-          {selectedIntegrations.map(({ integration }) => (
-            <div
-              onClick={() => {
-                setHide(true);
-                setCurrent(integration.id);
-              }}
-              key={integration.id}
-              className={clsx(
-                'border mobile:border-[1.5px] cursor-pointer relative flex gap-[8px] w-[40px] h-[40px] mobile:w-[44px] mobile:h-[44px] mobile:shrink-0 rounded-[8px] items-center bg-newBgLineColor mobile:bg-newSettings justify-center',
-                current === integration.id
-                  ? 'border-teal text-teal'
-                  : 'border-transparent'
-              )}
-            >
-              {/* an existing post keeps its channels, each with its own content */}
-              {!existingData.integration && (
-                <>
-                  <div
-                    onClick={removeSocial(integration)}
-                    className="absolute justify-center items-center flex mobile:hidden w-[8px] h-[8px] -top-[1px] -start-[3px] bg-error rounded-full text-white text-[8px]"
-                  >
-                    X
-                  </div>
-                  <IsGlobal id={integration.id} />
-                </>
-              )}
-              <div
-                {...{
-                  'data-tooltip-id': 'tooltip',
-                  'data-tooltip-content': integration.name,
-                }}
-                className={clsx(
-                  'relative w-full h-full rounded-full flex justify-center items-center filter transition-all duration-500'
-                )}
-              >
-                <SafeImage
-                  src={integration.picture || '/no-picture.jpg'}
-                  className="rounded-full min-w-[26px]"
-                  alt={integration.identifier}
-                  width={26}
-                  height={26}
-                  onError={(e) => {
-                    e.currentTarget.src = '/no-picture.jpg';
-                    e.currentTarget.srcset = '/no-picture.jpg';
-                  }}
-                />
-                {integration.identifier === 'youtube' ? (
-                  <img
-                    src="/icons/platforms/youtube.svg"
-                    className="absolute z-10 bottom-[2px] end-[2px] min-w-[12px]"
-                    width={12}
-                  />
-                ) : (
-                  <SafeImage
-                    src={`/icons/platforms/${integration.identifier}.png`}
-                    className="min-w-[12px] min-h-[12px] rounded-[3px] absolute z-10 bottom-[6px] end-[6px]"
-                    alt={integration.identifier}
-                    width={12}
-                    height={12}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div
-        className={clsx(hasScroll ? 'h-[55px]' : 'h-[40px]', 'mobile:hidden')}
-      />
-    </>
-  );
-};
-
-export const IsGlobal: FC<{ id: string }> = ({ id }) => {
-  const t = useT();
-  const { isInternal } = useLaunchStore(
-    useShallow((state) => ({
-      isInternal: !!state.internal.find((p) => p.integration.id === id),
-    }))
-  );
-
-  if (!isInternal) {
+  if (!selectedIntegrations.length) {
     return null;
   }
 
   return (
     <div
-      data-tooltip-id="tooltip"
-      data-tooltip-content={t('no_longer_global_mode')}
-      className="w-[8px] h-[8px] bg-teal -top-[1px] -end-[3px] absolute rounded-full"
-    />
+      role="tablist"
+      className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
+    >
+      {/* an existing post opens on its channels, without the shared text */}
+      {!existingData.integration && (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={current === 'global'}
+          onClick={() => setCurrent('global')}
+          className={tabClass(current === 'global')}
+        >
+          <GlobeIcon className="size-4" />
+          {t('global_edit')}
+          {!!errors.global && (
+            <span className="size-1.5 rounded-full bg-destructive" />
+          )}
+        </button>
+      )}
+      {selectedIntegrations.map(({ integration }) => {
+        const custom = internal.some((p) => p.integration.id === integration.id);
+        return (
+          <button
+            type="button"
+            role="tab"
+            key={integration.id}
+            aria-selected={current === integration.id}
+            onClick={() => setCurrent(integration.id)}
+            className={tabClass(current === integration.id)}
+          >
+            <ChannelAvatar
+              picture={integration.picture}
+              identifier={integration.identifier}
+              name={integration.name}
+              size="xs"
+            />
+            <span className="max-w-32 truncate">{integration.name}</span>
+            {!!errors[integration.id] ? (
+              <span className="size-1.5 rounded-full bg-destructive" />
+            ) : (
+              custom &&
+              !existingData.integration && (
+                <span
+                  title={t('no_longer_global_mode')}
+                  className="size-1.5 rounded-full bg-primary"
+                />
+              )
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 };

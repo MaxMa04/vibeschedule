@@ -1,181 +1,291 @@
 'use client';
 
-import React, {
+import {
   ChangeEvent,
-  ClipboardEvent,
   FC,
-  Fragment,
+  MouseEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
-import { Button } from '@vibeschedule/react/form/button';
 import useSWR from 'swr';
-import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-import { hasExtension } from '@vibeschedule/helpers/utils/has.extension';
-import { Media } from '@prisma/client';
-import { useToaster } from '@vibeschedule/react/toaster/toaster';
-import clsx from 'clsx';
-import { VideoFrame } from '@vibeschedule/react/helpers/video.frame';
-import { useUppyUploader } from '@vibeschedule/frontend/components/media/new.uploader';
-import { DropFiles } from '@vibeschedule/frontend/components/layout/drop.files';
-import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
-import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { ReactSortable } from 'react-sortablejs';
-import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
-import { Dashboard } from '@uppy/react';
+import { useDebounce } from 'use-debounce';
 import {
+  CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  PlusIcon,
-  DeleteCircleIcon,
-  CloseCircleIcon,
-  DragHandleIcon,
-  InsertMediaIcon,
-  VerticalDividerIcon,
-  NoMediaIcon,
-  TrashIcon,
-} from '@vibeschedule/frontend/components/ui/icons';
-import { useDebounce } from 'use-debounce';
-// on phones the media library takes the whole screen
-export const mediaLibrarySize = () =>
-  window.matchMedia('(max-width: 1025px)').matches
-    ? '100%'
-    : 'calc(100% - 80px)';
-export const Pagination: FC<{
-  current: number;
-  totalPages: number;
-  setPage: (num: number) => void;
-}> = (props) => {
+  ImageIcon,
+  Maximize2Icon,
+  PlayIcon,
+  SearchIcon,
+  Trash2Icon,
+  UploadIcon,
+  XIcon,
+} from 'lucide-react';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { hasExtension } from '@vibeschedule/helpers/utils/has.extension';
+import { useToaster } from '@vibeschedule/react/toaster/toaster';
+import { VideoFrame } from '@vibeschedule/react/helpers/video.frame';
+import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { useUppyUploader } from '@vibeschedule/frontend/components/media/new.uploader';
+import { DropFiles } from '@vibeschedule/frontend/components/layout/drop.files';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
+import { cn } from '@vibeschedule/frontend/lib/utils';
+import {
+  PageBody,
+  PageHeader,
+} from '@vibeschedule/frontend/components/layout/page-header';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
+import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import { Progress } from '@vibeschedule/frontend/components/ui/progress';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@vibeschedule/frontend/components/ui/input-group';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@vibeschedule/frontend/components/ui/empty';
+
+const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
+
+export interface MediaItem {
+  id: string;
+  name: string;
+  originalName?: string | null;
+  path: string;
+  createdAt?: string;
+}
+
+const isVideo = (media: { path: string }) => hasExtension(media.path, 'mp4');
+
+const matchesType = (
+  media: MediaItem,
+  type?: 'image' | 'image-static' | 'video'
+) => {
+  if (type === 'video') {
+    return isVideo(media);
+  }
+  if (type === 'image') {
+    return !isVideo(media);
+  }
+  if (type === 'image-static') {
+    return ['jpg', 'jpeg', 'png'].some((ext) => hasExtension(media.path, ext));
+  }
+  return true;
+};
+
+const allowedFileTypes = (type?: 'image' | 'image-static' | 'video') =>
+  type === 'image'
+    ? 'image/*'
+    : type === 'image-static'
+    ? 'image/jpeg,image/png'
+    : type === 'video'
+    ? 'video/mp4'
+    : 'image/*,video/mp4';
+
+const MediaPreview: FC<{ media: MediaItem }> = ({ media }) => (
+  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-muted">
+    {isVideo(media) ? (
+      <VideoFrame
+        url={media.path}
+        autoplay={true}
+        controls={true}
+        className="max-h-[75dvh] object-contain"
+      />
+    ) : (
+      <img
+        className="max-h-[75dvh] w-auto max-w-full object-contain"
+        src={media.path}
+        alt={media.originalName || media.name}
+      />
+    )}
+  </div>
+);
+
+const MediaTile: FC<{
+  media: MediaItem;
+  selectedIndex: number;
+  selectable: boolean;
+  anySelected: boolean;
+  onToggle: () => void;
+  onPreview: (e: MouseEvent) => void;
+  onDelete: (e: MouseEvent) => void;
+}> = ({
+  media,
+  selectedIndex,
+  selectable,
+  anySelected,
+  onToggle,
+  onPreview,
+  onDelete,
+}) => {
   const t = useT();
-
-  const { current, totalPages, setPage } = props;
-
-  const paginationItems = useMemo(() => {
-    // Convert to 1-based for algorithm (current is 0-based)
-    const c = current + 1;
-    const m = totalPages;
-
-    // If total pages <= 10, show all pages
-    if (m <= 10) {
-      return Array.from({ length: m }, (_, i) => i + 1);
-    }
-
-    const delta = 3;
-    const left = c - delta;
-    const right = c + delta + 1;
-    const range: number[] = [];
-    const rangeWithDots: (number | '...')[] = [];
-    let l: number | undefined;
-
-    // Build the range of pages to show
-    for (let i = 1; i <= m; i++) {
-      if (i === 1 || i === m || (i >= left && i < right)) {
-        range.push(i);
-      }
-    }
-
-    // Add dots where there are gaps
-    for (const i of range) {
-      if (l !== undefined) {
-        if (i - l === 2) {
-          rangeWithDots.push(l + 1);
-        } else if (i - l !== 1) {
-          rangeWithDots.push('...');
-        }
-      }
-      rangeWithDots.push(i);
-      l = i;
-    }
-
-    // Limit to maximum 10 items by trimming pages near edges if needed
-    while (rangeWithDots.length > 10) {
-      const currentIndex = rangeWithDots.findIndex((item) => item === c);
-      if (currentIndex !== -1 && currentIndex > rangeWithDots.length / 2) {
-        // Current is in second half, remove one item from start side
-        rangeWithDots.splice(2, 1);
-      } else {
-        // Current is in first half, remove one item from end side
-        rangeWithDots.splice(-3, 1);
-      }
-    }
-
-    return rangeWithDots;
-  }, [current, totalPages]);
-
+  const selected = selectedIndex > -1;
+  const label = media.originalName || media.name;
   return (
-    <ul className="flex flex-row flex-wrap items-center gap-1 justify-center mt-[15px]">
-      <li className={clsx(current === 0 && 'opacity-20 pointer-events-none')}>
-        <div
-          className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 ps-2.5 text-gray-400 hover:text-white border-[#1F1F1F] hover:bg-forth"
-          aria-label={t('previous')}
-          onClick={() => setPage(current - 1)}
-        >
-          <ChevronLeftIcon className="lucide lucide-chevron-left h-4 w-4" />
-          <span className="mobile:hidden">{t('previous')}</span>
-        </div>
-      </li>
-      {paginationItems.map((item, index) => (
-        // phones show "2 / 6" instead of the page numbers
-        <li key={index} className="mobile:hidden">
-          {item === '...' ? (
-            <span className="inline-flex items-center justify-center h-10 w-10 text-textColor select-none">
-              ...
-            </span>
-          ) : (
-            <div
-              aria-current="page"
-              onClick={() => setPage(item - 1)}
-              className={clsx(
-                'cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:bg-forth h-10 w-10 hover:text-white border-newBorder',
-                current === item - 1
-                  ? 'bg-forth !text-white'
-                  : 'text-textColor hover:text-white'
-              )}
-            >
-              {item}
-            </div>
+    <div className="group/tile flex min-w-0 flex-col gap-1.5">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={selectable ? onToggle : onPreview}
+          aria-pressed={selectable ? selected : undefined}
+          aria-label={label}
+          className={cn(
+            'relative block aspect-square w-full overflow-hidden rounded-lg bg-muted ring-1 ring-foreground/10 transition outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+            selected && 'ring-2 ring-primary'
           )}
-        </li>
-      ))}
-      <li className="hidden mobile:flex h-10 items-center px-[8px] text-[14px] text-textColor">
-        {current + 1} / {totalPages}
-      </li>
-      <li
-        className={clsx(
-          current + 1 === totalPages && 'opacity-20 pointer-events-none'
-        )}
-      >
-        <a
-          className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-forth"
-          aria-label={t('next')}
-          onClick={() => setPage(current + 1)}
         >
-          <span className="mobile:hidden">{t('next')}</span>
-          <ChevronRightIcon className="lucide lucide-chevron-right h-4 w-4" />
-        </a>
-      </li>
-    </ul>
+          {isVideo(media) ? (
+            <VideoFrame url={media.path} />
+          ) : (
+            <img
+              className="size-full object-cover transition-transform duration-300 group-hover/tile:scale-[1.03]"
+              src={media.path}
+              alt=""
+              loading="lazy"
+            />
+          )}
+          {isVideo(media) && (
+            <span className="absolute bottom-2 left-2 flex size-6 items-center justify-center rounded-full bg-black/60 text-white">
+              <PlayIcon className="size-3 fill-current" />
+            </span>
+          )}
+          {selected && <span className="absolute inset-0 bg-primary/10" />}
+        </button>
+        {selectable ? (
+          <span
+            className={cn(
+              'pointer-events-none absolute top-2 left-2 flex size-6 items-center justify-center rounded-full border-2 text-xs font-semibold tabular-nums shadow-sm',
+              selected
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-white/90 bg-black/20'
+            )}
+          >
+            {selected ? selectedIndex + 1 : null}
+          </span>
+        ) : (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={selected}
+            aria-label={t('select_media', { name: label })}
+            onClick={onToggle}
+            className={cn(
+              'absolute top-2 left-2 flex size-7 items-center justify-center rounded-full border-2 shadow-sm transition outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              selected
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-white/90 bg-black/20 text-transparent md:opacity-0 md:group-focus-within/tile:opacity-100 md:group-hover/tile:opacity-100',
+              anySelected && 'md:opacity-100'
+            )}
+          >
+            <CheckIcon className="size-4" />
+          </button>
+        )}
+        <div className="absolute top-2 right-2 flex gap-1 transition-opacity md:opacity-0 md:group-focus-within/tile:opacity-100 md:group-hover/tile:opacity-100">
+          {selectable && (
+            <Button
+              size="icon-sm"
+              variant="secondary"
+              className="shadow-sm"
+              aria-label={t('preview')}
+              onClick={onPreview}
+            >
+              <Maximize2Icon />
+            </Button>
+          )}
+          <Button
+            size="icon-sm"
+            variant="secondary"
+            className="text-destructive shadow-sm"
+            aria-label={t('delete')}
+            onClick={onDelete}
+          >
+            <Trash2Icon />
+          </Button>
+        </div>
+      </div>
+      <p className="truncate text-xs text-muted-foreground" title={label}>
+        {label}
+      </p>
+    </div>
   );
 };
-const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
+
+const PageControls: FC<{
+  page: number;
+  pages: number;
+  setPage: (page: number) => void;
+}> = ({ page, pages, setPage }) => {
+  const t = useT();
+  if (pages <= 1) {
+    return null;
+  }
+  return (
+    <nav
+      aria-label={t('pagination')}
+      className="flex items-center justify-center gap-2"
+    >
+      <Button
+        variant="outline"
+        className="h-10 md:h-8"
+        disabled={page === 0}
+        onClick={() => setPage(page - 1)}
+      >
+        <ChevronLeftIcon data-icon="inline-start" />
+        <span className="max-sm:sr-only">{t('previous')}</span>
+      </Button>
+      <span className="px-2 text-sm text-muted-foreground tabular-nums">
+        {t('page_of', { page: page + 1, pages })}
+      </span>
+      <Button
+        variant="outline"
+        className="h-10 md:h-8"
+        disabled={page + 1 >= pages}
+        onClick={() => setPage(page + 1)}
+      >
+        <span className="max-sm:sr-only">{t('next')}</span>
+        <ChevronRightIcon data-icon="inline-end" />
+      </Button>
+    </nav>
+  );
+};
+
+/**
+ * The media library. `standalone` is the /media page; otherwise it is the
+ * picker, and `setMedia` receives the selected media in the order they were
+ * picked.
+ */
 export const MediaBox: FC<{
   setMedia: (params: { id: string; path: string }[]) => void;
   standalone?: boolean;
   type?: 'image' | 'image-static' | 'video';
   closeModal: () => void;
-}> = ({ type, standalone, setMedia }) => {
+}> = ({ type, standalone, setMedia, closeModal }) => {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 300);
   const fetch = useFetch();
   const modals = useModals();
   const toaster = useToaster();
+  const t = useT();
+  const uploaderRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [selected, setSelected] = useState<MediaItem[]>([]);
+
   useEffect(() => {
     setPage(0);
   }, [debouncedSearch]);
+
   const loadMedia = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page + 1) });
     if (debouncedSearch.trim()) {
@@ -183,649 +293,346 @@ export const MediaBox: FC<{
     }
     return (await fetch(`/media?${params.toString()}`)).json();
   }, [page, debouncedSearch]);
-  const { data, mutate, isLoading } = useSWR(
-    `get-media-${page}-${debouncedSearch}`,
-    loadMedia
-  );
-  const [selected, setSelected] = useState([]);
-  const t = useT();
-  const uploaderRef = useRef<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  const uppy = useUppyUploader({
-    allowedFileTypes:
-      type == 'image'
-        ? 'image/*'
-        : type == 'image-static'
-        ? 'image/jpeg,image/png'
-        : type == 'video'
-        ? 'video/mp4'
-        : 'image/*,video/mp4',
-    onUploadSuccess: async (arr) => {
-      await mutate();
-      if (standalone) {
-        return;
-      }
-      setSelected((prevSelected) => {
-        return [...prevSelected, ...arr];
-      });
-    },
-    onStart: () => setLoading(true),
-    onEnd: () => setLoading(false),
+  const { data, mutate, isLoading } = useSWR<{
+    results: MediaItem[];
+    pages: number;
+  }>(`get-media-${page}-${debouncedSearch}`, loadMedia, {
+    keepPreviousData: true,
   });
 
-  // uploader messages (errors, processing warnings) stay after the upload ends
-  const [uploadInfo, setUploadInfo] = useState(false);
+  // the uploader is created once, so it calls the latest handler through a ref
+  const uploaded = useRef<(arr: MediaItem[]) => void>(() => {});
+  uploaded.current = async (arr: MediaItem[]) => {
+    await mutate();
+    if (arr.length) {
+      toaster.show(
+        arr.length > 1
+          ? t('media_uploaded_count', { count: arr.length })
+          : t('media_uploaded')
+      );
+    }
+    if (!standalone) {
+      setSelected((prev) => [...prev, ...arr]);
+    }
+  };
+
+  const uppy = useUppyUploader({
+    allowedFileTypes: allowedFileTypes(type),
+    onUploadSuccess: (arr) => uploaded.current(arr),
+    onStart: () => setUploading(true),
+    onEnd: () => {
+      setUploading(false);
+      setProgress(0);
+    },
+  });
+
   useEffect(() => {
-    const show = () => setUploadInfo(true);
-    const hide = () => setUploadInfo(false);
-    uppy.on('info-visible', show);
-    uppy.on('info-hidden', hide);
+    const update = (value: number) => setProgress(value);
+    uppy.on('progress', update);
     return () => {
-      uppy.off('info-visible', show);
-      uppy.off('info-hidden', hide);
+      uppy.off('progress', update);
     };
   }, [uppy]);
 
-  const addRemoveSelected = useCallback(
-    (media: any) => () => {
-      if (standalone) {
+  const upload = useCallback(
+    (files: File[]) => {
+      if (!files.length) {
         return;
       }
-      const exists = selected.find((p: any) => p.id === media.id);
-      if (exists) {
-        setSelected(selected.filter((f: any) => f.id !== media.id));
-        return;
-      }
-      setSelected([...selected, media]);
-    },
-    [selected]
-  );
-
-  const addMedia = useCallback(async () => {
-    if (standalone) {
-      return;
-    }
-    // @ts-ignore
-    setMedia(selected);
-    modals.closeCurrent();
-  }, [selected]);
-
-  const addToUpload = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
       const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-
       if (totalSize > MAX_UPLOAD_SIZE) {
         toaster.show(t('upload_size_limit_exceeded'), 'warning');
         return;
       }
-
-      setLoading(true);
-
-      // @ts-ignore
-      uppy.addFiles(files);
-    },
-    [toaster, t]
-  );
-
-  const dragAndDrop = useCallback(
-    async (event: ClipboardEvent<HTMLDivElement> | File[]) => {
-      // @ts-ignore
-      const clipboardItems = event.map((p) => ({
-        kind: 'file',
-        getAsFile: () => p,
-      }));
-      if (!clipboardItems) {
-        return;
-      }
-
-      const files: File[] = [];
-      // @ts-ignore
-      for (const item of clipboardItems) {
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            files.push(file);
-          }
+      setUploading(true);
+      for (const file of files) {
+        try {
+          uppy.addFile({ name: file.name, type: file.type, data: file });
+        } catch {
+          // a file Uppy rejects (size limit) is reported through uppy.info
         }
       }
-
-      const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-
-      if (totalSize > MAX_UPLOAD_SIZE) {
-        toaster.show(t('upload_size_limit_exceeded'), 'warning');
-        return;
-      }
-
-      setLoading(true);
-
-      for (const file of files) {
-        uppy.addFile(file);
+      if (!uppy.getFiles().length) {
+        setUploading(false);
       }
     },
-    [toaster, t]
+    [uppy, toaster, t]
   );
 
-  const maximize = useCallback(
-    (media: Media) => async (e: any) => {
-      e.stopPropagation();
-      modals.openModal({
-        title: '',
-        top: 10,
-        children: (
-          <div className="w-full h-full p-[50px]">
-            {hasExtension(media.path, 'mp4') ? (
-              <VideoFrame autoplay={true} url={media.path} />
-            ) : (
-              <img
-                width="100%"
-                height="100%"
-                className="w-full h-full max-h-[100%] max-w-[100%] object-cover"
-                src={media.path}
-                alt="media"
-              />
-            )}
-          </div>
-        ),
-      });
+  const pickFiles = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      upload(Array.from(e.target.files || []));
+      e.target.value = '';
     },
+    [upload]
+  );
+
+  const toggle = useCallback(
+    (media: MediaItem) => () =>
+      setSelected((prev) =>
+        prev.some((p) => p.id === media.id)
+          ? prev.filter((p) => p.id !== media.id)
+          : [...prev, media]
+      ),
     []
   );
 
-  const deleteImage = useCallback(
-    (media: Media) => async (e: any) => {
+  const preview = useCallback(
+    (media: MediaItem) => (e: MouseEvent) => {
       e.stopPropagation();
-      if (
-        !(await deleteDialog(t('are_you_sure_you_want_to_delete_the_image')))
-      ) {
-        return;
-      }
-      await fetch(`/media/${media.id}`, {
-        method: 'DELETE',
+      modals.openModal({
+        title: media.originalName || media.name,
+        size: 'xl',
+        children: <MediaPreview media={media} />,
       });
-      mutate();
     },
-    [mutate]
+    [modals]
   );
 
-  // phones have no hover, so the selected media are deleted together
+  const remove = useCallback(
+    async (items: MediaItem[]) => {
+      const result = await Promise.all(
+        items.map((media) => fetch(`/media/${media.id}`, { method: 'DELETE' }))
+      );
+      setSelected((prev) =>
+        prev.filter((p) => !items.some((item) => item.id === p.id))
+      );
+      const next = await mutate();
+      // deleting a whole last page leaves nothing to show there
+      if (page >= (next?.pages || 1)) {
+        setPage(Math.max(0, (next?.pages || 1) - 1));
+      }
+      if (result.some((r) => !r.ok)) {
+        toaster.show(t('media_delete_failed'), 'warning');
+        return;
+      }
+      toaster.show(
+        items.length > 1
+          ? t('media_deleted_count', { count: items.length })
+          : t('media_deleted')
+      );
+    },
+    [fetch, mutate, page, t, toaster]
+  );
+
+  const deleteOne = useCallback(
+    (media: MediaItem) => async (e: MouseEvent) => {
+      e.stopPropagation();
+      if (
+        await deleteDialog(
+          t('are_you_sure_you_want_to_delete_the_image'),
+          t('delete'),
+          t('delete_media')
+        )
+      ) {
+        await remove([media]);
+      }
+    },
+    [remove, t]
+  );
+
   const deleteSelected = useCallback(async () => {
     if (
-      !(await deleteDialog(t('are_you_sure_you_want_to_delete_selected_media')))
+      await deleteDialog(
+        t('are_you_sure_you_want_to_delete_selected_media'),
+        t('delete'),
+        t('delete_media')
+      )
     ) {
-      return;
+      await remove(selected);
     }
-    const toDelete = selected;
-    setSelected([]);
-    try {
-      await Promise.all(
-        toDelete.map((media: any) =>
-          fetch(`/media/${media.id}`, {
-            method: 'DELETE',
-          })
-        )
-      );
-    } finally {
-      const result = await mutate();
-      // deleting a whole last page leaves nothing to show there
-      if (page >= (result?.pages || 1)) {
-        setPage(Math.max(0, (result?.pages || 1) - 1));
-      }
-    }
-  }, [selected, mutate, page, t]);
+  }, [remove, selected, t]);
 
-  const btn = useMemo(() => {
-    return (
-      <button
-        disabled={loading}
-        onClick={() => uploaderRef?.current?.click()}
-        className="relative cursor-pointer bg-btnSimple changeColor flex gap-[8px] h-[44px] px-[18px] justify-center items-center rounded-[8px]"
-      >
-        {loading ? (
-          <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-            <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
-          </div>
-        ) : (
-          <PlusIcon size={14} />
-        )}
-        <div className={loading ? 'invisible' : undefined}>{t('upload')}</div>
-      </button>
-    );
-  }, [t, loading]);
+  const addMedia = useCallback(() => {
+    setMedia(selected.map(({ id, path }) => ({ id, path })));
+    closeModal();
+  }, [selected, setMedia, closeModal]);
+
+  const results = (data?.results || []).filter((m) => matchesType(m, type));
+  const empty = !isLoading && !results.length;
+
+  const uploadButton = (
+    <Button
+      className="h-10 md:h-8"
+      disabled={uploading}
+      onClick={() => uploaderRef.current?.click()}
+    >
+      {uploading ? (
+        <Spinner data-icon="inline-start" />
+      ) : (
+        <UploadIcon data-icon="inline-start" />
+      )}
+      {t('upload')}
+    </Button>
+  );
 
   return (
     <DropFiles
-      disabled={loading}
-      className="flex flex-col flex-1"
-      onDrop={dragAndDrop}
+      disabled={uploading}
+      onDrop={upload}
+      className={cn('flex min-h-0 flex-col gap-4', standalone && 'flex-1')}
     >
-      <div className="flex flex-col flex-1">
-        <div
-          className={clsx(
-            'flex items-center gap-[12px] mobile:flex-wrap',
-            !isLoading && !data?.results?.length && !debouncedSearch && 'hidden'
-          )}
-        >
-          <div className="flex-1 mobile:basis-full">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_media_by_name')}
-              className="w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-teal"
-            />
-          </div>
-          <input
-            type="file"
-            ref={uploaderRef}
-            onChange={addToUpload}
-            className="hidden"
-            multiple={true}
+      <input
+        type="file"
+        ref={uploaderRef}
+        onChange={pickFiles}
+        className="hidden"
+        multiple={true}
+        accept={allowedFileTypes(type)}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <InputGroup className="h-10 min-w-0 flex-1 basis-56 md:h-8 md:max-w-xs">
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('search_media_by_name')}
+            aria-label={t('search_media_by_name')}
           />
-          <div
-            className={clsx('flex gap-[8px]', !standalone && 'mobile:hidden')}
-          >
-            {btn}
-          </div>
-          {!standalone && !!data?.results?.length && (
-            <div className="hidden mobile:block basis-full text-[14px] font-[600]">
-              {t('select_or_upload_pictures_max_1gb')}
-            </div>
-          )}
-          {!!selected.length && (
-            <div
+        </InputGroup>
+        {standalone && !!selected.length && (
+          <div className="flex items-center gap-1 rounded-lg border bg-card py-0.5 ps-3 pe-0.5 text-sm">
+            <span className="tabular-nums">
+              {t('selected_count', { count: selected.length })}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
               onClick={deleteSelected}
-              className="hidden mobile:flex basis-full justify-center items-center gap-[8px] h-[24px] text-[15px] font-[600] text-error cursor-pointer select-none"
             >
-              <TrashIcon size={18} />
-              {t('delete_selected')} ({selected.length})
-            </div>
-          )}
-        </div>
-        <div
-          className={clsx(
-            'w-full pointer-events-none relative mt-[5px] mb-[5px]',
-            // phones only keep the upload progress while there is something to show
-            !loading && !uploadInfo && 'mobile:hidden'
-          )}
-        >
-          <div className="w-full h-[46px] overflow-hidden absolute left-0 bg-newBgColorInner uppyChange">
-            <Dashboard
-              height={46}
-              uppy={uppy}
-              id={`uploader`}
-              showProgressDetails={true}
-              hideUploadButton={true}
-              hideRetryButton={true}
-              hidePauseResumeButton={true}
-              hideCancelButton={true}
-              hideProgressAfterFinish={true}
-            />
+              <Trash2Icon data-icon="inline-start" />
+              {t('delete')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('clear_selection')}
+              onClick={() => setSelected([])}
+            >
+              <XIcon />
+            </Button>
           </div>
-          <div className="w-full h-[46px] uppyChange" />
+        )}
+        {(!empty || !!debouncedSearch) && (
+          <div className="ms-auto">{uploadButton}</div>
+        )}
+      </div>
+
+      {uploading && (
+        <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+          <Spinner className="text-muted-foreground" />
+          <span className="shrink-0">{t('uploading')}</span>
+          <Progress value={progress} className="flex-1" />
+          <span className="w-10 text-end text-muted-foreground tabular-nums">
+            {progress}%
+          </span>
         </div>
-        <div
-          className={clsx(
-            'flex-1 relative',
-            !isLoading &&
-              !data?.results?.length &&
-              'bg-newTextColor/[0.02] rounded-[12px]'
-          )}
-        >
+      )}
+
+      <div
+        className={cn(
+          'min-h-0',
+          !standalone && '-mx-1 max-h-[55dvh] overflow-y-auto px-1 py-1'
+        )}
+      >
+        {isLoading && !data ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-1.5">
+                <Skeleton className="aspect-square rounded-lg" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : empty ? (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ImageIcon />
+              </EmptyMedia>
+              <EmptyTitle>
+                {debouncedSearch
+                  ? t('no_media_match_search')
+                  : t('you_dont_have_any_media_yet')}
+              </EmptyTitle>
+              <EmptyDescription>
+                {debouncedSearch
+                  ? t('no_media_match_search_hint')
+                  : t('media_empty_description')}
+              </EmptyDescription>
+            </EmptyHeader>
+            {!debouncedSearch && <EmptyContent>{uploadButton}</EmptyContent>}
+          </Empty>
+        ) : (
           <div
-            className={clsx(
-              'absolute -left-[3px] -top-[3px] withp3 h-full overflow-x-hidden overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner mobile:-left-[6px] mobile:-top-[6px] mobile:!w-[calc(100%+12px)] mobile:!h-[calc(100%+12px)]',
-              !isLoading &&
-                !data?.results?.length &&
-                'flex justify-center items-center gap-[20px] flex-col'
+            className={cn(
+              'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4',
+              standalone ? 'lg:grid-cols-6' : 'lg:grid-cols-5'
             )}
           >
-            {!isLoading && !data?.results?.length && (
-              <>
-                <NoMediaIcon />
-                <div className="text-[20px] font-[600]">
-                  {debouncedSearch
-                    ? t('no_media_match_search')
-                    : t('you_dont_have_any_media_yet')}
-                </div>
-                <div className="whitespace-pre-line text-newTextColor/[0.6] text-center">
-                  {t('select_or_upload_pictures_max_1gb')} {'\n'}
-                  {t('you_can_drag_drop_pictures')}
-                </div>
-                <div className="forceChange flex gap-[8px] mobile:w-full mobile:max-w-[300px] mobile:child:flex-1">
-                  {btn}
-                </div>
-              </>
-            )}
-            {isLoading && (
-              <>
-                {[...new Array(16)].map((_, i) => (
-                  <div
-                    className={clsx(
-                      'px-[3px] py-[3px] mobile:p-[6px] float-left rounded-[6px] cursor-pointer w8-max mobile:!w-1/2 mobile:!max-w-[50%] aspect-square'
-                    )}
-                    key={i}
-                  >
-                    <div className="w-full h-full bg-newSep rounded-[6px] animate-pulse" />
-                  </div>
-                ))}
-              </>
-            )}
-            {data?.results
-              ?.filter((f: any) => {
-                if (type === 'video') {
-                  return hasExtension(f.path, 'mp4');
-                } else if (type === 'image') {
-                  return !hasExtension(f.path, 'mp4');
-                } else if (type === 'image-static') {
-                  return ['jpg', 'jpeg', 'png'].some((ext) =>
-                    hasExtension(f.path, ext)
-                  );
-                }
-                return true;
-              })
-              .map((media: any) => (
-                <div
-                  className={clsx(
-                    'group px-[3px] py-[3px] mobile:p-[6px] float-left rounded-[6px] w8-max mobile:!w-1/2 mobile:!max-w-[50%] aspect-square',
-                    !standalone && 'cursor-pointer'
-                  )}
-                  key={media.id}
-                >
-                  <div
-                    className={clsx(
-                      'w-full h-full rounded-[6px] border-[4px] relative',
-                      !!selected.find((p) => p.id === media.id)
-                        ? 'border-teal'
-                        : 'border-transparent'
-                    )}
-                    onClick={addRemoveSelected(media)}
-                  >
-                    {!!selected.find((p: any) => p.id === media.id) ? (
-                      <div className="text-white flex z-[101] justify-center items-center text-[14px] font-[500] w-[24px] h-[24px] rounded-full bg-teal absolute -bottom-[10px] -end-[10px]">
-                        {selected.findIndex((z: any) => z.id === media.id) + 1}
-                      </div>
-                    ) : (
-                      <DeleteCircleIcon
-                        className={clsx(
-                          'cursor-pointer hidden z-[100] group-hover:block absolute -top-[5px] -end-[5px]',
-                          // the picker deletes the selected media on phones
-                          !standalone && 'mobile:!hidden'
-                        )}
-                        onClick={deleteImage(media)}
-                      />
-                    )}
-                    <div
-                      className={clsx(
-                        'absolute bottom-[10px] start-[10px] end-[10px] z-[100] truncate text-end mobile:text-[12px] rounded-[4px] px-[6px] bg-black/60 text-white',
-                        !standalone && 'mobile:hidden'
-                      )}
-                    >
-                      {media.originalName}
-                    </div>
-                    <div className="w-full h-full rounded-[6px] overflow-hidden relative">
-                      <div className="absolute z-[20] left-[50%] top-[50%] -translate-x-[50%] -translate-y-[50%]">
-                        <div
-                          onClick={maximize(media)}
-                          className={clsx(
-                            'cursor-pointer p-[4px] bg-black/40 hidden group-hover:block hover:scale-150 transition-all',
-                            !standalone && 'mobile:!hidden'
-                          )}
-                        >
-                          <svg
-                            width="30"
-                            height="30"
-                            viewBox="0 0 14 14"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M2 9H0V14H5V12H2V9ZM0 5H2V2H5V0H0V5ZM12 12H9V14H14V9H12V12ZM9 0V2H12V5H14V0H9Z"
-                              fill="#F1F5F9"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      {hasExtension(media.path, 'mp4') ? (
-                        <VideoFrame url={media.path} />
-                      ) : (
-                        <img
-                          width="100%"
-                          height="100%"
-                          className="w-full h-full object-cover"
-                          src={media.path}
-                          alt="media"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-        {(data?.pages || 0) > 1 && (
-          <Pagination
-            current={page}
-            totalPages={data?.pages}
-            setPage={setPage}
-          />
-        )}
-        {!standalone && (
-          <div className="flex justify-end mt-[32px] gap-[8px] mobile:flex-col mobile:mt-[16px] mobile:gap-[12px]">
-            {!isLoading && !!data?.results?.length && (
-              <div className="hidden mobile:flex gap-[8px] mobile:child:flex-1">
-                {btn}
-              </div>
-            )}
-            <button
-              onClick={() => modals.closeCurrent()}
-              className="cursor-pointer h-[52px] px-[20px] items-center justify-center border border-newTextColor/10 flex rounded-[10px] mobile:hidden"
-            >
-              {t('cancel')}
-            </button>
-            {!isLoading && !!data?.results?.length && (
-              <button
-                onClick={standalone ? () => {} : addMedia}
-                disabled={selected.length === 0}
-                className="cursor-pointer text-surface disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-ink flex rounded-[12px] mobile:h-[44px] mobile:rounded-[8px] mobile:font-[600] mobile:disabled:opacity-100 mobile:disabled:bg-btnSimple mobile:disabled:text-textItemBlur"
-              >
-                {t('add_selected_media')}
-              </button>
-            )}
+            {results.map((media) => (
+              <MediaTile
+                key={media.id}
+                media={media}
+                selectable={!standalone}
+                anySelected={!!selected.length}
+                selectedIndex={selected.findIndex((p) => p.id === media.id)}
+                onToggle={toggle(media)}
+                onPreview={preview(media)}
+                onDelete={deleteOne(media)}
+              />
+            ))}
           </div>
         )}
       </div>
+
+      <PageControls page={page} pages={data?.pages || 0} setPage={setPage} />
+
+      {standalone ? (
+        !empty && (
+          <p className="text-center text-xs text-muted-foreground">
+            {t('media_drop_hint')}
+          </p>
+        )
+      ) : (
+        <div className="-mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-muted/50 p-4 sm:flex-row sm:items-center">
+          <span className="text-sm text-muted-foreground tabular-nums sm:me-auto">
+            {selected.length
+              ? t('selected_count', { count: selected.length })
+              : t('select_or_upload_pictures_max_1gb')}
+          </span>
+          <Button
+            variant="outline"
+            className="h-10 md:h-8"
+            onClick={closeModal}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            className="h-10 md:h-8"
+            disabled={!selected.length}
+            onClick={addMedia}
+          >
+            <CheckIcon data-icon="inline-start" />
+            {t('add_selected_media')}
+          </Button>
+        </div>
+      )}
     </DropFiles>
   );
 };
-export const MultiMediaComponent: FC<{
-  value?: Array<{
-    path: string;
-    id: string;
-  }>;
-  name: string;
-  error?: any;
-  toolBar?: React.ReactNode;
-  // after the tools, outside of their scroll
-  toolBarEnd?: React.ReactNode;
-  toolsClassName?: string;
-  toolsStyle?: React.CSSProperties;
-  information?: React.ReactNode;
-  onChange: (event: {
-    target: {
-      name: string;
-      value?: Array<{
-        id: string;
-        path: string;
-      }>;
-    };
-  }) => void;
-}> = (props) => {
-  const {
-    name,
-    error,
-    onChange,
-    value,
-    toolBar,
-    toolBarEnd,
-    toolsClassName,
-    toolsStyle,
-    information,
-  } = props;
-  const modals = useModals();
+
+export const MediaLibraryPage: FC = () => {
   const t = useT();
-  useEffect(() => {
-    if (value) {
-      setCurrentMedia(value);
-    }
-  }, [value]);
-
-  const [currentMedia, setCurrentMedia] = useState(value);
-  const changeMedia = useCallback(
-    (
-      m:
-        | {
-            path: string;
-            id: string;
-          }
-        | {
-            path: string;
-            id: string;
-          }[]
-    ) => {
-      const mediaArray = Array.isArray(m) ? m : [m];
-      const newMedia = [...(currentMedia || []), ...mediaArray];
-      setCurrentMedia(newMedia);
-      onChange({
-        target: {
-          name,
-          value: newMedia,
-        },
-      });
-    },
-    [currentMedia]
-  );
-  const showModal = useCallback(() => {
-    modals.openModal({
-      title: t('media_library'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: mediaLibrarySize(),
-      height: mediaLibrarySize(),
-      children: (close) => (
-        <MediaBox setMedia={changeMedia} closeModal={close} />
-      ),
-    });
-  }, [changeMedia, t]);
-
-  const clearMedia = useCallback(
-    (topIndex: number) => () => {
-      const newMedia = currentMedia?.filter((f, index) => index !== topIndex);
-      setCurrentMedia(newMedia);
-      onChange({
-        target: {
-          name,
-          value: newMedia,
-        },
-      });
-    },
-    [currentMedia]
-  );
-
   return (
-    <>
-      <div className="b1 flex flex-col gap-[8px] mobile:gap-[16px] rounded-bl-[8px] select-none w-full">
-        <div className="flex gap-[10px] px-[12px] mobile:px-0 mobile:empty:hidden">
-          {!!currentMedia?.length && (
-            <ReactSortable
-              list={currentMedia}
-              setList={(value) =>
-                onChange({ target: { name: 'upload', value } })
-              }
-              className="flex gap-[10px] sortable-container"
-              animation={200}
-              swap={true}
-              handle=".dragging"
-            >
-              {currentMedia.map((media, index) => (
-                <div
-                  key={media.id}
-                  className="cursor-pointer rounded-[5px] w-[40px] h-[40px] mobile:w-[60px] mobile:h-[60px] mobile:rounded-[8px] border-2 mobile:border-0 border-tableBorder relative flex transition-all"
-                >
-                  <DragHandleIcon className="z-[20] dragging absolute pe-[1px] pb-[3px] -start-[4px] -top-[4px] cursor-move" />
-
-                  <div className="w-full h-full relative group">
-                    {hasExtension(media?.path, 'mp4') ? (
-                      <VideoFrame url={media?.path} />
-                    ) : (
-                      <img
-                        className="w-full h-full object-cover rounded-[4px] mobile:rounded-[8px]"
-                        src={media?.path}
-                      />
-                    )}
-                  </div>
-
-                  <CloseCircleIcon
-                    onClick={clearMedia(index)}
-                    className="absolute -end-[4px] -top-[4px] mobile:-end-[8px] mobile:-top-[8px] mobile:w-[24px] mobile:h-[24px] z-[20] rounded-full bg-white"
-                  />
-                </div>
-              ))}
-            </ReactSortable>
-          )}
-        </div>
-        {/* on phones the info stays with the post, the tools can move to the bottom */}
-        {information && (
-          <div className="hidden mobile:flex justify-end">{information}</div>
-        )}
-        <div
-          className={clsx(
-            'flex gap-[8px] px-[12px] mobile:px-0 border-t border-newColColor mobile:border-t-0 w-full b1 text-textColor',
-            toolsClassName
-          )}
-          style={toolsStyle}
-        >
-          <div className="flex gap-[8px] mobile:gap-[4px] mobile:flex-1 mobile:min-w-0 mobile:overflow-x-auto mobile:scrollbar-none b1">
-            <div className="flex py-[10px] mobile:py-0 mobile:shrink-0 b2 items-center gap-[4px]">
-              <div
-                onClick={showModal}
-                className="cursor-pointer h-[30px] mobile:h-[40px] mobile:min-w-[40px] rounded-[6px] mobile:rounded-[8px] justify-center items-center flex bg-newColColor mobile:bg-newSettings px-[8px]"
-              >
-                <div className="flex gap-[8px] items-center">
-                  <div>
-                    <InsertMediaIcon className="mobile:w-[20px] mobile:h-[20px]" />
-                  </div>
-                  <div className="text-[10px] font-[600] maxMedia:hidden block">
-                    {t('insert_media')}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className={clsx(
-                'text-newColColor h-full flex items-center mobile:shrink-0 mobile:px-[4px]',
-                !toolBar && 'mobile:hidden'
-              )}
-            >
-              <VerticalDividerIcon />
-            </div>
-            {!!toolBar && (
-              <div className="flex py-[10px] mobile:py-0 mobile:shrink-0 b2 items-center gap-[4px]">
-                {toolBar}
-              </div>
-            )}
-          </div>
-          {toolBarEnd}
-          {information && (
-            <div className="flex-1 justify-end flex py-[10px] mobile:hidden b2 items-center gap-[4px]">
-              {information}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="text-[12px] text-error">{error}</div>
-    </>
+    <PageBody className="flex-1">
+      <PageHeader title={t('media')} description={t('media_description')} />
+      <MediaBox standalone={true} setMedia={() => {}} closeModal={() => {}} />
+    </PageBody>
   );
 };

@@ -1,5 +1,6 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { PlatformAnalytics } from '@vibeschedule/frontend/components/platform-analytics/platform.analytics';
+import { AnalyticsView } from '@vibeschedule/frontend/components/analytics/analytics-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <PlatformAnalytics />;
+  return (
+    <Suspense>
+      <AnalyticsView />
+    </Suspense>
+  );
 }

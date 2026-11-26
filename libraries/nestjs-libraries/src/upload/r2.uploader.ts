@@ -7,6 +7,7 @@ import {
   UploadPartCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -72,6 +73,18 @@ export async function uploadStream(
     },
   }).done();
   return { filename: key, path: publicUrl(key) };
+}
+
+export async function putObject(key: string, body: Buffer, mime: string) {
+  await R2.send(
+    new PutObjectCommand({
+      Bucket: CLOUDFLARE_BUCKETNAME,
+      Key: key,
+      Body: body,
+      ContentType: mime,
+    })
+  );
+  return publicUrl(key);
 }
 
 export async function removeFile(fileUrl: string) {

@@ -1,169 +1,206 @@
 'use client';
 
-import { FC } from 'react';
-import clsx from 'clsx';
-import SafeImage from '@vibeschedule/react/helpers/safe.image';
-import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
+import { FC, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import { useShallow } from 'zustand/react/shallow';
-import { useExistingData } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
-import ImageWithFallback from '@vibeschedule/react/helpers/image.with.fallback';
-import { Check } from '@vibeschedule/frontend/components/launches/tags.component';
+import { CheckIcon } from 'lucide-react';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { Integrations } from '@vibeschedule/frontend/components/launches/calendar.context';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@vibeschedule/frontend/components/ui/toggle-group';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
-const PlatformBadge: FC<{ integration: Integrations }> = ({ integration }) => {
-  return integration.identifier === 'youtube' ? (
-    <img
-      src="/icons/platforms/youtube.svg"
-      className="absolute z-10 bottom-0 -end-[5px] min-w-[16px]"
-      width={16}
-    />
-  ) : (
-    <SafeImage
-      src={`/icons/platforms/${integration.identifier}.png`}
-      className="rounded-[4px] absolute z-10 bottom-0 -end-[5px] min-w-[16px] min-h-[16px]"
-      alt={integration.identifier}
-      width={16}
-      height={16}
-    />
-  );
+interface App {
+  id: string;
+  name: string;
+}
+
+const NO_APP = 'none';
+const ALL_APPS = 'all';
+
+const useApps = () => {
+  const fetch = useFetch();
+  return useSWR<App[]>('/apps', async (path: string) => {
+    const response = await fetch(path);
+    return response.ok ? response.json() : [];
+  });
 };
 
-// a channel row with a checkbox, for the phone sheets
-export const IntegrationListRow: FC<{
+const ChannelChip: FC<{
   integration: Integrations;
   selected: boolean;
   onClick: () => void;
-}> = ({ integration, selected, onClick }) => {
-  return (
-    <div
-      onClick={onClick}
-      className="flex items-center gap-[12px] py-[8px] cursor-pointer select-none"
+}> = ({ integration, selected, onClick }) => (
+  <button
+    type="button"
+    aria-pressed={selected}
+    onClick={onClick}
+    className={cn(
+      'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg border p-2 text-start transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+      selected
+        ? 'border-primary bg-primary/5'
+        : 'hover:border-foreground/20 hover:bg-muted/50'
+    )}
+  >
+    <ChannelAvatar
+      picture={integration.picture}
+      identifier={integration.identifier}
+      name={integration.name}
+      size="md"
+    />
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate text-sm font-medium">{integration.name}</span>
+      {!!integration.display && integration.display !== integration.name && (
+        <span className="truncate text-xs text-muted-foreground">
+          {integration.display}
+        </span>
+      )}
+    </span>
+    <span
+      className={cn(
+        'flex size-4 shrink-0 items-center justify-center rounded-full border',
+        selected
+          ? 'border-primary bg-primary text-primary-foreground'
+          : 'border-input'
+      )}
     >
-      <div className="relative">
-        <ImageWithFallback
-          fallbackSrc="/no-picture.jpg"
-          src={integration.picture || '/no-picture.jpg'}
-          className="rounded-[8px] min-w-[40px] min-h-[40px]"
-          alt={integration.identifier}
-          width={40}
-          height={40}
-        />
-        <PlatformBadge integration={integration} />
-      </div>
-      <div className="flex-1 min-w-0 truncate text-[14px] font-[600]">
-        {integration.name}
-      </div>
-      <Check onChange={() => {}} value={selected} />
-    </div>
-  );
-};
+      {selected && <CheckIcon className="size-3" />}
+    </span>
+  </button>
+);
 
-export const PicksSocialsComponent: FC<{
-  toolTip?: boolean;
-  list?: boolean;
-}> = ({ toolTip, list }) => {
-  const exising = useExistingData();
-
+// the channels to post on, grouped by app
+export const PicksSocialsComponent: FC = () => {
+  const t = useT();
+  const { data: apps = [] } = useApps();
+  const [appFilter, setAppFilter] = useState(ALL_APPS);
   const {
-    locked,
-    addOrRemoveSelectedIntegration,
     integrations,
     selectedIntegrations,
+    addOrRemoveSelectedIntegration,
+    locked,
+    clearError,
   } = useLaunchStore(
     useShallow((state) => ({
       integrations: state.integrations,
       selectedIntegrations: state.selectedIntegrations,
       addOrRemoveSelectedIntegration: state.addOrRemoveSelectedIntegration,
       locked: state.locked,
+      clearError: state.clearError,
     }))
   );
 
-  const availableIntegrations = integrations.filter((f) => {
-    if (exising.integration) {
-      return (
-        f.id === exising.integration ||
-        !!exising.siblings?.some((sibling) => sibling.integration === f.id)
-      );
-    }
-    return !f.disabled;
-  });
-
-  const toggleIntegration = (integration: Integrations) => () => {
-    if (exising.integration) {
-      return;
-    }
+  const toggle = (integration: Integrations) => {
+    clearError('form');
     addOrRemoveSelectedIntegration(integration, {});
   };
 
-  if (list) {
+  const isSelected = (id: string) =>
+    selectedIntegrations.some((p) => p.integration.id === id);
+
+  const groups = useMemo(() => {
+    const available = integrations.filter((p) => !p.disabled);
+    const appOf = (integration: Integrations) =>
+      integration.app?.id || NO_APP;
+    return [
+      ...apps.map((app) => ({ id: app.id, name: app.name })),
+      { id: NO_APP, name: t('editor_without_app') },
+    ]
+      .map((group) => ({
+        ...group,
+        channels: available.filter((p) => appOf(p) === group.id),
+      }))
+      .filter((group) => group.channels.length > 0);
+  }, [integrations, apps]);
+
+  const visibleGroups =
+    appFilter === ALL_APPS
+      ? groups
+      : groups.filter((group) => group.id === appFilter);
+
+  const toggleGroup = (channels: Integrations[]) => {
+    const allSelected = channels.every((p) => isSelected(p.id));
+    for (const channel of channels) {
+      if (allSelected || !isSelected(channel.id)) {
+        toggle(channel);
+      }
+    }
+  };
+
+  if (!groups.length) {
     return (
-      <div
-        className={clsx(
-          'flex flex-col gap-[4px]',
-          locked && 'opacity-50 pointer-events-none'
-        )}
-      >
-        {availableIntegrations.map((integration) => (
-          <IntegrationListRow
-            key={integration.id}
-            integration={integration}
-            selected={selectedIntegrations.some(
-              (p) => p.integration.id === integration.id
-            )}
-            onClick={toggleIntegration(integration)}
-          />
-        ))}
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('editor_no_channels')}
+      </p>
     );
   }
 
   return (
-    <div className={clsx('flex', locked && 'opacity-50 pointer-events-none')}>
-      <div className="flex flex-1">
-        <div className="innerComponent flex-1 flex">
-          <div className="flex flex-wrap gap-[12px] flex-1">
-            {availableIntegrations.map((integration) => (
-              <div
-                key={integration.id}
-                className="flex gap-[8px] items-center"
-                {...(toolTip && {
-                  'data-tooltip-id': 'tooltip',
-                  'data-tooltip-content': integration.name,
-                })}
+    <div
+      className={cn(
+        'flex flex-col gap-4',
+        locked && 'pointer-events-none opacity-50'
+      )}
+    >
+      {groups.length > 1 && (
+        <ToggleGroup
+          variant="outline"
+          size="sm"
+          spacing={1}
+          className="flex-wrap"
+          value={[appFilter]}
+          onValueChange={(value) => setAppFilter(value[0] ?? ALL_APPS)}
+        >
+          <ToggleGroupItem value={ALL_APPS}>{t('all')}</ToggleGroupItem>
+          {groups.map((group) => (
+            <ToggleGroupItem key={group.id} value={group.id}>
+              {group.name}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
+      {visibleGroups.map((group) => {
+        const selectedCount = group.channels.filter((p) =>
+          isSelected(p.id)
+        ).length;
+        return (
+          <div key={group.id} className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{group.name}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {selectedCount}/{group.channels.length}
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className="ms-auto"
+                onClick={() => toggleGroup(group.channels)}
               >
-                <div
-                  onClick={toggleIntegration(integration)}
-                  className={clsx(
-                    'cursor-pointer border-[2px] relative rounded-full flex justify-center items-center bg-fifth filter transition-all duration-500',
-                    selectedIntegrations.findIndex(
-                      (p) => p.integration.id === integration.id
-                    ) === -1
-                      ? 'grayscale border-transparent'
-                      : 'border-teal'
-                  )}
-                >
-                  <ImageWithFallback
-                    fallbackSrc="/no-picture.jpg"
-                    src={integration.picture || '/no-picture.jpg'}
-                    className={clsx(
-                      'rounded-full transition-all min-w-[42px] border-[1.5px] min-h-[42px]',
-                      selectedIntegrations.findIndex(
-                        (p) => p.integration.id === integration.id
-                      ) === -1
-                        ? 'border-transparent'
-                        : 'border-[#000]'
-                    )}
-                    alt={integration.identifier}
-                    width={42}
-                    height={42}
-                  />
-                  <PlatformBadge integration={integration} />
-                </div>
-              </div>
-            ))}
+                {selectedCount === group.channels.length
+                  ? t('editor_select_none')
+                  : t('editor_select_all')}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+              {group.channels.map((integration) => (
+                <ChannelChip
+                  key={integration.id}
+                  integration={integration}
+                  selected={isSelected(integration.id)}
+                  onClick={() => toggle(integration)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 };

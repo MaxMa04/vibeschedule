@@ -2,8 +2,11 @@
 
 import { ArrayNotEmpty, IsOptional, IsUrl, MaxLength } from 'class-validator';
 import { withProvider } from '@vibeschedule/frontend/components/new-launch/providers/high.order.provider';
-import { Input } from '@vibeschedule/react/form/input';
-import { useSettings } from '@vibeschedule/frontend/components/launches/helpers/use.values';
+import { FieldGroup } from '@vibeschedule/frontend/components/ui/field';
+import {
+  SettingsInput,
+  SettingsListInput,
+} from '@vibeschedule/frontend/components/new-launch/providers/settings.fields';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { PinterestPreview } from '@vibeschedule/frontend/components/new-launch/providers/pinterest/pinterest.preview';
 
@@ -20,49 +23,19 @@ class PinterestSettingsDto {
   link?: string;
 }
 
-const toList = (value: string) =>
-  value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-const emptyToUndefined = (value: string) => value.trim() || undefined;
-
 const PinterestSettings = () => {
   const t = useT();
-  const {
-    register,
-    formState: { errors },
-  } = useSettings();
 
   return (
-    <div className="flex flex-col">
-      <Input
+    <FieldGroup>
+      <SettingsListInput
+        name="board_ids"
         label={t('pinterest_board_ids')}
-        error={errors.board_ids && t(errors.board_ids.message as string)}
-        {...register('board_ids', {
-          setValueAs: toList,
-        })}
+        description={t('pinterest_board_ids_hint')}
       />
-      <div className="-mt-[6px] mb-[12px] text-[12px] text-textItemBlur">
-        {t('pinterest_board_ids_hint')}
-      </div>
-      <Input
-        label={t('title')}
-        maxLength={100}
-        error={errors.title && t(errors.title.message as string)}
-        {...register('title', {
-          setValueAs: emptyToUndefined,
-        })}
-      />
-      <Input
-        label={t('link')}
-        error={errors.link && t(errors.link.message as string)}
-        {...register('link', {
-          setValueAs: emptyToUndefined,
-        })}
-      />
-    </div>
+      <SettingsInput name="title" label={t('title')} maxLength={100} />
+      <SettingsInput name="link" label={t('link')} />
+    </FieldGroup>
   );
 };
 

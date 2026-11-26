@@ -32,7 +32,11 @@ export class IntegrationRepository {
   }
 
   // a connected account comes back to life even if it was removed before
-  async upsertFromPfm(org: string, account: PfmSocialAccount) {
+  async upsertFromPfm(
+    org: string,
+    account: PfmSocialAccount,
+    picture: string | null
+  ) {
     const name = account.username || account.platform;
     await this._integration.model.integration.upsert({
       where: {
@@ -47,12 +51,12 @@ export class IntegrationRepository {
         providerIdentifier: account.platform,
         name,
         profile: account.username,
-        picture: account.profile_photo_url,
+        picture,
       },
       update: {
         name,
         profile: account.username,
-        picture: account.profile_photo_url,
+        picture,
         disabled: false,
         deletedAt: null,
       },
@@ -186,6 +190,35 @@ export class IntegrationRepository {
         deletedAt: null,
       },
       select: { postingTimes: true },
+    });
+  }
+
+  // vibeschedule posts behind feed posts: PfM post id or platform post id
+  postsForFeed(
+    org: string,
+    integrationId: string,
+    pfmPostIds: string[],
+    releaseIds: string[]
+  ) {
+    if (!pfmPostIds.length && !releaseIds.length) {
+      return Promise.resolve([]);
+    }
+    return this._posts.model.post.findMany({
+      where: {
+        organizationId: org,
+        integrationId,
+        deletedAt: null,
+        OR: [
+          { pfmPostId: { in: pfmPostIds } },
+          { releaseId: { in: releaseIds } },
+        ],
+      },
+      select: {
+        id: true,
+        pfmPostId: true,
+        releaseId: true,
+        format: { select: { id: true, name: true } },
+      },
     });
   }
 }

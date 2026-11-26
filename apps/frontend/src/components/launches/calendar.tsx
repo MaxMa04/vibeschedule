@@ -5,31 +5,42 @@ import React, {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import {
-  CalendarContext,
-  Integrations,
-  useCalendar,
-  useNow,
-} from '@vibeschedule/frontend/components/launches/calendar.context';
 import dayjs from 'dayjs';
 import 'dayjs/locale/de';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
-import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
-import clsx from 'clsx';
-import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
-import { ExistingDataContextProvider } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
-import { useDrag, useDrop } from 'react-dnd';
-import { Integration, Post, State, Tags } from '@prisma/client';
-import { useAddProvider } from '@vibeschedule/frontend/components/launches/add.provider.component';
-import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { groupBy, sortBy } from 'lodash';
-import SafeImage from '@vibeschedule/react/helpers/safe.image';
 import { extend } from 'dayjs';
+import { useDrag, useDrop } from 'react-dnd';
+import { groupBy, sortBy } from 'lodash';
+import useSWR from 'swr';
+import { toast } from 'sonner';
+import {
+  BarChart3Icon,
+  CalendarClockIcon,
+  CopyIcon,
+  EllipsisIcon,
+  ExternalLinkIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+} from 'lucide-react';
+import { State } from '@prisma/client';
+import {
+  CalendarPost,
+  useCalendar,
+  useNow,
+} from '@vibeschedule/frontend/components/launches/calendar.context';
+import { useModals } from '@vibeschedule/frontend/components/layout/new-modal';
+import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { ExistingDataContextProvider } from '@vibeschedule/frontend/components/launches/helpers/use.existing.data';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { AddEditModal } from '@vibeschedule/frontend/components/new-launch/add.edit.modal';
 import { deleteDialog } from '@vibeschedule/react/helpers/delete.dialog';
@@ -38,136 +49,124 @@ import {
   fromUtc,
   newDayjs,
 } from '@vibeschedule/frontend/components/layout/set.timezone';
-import { ChevronUpIcon } from '@vibeschedule/frontend/components/ui/icons';
 import { RenderAnalytics } from '@vibeschedule/frontend/components/platform-analytics/render.analytics';
+import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
+import {
+  editorModalOptions,
+  useCreatePost,
+} from '@vibeschedule/frontend/components/launches/new.post';
+import { Badge } from '@vibeschedule/frontend/components/ui/badge';
+import { Button } from '@vibeschedule/frontend/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@vibeschedule/frontend/components/ui/dropdown-menu';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@vibeschedule/frontend/components/ui/empty';
+import {
+  Alert,
+  AlertDescription,
+} from '@vibeschedule/frontend/components/ui/alert';
+import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
+import { cn } from '@vibeschedule/frontend/lib/utils';
 
 extend(isSameOrAfter);
 extend(isSameOrBefore);
 extend(localizedFormat);
 dayjs.locale('de');
 
-export const hours = Array.from(
-  {
-    length: 24,
+export const hours = Array.from({ length: 24 }, (_, i) => i);
+
+const statusMeta: Record<
+  State,
+  { label: string; dot: string; accent: string; badge: string; chip: string }
+> = {
+  QUEUE: {
+    label: 'scheduled',
+    dot: 'bg-sky-500',
+    accent: 'before:bg-sky-500',
+    badge: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+    chip: 'bg-card',
   },
-  (_, i) => i
-);
+  PUBLISHED: {
+    label: 'published',
+    dot: 'bg-emerald-500',
+    accent: 'before:bg-emerald-500',
+    badge:
+      'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    chip: 'border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950',
+  },
+  ERROR: {
+    label: 'calendar_status_error',
+    dot: 'bg-destructive',
+    accent: 'before:bg-destructive',
+    badge: 'border-destructive/40 bg-destructive/10 text-destructive',
+    chip: 'border-destructive/40 bg-red-50 dark:bg-red-950',
+  },
+  DRAFT: {
+    label: 'draft',
+    dot: 'bg-muted-foreground/50',
+    accent: 'before:bg-muted-foreground/50',
+    badge: 'text-muted-foreground',
+    chip: 'border-dashed bg-muted',
+  },
+};
 
-// The current time badge at the start of the now line
-const NowTime: FC<{ time: string }> = ({ time }) => (
-  <div className="rounded-[6px] bg-newTableTextFocused px-[6px] text-[12px] leading-[20px] font-[500] text-black whitespace-nowrap">
-    {time}
-  </div>
-);
-
-// Current time line across the week. It ticks on its own so the grid doesn't
-// re-render every minute. An absolute grid child is placed inside the grid area
-// it names, here the current hour row (after the header row).
-const WeekNowLine: FC<{ days: dayjs.Dayjs[] }> = ({ days }) => {
-  const now = useNow();
-  const todayIndex = days.findIndex((day) => day.isSame(now, 'day'));
-  if (todayIndex === -1) {
-    return null;
-  }
-
-  const gridRow = `${now.hour() + 2} / ${now.hour() + 3}`;
-  const top = `${(now.minute() / 60) * 100}%`;
+export const StatusBadge: FC<{ state: State; className?: string }> = ({
+  state,
+  className,
+}) => {
+  const t = useT();
+  const meta = statusMeta[state] || statusMeta.QUEUE;
   return (
-    <>
-      {/* covers this hour's label with the calendar background, the time takes its place */}
-      <div
-        className="absolute inset-0 bg-newBgColorInner pointer-events-none"
-        style={{ gridColumn: '1 / 2', gridRow }}
-      >
-        <div className="absolute end-0 -translate-y-1/2" style={{ top }}>
-          {/* same format as the hour labels */}
-          <NowTime time={now.format('H:mm')} />
-        </div>
-      </div>
-      {/* a piece per day, so nothing shows through the gaps of the sticky header */}
-      {days.map((day, index) => (
-        <div
-          key={day.format('YYYY-MM-DD')}
-          className="absolute start-0 end-0 h-0 flex items-center z-[15] pointer-events-none"
-          style={{ gridColumn: `${index + 2} / ${index + 3}`, gridRow, top }}
-        >
-          {index === todayIndex ? (
-            <>
-              <div className="w-[3px] h-[12px] rounded-full bg-newTableTextFocused" />
-              <div className="flex-1 h-[3px] bg-newTableTextFocused" />
-            </>
-          ) : (
-            <div className="flex-1 h-[1px] bg-newTableTextFocused opacity-40" />
-          )}
-        </div>
-      ))}
-    </>
+    <Badge variant="outline" className={cn(meta.badge, className)}>
+      <span className={cn('size-1.5 rounded-full', meta.dot)} />
+      {t(meta.label)}
+    </Badge>
   );
 };
 
-// Current time line between the slots of the day view, as tall as the slot's bottom margin
-const DayNowLine: FC<{ now: dayjs.Dayjs; className?: string }> = ({
-  now,
-  className,
-}) => (
-  <div
-    className={clsx(
-      'flex items-center h-[20px] shrink-0 pointer-events-none',
-      className
-    )}
-  >
-    {/* same format as the slot labels */}
-    <NowTime time={now.format('LT')} />
-    <div className="flex-1 h-[3px] bg-newTableTextFocused" />
-  </div>
-);
+const postText = (post: CalendarPost) =>
+  stripHtmlValidation('none', post.content || '', false, true, false).trim();
 
-// Shared hook for post actions (edit, delete, analytics)
-const usePostActions = (onMutate?: () => void) => {
+// the hour slot a click creates a post in; the current hour starts a bit from now
+const slotDate = (cell: dayjs.Dayjs, now: dayjs.Dayjs) =>
+  cell.isSame(now, 'hour')
+    ? now.add(15, 'minute').startOf('minute')
+    : cell.startOf('hour');
+
+// edit, duplicate, delete, preview and statistics of a post
+const usePostActions = () => {
   const t = useT();
   const fetch = useFetch();
   const modal = useModals();
-  const toaster = useToaster();
   const { integrations, reloadCalendarView } = useCalendar();
 
-  const mutate = useCallback(() => {
-    reloadCalendarView();
-    onMutate?.();
-  }, [reloadCalendarView, onMutate]);
-
-  const editPost = useCallback(
-    (loadPost: any, isDuplicate?: boolean) => async () => {
-      const post = {
-        ...loadPost,
-        publishDate: loadPost.actualDate || loadPost.publishDate,
-      };
-
+  const edit = useCallback(
+    async (post: CalendarPost, isDuplicate?: boolean) => {
       const data = await (await fetch(`/posts/group/${post.group}`)).json();
       if (!data?.posts?.length) {
-        toaster.show(t('post_not_found'), 'warning');
-        mutate();
+        toast.error(t('post_not_found'));
+        reloadCalendarView();
         return;
       }
-      const date = !isDuplicate
-        ? null
-        : (await (await fetch('/posts/find-slot')).json()).date;
+      const date = isDuplicate
+        ? (await (await fetch('/posts/find-slot')).json()).date
+        : null;
       const publishDate = fromUtc(date || data.posts[0].publishDate);
-      const ExistingData = !isDuplicate
-        ? ExistingDataContextProvider
-        : Fragment;
+      const Wrapper = isDuplicate ? Fragment : ExistingDataContextProvider;
       modal.openModal({
-        id: 'add-edit-modal',
-        closeOnClickOutside: false,
-        removeLayout: true,
-        closeOnEscape: false,
-        withCloseButton: false,
-        askClose: true,
-        fullScreen: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px] text-textColor',
-        },
+        ...editorModalOptions,
         children: (
-          <ExistingData value={data}>
+          <Wrapper value={data}>
             <AddEditModal
               {...(isDuplicate
                 ? {
@@ -181,13 +180,12 @@ const usePostActions = (onMutate?: () => void) => {
                   }
                 : {})}
               allIntegrations={integrations.map((p) => ({ ...p }))}
-              reopenModal={editPost(post)}
-              mutate={mutate}
+              reopenModal={() => edit(post, isDuplicate)}
+              mutate={reloadCalendarView}
               integrations={
                 isDuplicate
-                  ? integrations
+                  ? integrations.filter((p) => !p.disabled)
                   : integrations
-                      .slice(0)
                       .filter((f) => f.id === data.integration)
                       .map((p) => ({
                         ...p,
@@ -196,972 +194,859 @@ const usePostActions = (onMutate?: () => void) => {
               }
               date={publishDate}
             />
-          </ExistingData>
+          </Wrapper>
         ),
-        size: '80%',
-        title: ``,
       });
     },
-    [integrations, fetch, modal, mutate, toaster, t]
+    [fetch, integrations, modal, reloadCalendarView, t]
   );
 
-  const deletePost = useCallback(
-    (post: any) => async () => {
+  const remove = useCallback(
+    async (post: CalendarPost) => {
       if (
         !(await deleteDialog(
           t('are_you_sure_you_want_to_delete_post'),
-          undefined,
-          undefined,
-          undefined,
-          true
+          t('delete_post')
         ))
       ) {
         return;
       }
-
-      await fetch(`/posts/${post.group}`, {
-        method: 'DELETE',
-      });
-
-      toaster.show(t('post_deleted_successfully'), 'success');
-
-      mutate();
+      await fetch(`/posts/${post.group}`, { method: 'DELETE' });
+      toast.success(t('post_deleted_successfully'));
+      reloadCalendarView();
     },
-    [toaster, t, fetch, mutate]
+    [fetch, reloadCalendarView, t]
   );
 
-  const openStatistics = useCallback(
-    (id: string) => () => {
+  const statistics = useCallback(
+    (post: CalendarPost) => {
       modal.openModal({
-        title: t('statistics'),
-        closeOnClickOutside: true,
-        closeOnEscape: true,
-        withCloseButton: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px]',
-        },
-        children: <RenderAnalytics url={`/analytics/post/${id}`} />,
-        size: '80%',
+        title: t('post_statistics'),
+        size: 'xl',
+        children: <RenderAnalytics url={`/analytics/post/${post.id}`} />,
       });
     },
     [modal, t]
   );
 
-  return {
-    editPost,
-    deletePost,
-    openStatistics,
-  };
+  const preview = useCallback(
+    (post: CalendarPost) => {
+      modal.openModal({
+        title: t('calendar_preview'),
+        size: 'lg',
+        children: (close) => (
+          <PostPreview
+            post={post}
+            onEdit={() => {
+              close();
+              edit(post);
+            }}
+          />
+        ),
+      });
+    },
+    [modal, t, edit]
+  );
+
+  return { edit, remove, statistics, preview };
 };
 
-// A day view slot is a minute of the user's day, on the day in view
-const slotDate = (startDate: string, time: number) =>
-  newDayjs(startDate)
-    .hour(Math.floor(time / 60))
-    .minute(time % 60);
-
-// One day view slot. Memoized, so the now line's minute tick doesn't re-render the slots
-const DaySlotColumn: FC<{ option: any[]; startDate: string }> = memo(
-  ({ option, startDate }) => {
-    const calendar = useCalendar();
-    return (
-      <CalendarContext.Provider
-        value={{
-          ...calendar,
-          integrations: option.flatMap((p) => p.integration),
-        }}
-      >
-        <CalendarColumn getDate={slotDate(startDate, option[0].time)} />
-      </CalendarContext.Provider>
-    );
-  }
-);
-
-export const DayView = () => {
-  const calendar = useCalendar();
-  const { integrations, posts, postDates, startDate } = calendar;
-
-  const options = useMemo(() => {
-    const day = newDayjs(startDate);
-    // a recurring post comes with all its occurrences, only this day's make slots
-    const createdPosts = posts
-      .filter(
-        (post) =>
-          postDates.get(post).format('YYYY-MM-DD') === day.format('YYYY-MM-DD')
-      )
-      .map((post) => {
-        const date = postDates.get(post);
-        return {
-          integration: [
-            integrations.find((i) => i.id === post.integration.id)!,
-          ],
-          image: post?.integration?.picture || '',
-          identifier: post?.integration?.providerIdentifier || '',
-          id: post?.integration?.id || '',
-          name: post?.integration?.name || '',
-          time: date.hour() * 60 + date.minute(),
-        };
-      });
-    // posting times are minutes of the UTC day, moved to the clock of the day
-    // in view (on a DST change day, the ones before the change are an hour off)
-    const offset = day.hour(12).utcOffset();
-    return sortBy(
-      Object.values(
-        groupBy(
-          [
-            ...createdPosts,
-            ...integrations.flatMap((p) =>
-              p.time.flatMap((t) => ({
-                integration: p,
-                identifier: p?.identifier,
-                name: p?.name,
-                id: p?.id,
-                image: p?.picture,
-                time: (((t?.time + offset) % 1440) + 1440) % 1440,
-              }))
-            ),
-          ],
-          (p: any) => p.time
-        )
-      ),
-      (p) => p[0].time
-    );
-  }, [integrations, posts, postDates, startDate]);
-
-  // the now line goes right before the first upcoming slot, only on today
-  const now = useNow();
-  const nowIndex = useMemo(() => {
-    if (!options.length || !newDayjs(startDate).isSame(now, 'day')) {
-      return -1;
-    }
-    const upcoming = options.findIndex((option) =>
-      slotDate(startDate, option[0].time).isAfter(now)
-    );
-    return upcoming === -1 ? options.length : upcoming;
-  }, [options, startDate, now]);
+const PostPreview: FC<{ post: CalendarPost; onEdit: () => void }> = ({
+  post,
+  onEdit,
+}) => {
+  const t = useT();
+  const fetch = useFetch();
+  const { data, isLoading } = useSWR(`/posts/group/${post.group}`, async (u) =>
+    (await fetch(u)).json()
+  );
+  const first = data?.posts?.[0];
+  const media: { path: string }[] = first?.image || [];
+  const text = first
+    ? stripHtmlValidation('normal', first.content || '', false, true, false)
+    : '';
+  const date = fromUtc(post.publishDate);
 
   return (
-    <div className="flex flex-col gap-[10px] flex-1 relative">
-      <div className="absolute start-0 top-0 w-full h-full flex flex-col overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
-        {options.map((option, index) => (
-          <Fragment key={option[0].time}>
-            {/* sits in the 20px gap under the previous slot */}
-            {index === nowIndex && (
-              <DayNowLine
-                now={now}
-                className={clsx(index > 0 && '-mt-[20px]')}
-              />
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <ChannelAvatar
+          size="md"
+          picture={post.integration.picture}
+          identifier={post.integration.providerIdentifier}
+          name={post.integration.name}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium">{post.integration.name}</div>
+          <div className="text-sm text-muted-foreground">
+            {date.format('dddd, D. MMMM YYYY · HH:mm')}
+          </div>
+        </div>
+        <StatusBadge state={post.state} />
+      </div>
+      {post.state === 'ERROR' && (
+        <Alert variant="destructive">
+          <TriangleAlertIcon />
+          <AlertDescription>
+            {post.error || t('post_publish_error')}
+          </AlertDescription>
+        </Alert>
+      )}
+      {isLoading ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-40 w-40" />
+        </div>
+      ) : (
+        <>
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {text.trim() || (
+              <span className="text-muted-foreground">{t('no_content')}</span>
             )}
-            <div className="text-center text-[14px] min-h-[21px] shrink-0">
-              {slotDate(startDate, option[0].time).format('LT')}
+          </p>
+          {!!media.length && (
+            <div className="grid grid-cols-3 gap-2">
+              {media.map((m) =>
+                /\.(mp4|mov|webm)(\?|$)/i.test(m.path) ? (
+                  <video
+                    key={m.path}
+                    src={m.path}
+                    muted
+                    controls
+                    className="aspect-[9/16] w-full rounded-lg border bg-muted object-cover"
+                  />
+                ) : (
+                  <img
+                    key={m.path}
+                    src={m.path}
+                    alt=""
+                    className="aspect-square w-full rounded-lg border bg-muted object-cover"
+                  />
+                )
+              )}
             </div>
-            <div
-              key={option[0].time}
-              className="min-h-[60px] shrink-0 rounded-[10px] flex justify-center items-center gap-[10px] mb-[20px]"
+          )}
+        </>
+      )}
+      <div className="flex flex-wrap justify-end gap-2">
+        {post.state === 'PUBLISHED' && post.releaseURL?.startsWith('http') && (
+          <Button
+            variant="outline"
+            className="h-10 md:h-8"
+            nativeButton={false}
+            render={<a href={post.releaseURL} target="_blank" rel="noreferrer" />}
+          >
+            <ExternalLinkIcon data-icon="inline-start" />
+            {t('open_post')}
+          </Button>
+        )}
+        <Button className="h-10 md:h-8" onClick={onEdit}>
+          <PencilIcon data-icon="inline-start" />
+          {t('calendar_edit')}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const PostActionsMenu: FC<{ post: CalendarPost; className?: string }> = ({
+  post,
+  className,
+}) => {
+  const t = useT();
+  const { edit, remove, statistics, preview } = usePostActions();
+  return (
+    // clicks inside the portaled menu still bubble through React to the post
+    <div onClick={(e) => e.stopPropagation()} className={cn('flex', className)}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={t('calendar_post_actions')}
+              className="text-muted-foreground"
+            />
+          }
+        >
+          <EllipsisIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem onClick={() => preview(post)}>
+            <EyeIcon />
+            {t('calendar_preview')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => edit(post)}>
+            <PencilIcon />
+            {t('calendar_edit')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => edit(post, true)}>
+            <CopyIcon />
+            {t('duplicate_post')}
+          </DropdownMenuItem>
+          {post.state === 'PUBLISHED' && (
+            <DropdownMenuItem onClick={() => statistics(post)}>
+              <BarChart3Icon />
+              {t('post_statistics')}
+            </DropdownMenuItem>
+          )}
+          {post.state === 'PUBLISHED' && post.releaseURL?.startsWith('http') && (
+            <DropdownMenuItem
+              render={
+                <a href={post.releaseURL} target="_blank" rel="noreferrer" />
+              }
             >
-              <DaySlotColumn option={option} startDate={startDate} />
+              <ExternalLinkIcon />
+              {t('open_post')}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={() => remove(post)}>
+            <Trash2Icon />
+            {t('delete_post')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
+
+type ChipVariant = 'week' | 'day' | 'month';
+
+// a post in a calendar cell: channel, time, text and status, draggable unless published
+const PostChip: FC<{
+  post: CalendarPost;
+  date: dayjs.Dayjs;
+  variant: ChipVariant;
+}> = memo(({ post, date, variant }) => {
+  const t = useT();
+  const { edit } = usePostActions();
+  const meta = statusMeta[post.state] || statusMeta.QUEUE;
+  const [{ isDragging }, drag] = useDrag(
+    () => ({
+      type: 'post',
+      canDrag: post.state !== 'PUBLISHED',
+      item: { id: post.id, date },
+      collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    }),
+    [post.id, post.state, date]
+  );
+  const text = postText(post);
+
+  return (
+    <div
+      ref={(node) => {
+        drag(node);
+      }}
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        edit(post);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          edit(post);
+        }
+      }}
+      className={cn(
+        'group/post relative w-full min-w-0 overflow-hidden rounded-md border py-0.5 ps-2 pe-1 text-xs shadow-xs transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
+        'before:absolute before:inset-y-1 before:start-0.5 before:w-0.5 before:rounded-full',
+        meta.chip,
+        meta.accent,
+        post.state !== 'PUBLISHED' && 'cursor-grab active:cursor-grabbing',
+        isDragging && 'opacity-40',
+        variant === 'week'
+          ? 'flex flex-col gap-0.5 py-1'
+          : 'flex items-center gap-1.5',
+        variant === 'month' && 'max-md:justify-center max-md:p-0.5'
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
+        <ChannelAvatar
+          size="xs"
+          picture={post.integration.picture}
+          identifier={
+            variant === 'day' ? post.integration.providerIdentifier : null
+          }
+          name={post.integration.name}
+        />
+        <span
+          className={cn(
+            'shrink-0 font-medium tabular-nums',
+            variant === 'month' && 'max-md:hidden'
+          )}
+        >
+          {fromUtc(post.publishDate).format('HH:mm')}
+        </span>
+        {post.state === 'ERROR' && (
+          <TriangleAlertIcon
+            className={cn(
+              'size-3 shrink-0 text-destructive',
+              variant === 'month' && 'max-md:hidden'
+            )}
+          />
+        )}
+        {variant === 'week' && (
+          <span className="min-w-0 truncate text-muted-foreground">
+            {post.integration.name}
+          </span>
+        )}
+      </span>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate',
+          variant === 'week' ? 'text-foreground' : 'text-muted-foreground',
+          variant === 'month' && 'max-md:hidden'
+        )}
+      >
+        {variant === 'day' && (
+          <span className="me-1.5 font-medium text-foreground max-md:hidden">
+            {post.integration.name}
+          </span>
+        )}
+        {post.state === 'DRAFT' && `${t('draft')}: `}
+        {text || t('no_content')}
+      </span>
+      {variant === 'day' && <StatusBadge state={post.state} />}
+      <PostActionsMenu
+        post={post}
+        className={cn(
+          variant === 'day'
+            ? 'md:opacity-0 md:group-hover/post:opacity-100 md:has-[[aria-expanded=true]]:opacity-100'
+            : 'absolute end-0.5 top-0.5 rounded-md bg-card opacity-0 shadow-xs group-hover/post:opacity-100 has-[[aria-expanded=true]]:opacity-100 max-md:hidden'
+        )}
+      />
+    </div>
+  );
+});
+PostChip.displayName = 'PostChip';
+
+// a cell takes dropped posts, they keep their time of day or minute
+const useCellDrop = (target: (date: dayjs.Dayjs) => dayjs.Dayjs) => {
+  const fetch = useFetch();
+  const t = useT();
+  const { changeDate, reloadCalendarView } = useCalendar();
+  return useDrop(
+    () => ({
+      accept: 'post',
+      canDrop: (item: { id: string; date: dayjs.Dayjs }) =>
+        target(item.date).isAfter(newDayjs()),
+      drop: async (item: { id: string; date: dayjs.Dayjs }) => {
+        const date = target(item.date);
+        changeDate(item.id, date);
+        const response = await fetch(`/posts/${item.id}/date`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
+            action: 'schedule',
+          }),
+        });
+        if (!response.ok) {
+          toast.error(t('calendar_move_failed'));
+        }
+        reloadCalendarView();
+      },
+      collect: (monitor) => ({
+        over: monitor.isOver() && monitor.canDrop(),
+      }),
+    }),
+    [target, changeDate, fetch, reloadCalendarView, t]
+  );
+};
+
+// the red line at the current minute, inside the current hour's cell
+const NowLine: FC = () => {
+  const now = useNow();
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 flex h-0 items-center"
+      style={{ top: `${(now.minute() / 60) * 100}%` }}
+    >
+      <span className="-ms-1 size-2 rounded-full bg-destructive" />
+      <span className="h-0.5 flex-1 bg-destructive" />
+    </div>
+  );
+};
+
+const VISIBLE_IN_CELL = 3;
+
+const HourCell: FC<{
+  date: dayjs.Dayjs;
+  posts: CalendarPost[];
+  variant: 'week' | 'day';
+}> = memo(({ date, posts, variant }) => {
+  const t = useT();
+  const { currentHour } = useCalendar();
+  const create = useCreatePost();
+  const [showAll, setShowAll] = useState(false);
+  const isPast = date.isBefore(currentHour);
+  const isNow = date.isSame(currentHour, 'hour');
+  const target = useCallback(
+    (from: dayjs.Dayjs) => date.minute(from.minute()),
+    [date]
+  );
+  const [{ over }, drop] = useCellDrop(target);
+  const limit = variant === 'day' ? Infinity : VISIBLE_IN_CELL;
+  const list = showAll ? posts : posts.slice(0, limit);
+
+  return (
+    <div
+      ref={(node) => {
+        drop(node);
+      }}
+      onClick={
+        isPast ? undefined : () => create({ date: slotDate(date, newDayjs()) })
+      }
+      className={cn(
+        'group/cell relative flex min-h-14 min-w-0 flex-col gap-0.5 border-e border-b p-0.5',
+        isPast ? 'bg-muted/40' : 'cursor-pointer hover:bg-muted/40',
+        over && 'bg-primary/5 ring-2 ring-primary/40 ring-inset'
+      )}
+    >
+      {isNow && <NowLine />}
+      {list.map((post) => (
+        <PostChip
+          key={post.id}
+          post={post}
+          date={fromUtc(post.publishDate)}
+          variant={variant}
+        />
+      ))}
+      {posts.length > limit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAll((v) => !v);
+          }}
+          className="rounded px-1 text-start text-xs text-muted-foreground hover:text-foreground"
+        >
+          {showAll
+            ? t('show_less')
+            : t('calendar_more', { count: posts.length - limit })}
+        </button>
+      )}
+      {!isPast && (
+        <PlusIcon className="pointer-events-none absolute end-1.5 bottom-1.5 size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/cell:opacity-100" />
+      )}
+    </div>
+  );
+});
+HourCell.displayName = 'HourCell';
+
+const usePostsBy = (format: string) => {
+  const { posts, postDates } = useCalendar();
+  return useMemo(() => {
+    const sorted = sortBy(posts, (p) => postDates.get(p)?.valueOf());
+    return groupBy(sorted, (p) => postDates.get(p)?.format(format));
+  }, [posts, postDates, format]);
+};
+
+const DayHeader: FC<{ day: dayjs.Dayjs; today: dayjs.Dayjs }> = ({
+  day,
+  today,
+}) => {
+  const isToday = day.isSame(today, 'day');
+  return (
+    <div
+      data-today={isToday || undefined}
+      className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-e border-b bg-card py-2"
+    >
+      <span
+        className={cn(
+          'text-xs text-muted-foreground uppercase',
+          isToday && 'font-medium text-foreground'
+        )}
+      >
+        {day.format('dd')}
+      </span>
+      <span
+        className={cn(
+          'flex size-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums',
+          isToday && 'bg-primary text-primary-foreground'
+        )}
+      >
+        {day.date()}
+      </span>
+    </div>
+  );
+};
+
+// week and day: hours down, days across. Phones scroll the week sideways.
+const TimeGrid: FC<{ days: dayjs.Dayjs[] }> = ({ days }) => {
+  const { currentHour, display, startDate, loading, posts, postDates } =
+    useCalendar();
+  const postsByHour = usePostsBy('YYYY-MM-DD HH');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef('');
+  const variant = days.length === 1 ? 'day' : 'week';
+
+  // once per range: today starts at the hour before now, other ranges at the
+  // first post or the morning
+  useEffect(() => {
+    const key = `${display}-${startDate}`;
+    if (loading || scrolledFor.current === key) {
+      return;
+    }
+    scrolledFor.current = key;
+    const now = newDayjs();
+    const hasToday = days.some((day) => day.isSame(now, 'day'));
+    const firstPost = posts.length
+      ? Math.min(...posts.map((p) => postDates.get(p)?.hour() ?? 24))
+      : 8;
+    const hour = hasToday ? now.hour() - 1 : Math.min(firstPost, 8);
+    const scroller = scrollRef.current;
+    const row = scroller?.querySelector<HTMLElement>(
+      `[data-hour="${Math.max(0, hour)}"]`
+    );
+    const header = scroller?.querySelector<HTMLElement>('[data-header]');
+    if (scroller && row) {
+      scroller.scrollTop = row.offsetTop - (header?.offsetHeight || 0);
+    }
+    // narrow screens scroll the week sideways until today is in view
+    const today = scroller?.querySelector<HTMLElement>('[data-today]');
+    if (
+      scroller &&
+      today &&
+      today.offsetLeft + today.offsetWidth > scroller.clientWidth
+    ) {
+      scroller.scrollLeft = today.offsetLeft - (header?.offsetWidth || 0);
+    }
+  }, [display, startDate, loading, days, posts, postDates]);
+
+  return (
+    <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto">
+      <div
+        className={cn(
+          'grid',
+          variant === 'week'
+            ? 'min-w-[48rem] grid-cols-[3.25rem_repeat(7,minmax(0,1fr))]'
+            : 'grid-cols-[3.25rem_minmax(0,1fr)]'
+        )}
+      >
+        <div
+          data-header
+          className="sticky start-0 top-0 z-30 border-e border-b bg-card"
+        />
+        {days.map((day) => (
+          <DayHeader key={day.valueOf()} day={day} today={currentHour} />
+        ))}
+        {hours.map((hour) => (
+          <Fragment key={hour}>
+            <div
+              data-hour={hour}
+              className="sticky start-0 z-10 border-e border-b bg-card pe-2 pt-1 text-end text-xs text-muted-foreground tabular-nums"
+            >
+              {String(hour).padStart(2, '0')}:00
             </div>
+            {days.map((day) => {
+              const date = day.hour(hour).startOf('hour');
+              return (
+                <HourCell
+                  key={date.valueOf()}
+                  date={date}
+                  variant={variant}
+                  posts={postsByHour[date.format('YYYY-MM-DD HH')] || []}
+                />
+              );
+            })}
           </Fragment>
         ))}
-        {nowIndex === options.length && (
-          <DayNowLine now={now} className="-mt-[20px]" />
+      </div>
+    </div>
+  );
+};
+
+export const WeekView = () => {
+  const { startDate } = useCalendar();
+  const days = useMemo(() => {
+    const start = newDayjs(startDate).startOf('day');
+    return Array.from({ length: 7 }, (_, i) => start.add(i, 'day'));
+  }, [startDate]);
+  return <TimeGrid days={days} />;
+};
+
+export const DayView = () => {
+  const { startDate } = useCalendar();
+  const days = useMemo(() => [newDayjs(startDate).startOf('day')], [startDate]);
+  return <TimeGrid days={days} />;
+};
+
+const MonthCell: FC<{
+  day: dayjs.Dayjs;
+  inMonth: boolean;
+  posts: CalendarPost[];
+}> = memo(({ day, inMonth, posts }) => {
+  const t = useT();
+  const { currentHour } = useCalendar();
+  const create = useCreatePost();
+  const [showAll, setShowAll] = useState(false);
+  const isPast = day.endOf('day').isBefore(currentHour);
+  const isToday = day.isSame(currentHour, 'day');
+  const target = useCallback(
+    (from: dayjs.Dayjs) => day.hour(from.hour()).minute(from.minute()),
+    [day]
+  );
+  const [{ over }, drop] = useCellDrop(target);
+  const list = showAll ? posts : posts.slice(0, VISIBLE_IN_CELL);
+
+  const createAt = useCallback(() => {
+    const now = newDayjs();
+    create({
+      date: isToday
+        ? now.add(1, 'hour').startOf('hour')
+        : day.hour(10).startOf('hour'),
+    });
+  }, [create, day, isToday]);
+
+  return (
+    <div
+      ref={(node) => {
+        drop(node);
+      }}
+      onClick={isPast ? undefined : createAt}
+      className={cn(
+        'group/cell relative flex min-h-18 min-w-0 flex-col gap-0.5 border-e border-b p-1 md:min-h-24',
+        !inMonth && 'bg-muted/30',
+        isPast ? 'cursor-default' : 'cursor-pointer hover:bg-muted/40',
+        over && 'bg-primary/5 ring-2 ring-primary/40 ring-inset'
+      )}
+    >
+      <div className="flex items-center justify-between px-0.5">
+        <span
+          className={cn(
+            'flex size-6 items-center justify-center rounded-full text-xs font-medium tabular-nums',
+            !inMonth && 'text-muted-foreground',
+            isPast && inMonth && 'text-muted-foreground',
+            isToday && 'bg-primary text-primary-foreground'
+          )}
+        >
+          {day.date()}
+        </span>
+        {!isPast && (
+          <PlusIcon className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/cell:opacity-100" />
         )}
       </div>
-    </div>
-  );
-};
-export const WeekView = () => {
-  const { startDate, endDate } = useCalendar();
-  const t = useT();
-
-  const localizedDays = useMemo(() => {
-    const days = [];
-    const weekStart = newDayjs(startDate);
-    for (let i = 0; i < 7; i++) {
-      const day = weekStart.add(i, 'day');
-      days.push({
-        name: day.format('dddd'),
-        day: day.format('L'),
-        date: day,
-      });
-    }
-    return days;
-  }, [startDate]);
-
-  return (
-    <div className="flex flex-col text-textColor flex-1">
-      <div className="flex-1 relative">
-        <div className="grid [grid-template-columns:136px_repeat(7,_minmax(0,_1fr))] tablet:[grid-template-columns:72px_repeat(7,_minmax(100px,_1fr))] gap-[4px] rounded-[10px] absolute h-full start-0 top-0 w-full overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
-          <div className="z-10 bg-newTableHeader flex justify-center items-center flex-col h-[62px] rounded-[8px] sticky top-0"></div>
-          {localizedDays.map((day, index) => (
-            <div
-              key={day.name}
-              className="p-2 text-center bg-newTableHeader flex justify-center items-center flex-col h-[62px] rounded-[8px] sticky top-0 z-[20]"
-            >
-              <div className="text-[14px] font-[500] text-newTableText">
-                {day.name}
-              </div>
-              <div
-                className={clsx(
-                  'text-[14px] font-[600] flex items-center justify-center gap-[6px]',
-                  day.day === newDayjs().format('L') &&
-                    'text-newTableTextFocused'
-                )}
-              >
-                {day.day === newDayjs().format('L') && (
-                  <div className="w-[6px] h-[6px] bg-newTableTextFocused rounded-full" />
-                )}
-                {day.day}
-              </div>
-            </div>
-          ))}
-          {hours.map((hour) => (
-            <Fragment key={hour}>
-              <div className="p-2 pe-4 tablet:px-[4px] text-center items-center justify-center flex text-[14px] tablet:text-[12px] tablet:whitespace-nowrap text-newTableText">
-                {hour}:00
-              </div>
-              {localizedDays.map((day, indexDay) => (
-                <Fragment
-                  key={`${startDate}-${day.date.format('YYYY-MM-DD')}-${hour}`}
-                >
-                  <div className="relative">
-                    <CalendarColumn
-                      getDate={day.date.hour(hour).startOf('hour')}
-                    />
-                  </div>
-                </Fragment>
-              ))}
-            </Fragment>
-          ))}
-          <WeekNowLine days={localizedDays.map((day) => day.date)} />
-        </div>
+      <div className="flex flex-wrap gap-0.5 md:flex-col md:flex-nowrap">
+        {list.map((post) => (
+          <div key={post.id} className="min-w-0 md:w-full">
+            <PostChip
+              post={post}
+              date={fromUtc(post.publishDate)}
+              variant="month"
+            />
+          </div>
+        ))}
       </div>
+      {posts.length > VISIBLE_IN_CELL && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAll((v) => !v);
+          }}
+          className="rounded px-1 text-start text-xs text-muted-foreground hover:text-foreground"
+        >
+          {showAll ? (
+            <>
+              <span className="md:hidden">−</span>
+              <span className="max-md:hidden">{t('show_less')}</span>
+            </>
+          ) : (
+            <>
+              <span className="md:hidden">
+                +{posts.length - VISIBLE_IN_CELL}
+              </span>
+              <span className="max-md:hidden">
+                {t('calendar_more', {
+                  count: posts.length - VISIBLE_IN_CELL,
+                })}
+              </span>
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
-};
+});
+MonthCell.displayName = 'MonthCell';
+
 export const MonthView = () => {
   const { startDate } = useCalendar();
-  const t = useT();
+  const postsByDay = usePostsBy('YYYY-MM-DD');
 
-  const localizedDays = useMemo(() => {
-    const days = [];
-    // Starting from Monday (1) to Sunday (7)
-    for (let i = 1; i <= 7; i++) {
-      days.push({
-        name: newDayjs().day(i).format('dddd'),
-        short: newDayjs().day(i).format('ddd'),
-      });
-    }
-    return days;
-  }, []);
-
-  const calendarDays = useMemo(() => {
-    const monthStart = newDayjs(startDate);
-    const currentMonth = monthStart.month();
-
-    const startOfMonth = monthStart.startOf('month');
-
-    // Calculate the day offset for Monday (isoWeekday() returns 1 for Monday)
-    const startDayOfWeek = startOfMonth.isoWeekday(); // 1 for Monday, 7 for Sunday
-    const daysBeforeMonth = startDayOfWeek - 1; // Days to show from the previous month
-
-    // Get the start date (Monday of the first week that includes this month)
-    const calendarStartDate = startOfMonth.subtract(daysBeforeMonth, 'day');
-
-    // Create an array to hold the calendar days (6 weeks * 7 days = 42 days max)
-    const calendarDays = [];
-    let currentDay = calendarStartDate;
-    for (let i = 0; i < 42; i++) {
-      let label = 'current-month';
-      if (currentDay.month() < currentMonth) label = 'previous-month';
-      if (currentDay.month() > currentMonth) label = 'next-month';
-      calendarDays.push({
-        day: currentDay,
-        label,
-      });
-
-      // Move to the next day
-      currentDay = currentDay.add(1, 'day');
-    }
-    return calendarDays;
+  const weeks = useMemo(() => {
+    const monthStart = newDayjs(startDate).startOf('month');
+    const first = monthStart.startOf('isoWeek');
+    const last = monthStart.endOf('month').endOf('isoWeek');
+    const count = Math.round(last.diff(first, 'day', true));
+    return Array.from({ length: count }, (_, i) => first.add(i, 'day'));
   }, [startDate]);
 
+  const month = newDayjs(startDate).month();
+  const weekdays = weeks.slice(0, 7);
+
   return (
-    <div className="flex flex-col text-textColor flex-1">
-      <div className="flex-1 flex relative">
-        {/* on phones the whole month fits the width, posts show as channel avatars */}
-        <div className="grid grid-cols-7 tablet:[grid-template-columns:repeat(7,_minmax(100px,_1fr))] mobile:!grid-cols-7 grid-rows-[62px_auto] mobile:grid-rows-[36px_auto] gap-[4px] mobile:gap-[2px] rounded-[10px] absolute start-0 top-0 overflow-auto w-full h-full scrollbar scrollbar-thumb-tableBorder scrollbar-track-secondary">
-          {localizedDays.map((day) => (
-            <div
-              key={day.name}
-              className="z-[20] p-2 mobile:p-0 bg-newTableHeader flex justify-center items-center flex-col h-[62px] mobile:h-[36px] rounded-[8px] sticky top-0"
-            >
-              <div className="mobile:hidden">{day.name}</div>
-              <div className="hidden mobile:block text-[13px]">{day.short}</div>
-            </div>
-          ))}
-          {calendarDays.map((date, index) => (
-            <div
-              key={index}
-              className="text-center items-center justify-center flex mobile:min-w-0"
-            >
-              <CalendarColumn
-                getDate={newDayjs(date.day).endOf('day')}
-                randomHour={true}
-              />
-            </div>
-          ))}
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <div className="sticky top-0 z-20 grid grid-cols-7 bg-card">
+        {weekdays.map((d) => (
+          <div
+            key={d.valueOf()}
+            className="border-e border-b py-2 text-center text-xs text-muted-foreground uppercase"
+          >
+            {d.format('dd')}
+          </div>
+        ))}
+      </div>
+      <div
+        className="grid flex-1 grid-cols-7 [--row:4.5rem] md:[--row:6rem]"
+        style={{
+          gridTemplateRows: `repeat(${weeks.length / 7}, minmax(var(--row), auto))`,
+        }}
+      >
+        {weeks.map((day) => (
+          <MonthCell
+            key={day.valueOf()}
+            day={day}
+            inMonth={day.month() === month}
+            posts={postsByDay[day.format('YYYY-MM-DD')] || []}
+          />
+        ))}
       </div>
     </div>
   );
 };
+
+const PostRow: FC<{ post: CalendarPost }> = ({ post }) => {
+  const t = useT();
+  const { edit } = usePostActions();
+  const text = postText(post);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => edit(post)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          edit(post);
+        }
+      }}
+      className="flex cursor-pointer items-start gap-3 px-3 py-3 outline-none hover:bg-muted/50 focus-visible:bg-muted/50 md:items-center md:px-4"
+    >
+      <span className="w-11 shrink-0 pt-0.5 text-sm font-medium tabular-nums md:pt-0">
+        {fromUtc(post.publishDate).format('HH:mm')}
+      </span>
+      <ChannelAvatar
+        picture={post.integration.picture}
+        identifier={post.integration.providerIdentifier}
+        name={post.integration.name}
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:items-center md:gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">
+            {post.integration.name}
+          </div>
+          <div className="line-clamp-2 text-sm text-muted-foreground md:line-clamp-1">
+            {text || t('no_content')}
+          </div>
+          {post.state === 'ERROR' && !!post.error && (
+            <div className="mt-0.5 line-clamp-1 text-xs text-destructive">
+              {post.error}
+            </div>
+          )}
+        </div>
+        <StatusBadge state={post.state} />
+      </div>
+      <PostActionsMenu post={post} />
+    </div>
+  );
+};
+
 export const ListView = () => {
   const t = useT();
-  const { integrations, loading, listPosts, listState } = useCalendar();
-  const emptyMessage =
-    listState === 'scheduled'
-      ? t('no_upcoming_posts')
-      : listState === 'draft'
-      ? t('no_draft_posts')
-      : listState === 'published'
-      ? t('no_published_posts')
-      : t('no_posts');
+  const { loading, listPosts, listState } = useCalendar();
 
-  // Use shared post actions hook
-  const { editPost, deletePost, openStatistics } = usePostActions();
-
-  // Group posts by date
-  const groupedPosts = useMemo(() => {
-    const groups: { [key: string]: any[] } = {};
-    listPosts.forEach((post) => {
-      const dateKey = fromUtc(post.publishDate).format('YYYY-MM-DD');
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(post);
-    });
+  const grouped = useMemo(() => {
+    const groups = groupBy(
+      sortBy(listPosts, (p) => fromUtc(p.publishDate).valueOf()),
+      (p) => fromUtc(p.publishDate).format('YYYY-MM-DD')
+    );
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [listPosts]);
 
   if (loading) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center">
-        <div className="text-textColor">{t('loading')}</div>
-      </div>
-    );
-  }
-
-  if (listPosts.length === 0) {
-    return (
-      <div className="flex flex-col flex-1 items-center justify-center">
-        <div className="text-textColor text-[16px]">{emptyMessage}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-[10px] flex-1 relative">
-      <div className="absolute start-0 top-0 w-full h-full flex flex-col overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
-        {groupedPosts.map(([dateKey, datePosts]) => (
-          <Fragment key={dateKey}>
-            <div className="text-center text-[14px] min-h-[21px] text-textColor font-[500] mt-[10px]">
-              {newDayjs(dateKey).format('dddd, D. MMMM YYYY')}
-            </div>
-            <div className="flex flex-col gap-[10px] mb-[20px] px-[10px]">
-              {datePosts.map((post) => (
-                <CalendarItem
-                  key={post.id}
-                  display="day"
-                  isBeforeNow={false}
-                  date={fromUtc(post.publishDate)}
-                  state={post.state}
-                  statistics={openStatistics(post.id)}
-                  editPost={editPost(post, false)}
-                  duplicatePost={editPost(post, true)}
-                  post={post}
-                  integrations={integrations}
-                  deletePost={deletePost(post)}
-                  showTime={true}
-                />
-              ))}
-            </div>
-          </Fragment>
+      <div className="flex flex-col gap-2 p-4">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-14 w-full" />
         ))}
       </div>
+    );
+  }
+
+  if (!listPosts.length) {
+    const emptyMessage =
+      listState === 'scheduled'
+        ? t('no_upcoming_posts')
+        : listState === 'draft'
+        ? t('no_draft_posts')
+        : listState === 'published'
+        ? t('no_published_posts')
+        : t('no_posts');
+    return (
+      <Empty className="flex-1">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <CalendarClockIcon />
+          </EmptyMedia>
+          <EmptyTitle>{emptyMessage}</EmptyTitle>
+          <EmptyDescription>{t('calendar_list_empty_hint')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  const today = newDayjs();
+  return (
+    <div className="min-h-0 flex-1 overflow-auto">
+      {grouped.map(([dateKey, posts]) => {
+        const day = newDayjs(dateKey);
+        return (
+          <section key={dateKey}>
+            <h3 className="sticky top-0 z-10 flex items-baseline gap-2 border-b bg-card/95 px-3 py-2 text-sm font-semibold backdrop-blur md:px-4">
+              {day.format('dddd, D. MMMM YYYY')}
+              {day.isSame(today, 'day') && (
+                <span className="text-xs font-normal text-muted-foreground">
+                  {t('today')}
+                </span>
+              )}
+              <span className="ms-auto text-xs font-normal text-muted-foreground">
+                {t('calendar_post_count', { count: posts.length })}
+              </span>
+            </h3>
+            <div className="divide-y border-b">
+              {posts.map((post) => (
+                <PostRow key={post.id} post={post} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 };
 
 export const Calendar = () => {
   const { display } = useCalendar();
-  return (
-    <>
-      {display === 'list' ? (
-        <ListView />
-      ) : display === 'day' ? (
-        <DayView />
-      ) : display === 'week' ? (
-        <WeekView />
-      ) : (
-        <MonthView />
-      )}
-    </>
-  );
-};
-export const CalendarColumn: FC<{
-  getDate: dayjs.Dayjs;
-  randomHour?: boolean;
-}> = memo((props) => {
-  const t = useT();
-
-  const { getDate, randomHour } = props;
-  const {
-    integrations,
-    posts,
-    postDates,
-    changeDate,
-    display,
-    reloadCalendarView,
-    loading,
-    currentHour,
-  } = useCalendar();
-  const modal = useModals();
-  const fetch = useFetch();
-
-  // Use shared post actions hook
-  const { editPost, deletePost, openStatistics } = usePostActions();
-  const postList = useMemo(() => {
-    if (display === 'week') {
-      const start = getDate.startOf('hour').valueOf();
-      const end = getDate.endOf('hour').valueOf();
-      return posts.filter((post) => {
-        const time = postDates.get(post).valueOf();
-        return time >= start && time < end;
-      });
-    }
-    const format = display === 'day' ? 'YYYY-MM-DD HH:mm' : 'DD/MM/YYYY';
-    const cell = getDate.format(format);
-    return posts.filter((post) => postDates.get(post).format(format) === cell);
-  }, [posts, postDates, display, getDate]);
-  const [showAll, setShowAll] = useState(false);
-  const showAllFunc = useCallback(() => {
-    setShowAll(true);
-  }, []);
-  const showLessFunc = useCallback(() => {
-    setShowAll(false);
-  }, []);
-  const list = useMemo(() => {
-    if (showAll) {
-      return postList;
-    }
-    return postList.slice(0, 3);
-  }, [postList, showAll]);
-
-  // currentHour comes from one shared clock, so passed hours get blocked
-  // while the calendar stays open
-  const isBeforeNow = useMemo(
-    () => getDate.startOf('hour').isBefore(currentHour),
-    [getDate, currentHour]
-  );
-
-  const [{ canDrop }, drop] = useDrop(
-    () => ({
-      accept: 'post',
-      drop: async (item: any) => {
-        if (isBeforeNow) return;
-
-        changeDate(item.id, getDate);
-        await fetch(`/posts/${item.id}/date`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            date: getDate.utc().format('YYYY-MM-DDTHH:mm:ss'),
-            action: 'schedule',
-          }),
-        });
-      },
-      collect: (monitor) => ({
-        canDrop: isBeforeNow
-          ? false
-          : !!monitor.canDrop() && !!monitor.isOver(),
-      }),
-    }),
-    [posts, isBeforeNow]
-  );
-
-  const addModal = useCallback(() => {
-    modal.openModal({
-      id: 'add-edit-modal',
-      closeOnClickOutside: false,
-      removeLayout: true,
-      closeOnEscape: false,
-      withCloseButton: false,
-      askClose: true,
-      fullScreen: true,
-      classNames: {
-        modal: 'w-[100%] max-w-[1400px] text-textColor',
-      },
-      children: (
-        <AddEditModal
-          allIntegrations={integrations.map((p) => ({
-            ...p,
-          }))}
-          integrations={integrations.slice(0).map((p) => ({
-            ...p,
-          }))}
-          mutate={reloadCalendarView}
-          date={
-            randomHour
-              ? getDate.hour(Math.floor(Math.random() * 24))
-              : getDate.format('YYYY-MM-DDTHH:mm:ss') ===
-                newDayjs().startOf('hour').format('YYYY-MM-DDTHH:mm:ss')
-              ? newDayjs().add(10, 'minute')
-              : getDate
-          }
-          reopenModal={() => ({})}
-        />
-      ),
-      size: '80%',
-    });
-  }, [integrations, getDate]);
-
-  const addProvider = useAddProvider();
-  return (
-    <div
-      className={clsx(
-        'flex flex-col w-full min-h-full relative',
-        isBeforeNow && 'repeated-strip',
-        loading && 'animate-pulse',
-        isBeforeNow
-          ? 'cursor-not-allowed'
-          : 'border border-newTextColor/5 rounded-[8px]'
-      )}
-      ref={drop as any}
-    >
-      {display === 'month' && (
-        <div
-          className={clsx(
-            'pt-[3px] text-[14px] mobile:pt-[2px] mobile:text-[12px] flex justify-center'
-          )}
-        >
-          {/* every day number gets the same box so only today's is filled */}
-          <div
-            className={clsx(
-              'h-[24px] min-w-[24px] px-[5px] mobile:h-[20px] mobile:min-w-[20px] mobile:px-[4px] rounded-[6px] flex items-center justify-center',
-              getDate.isSame(currentHour, 'day') &&
-                'bg-teal text-white font-[600]'
-            )}
-          >
-            {getDate.date()}
-          </div>
-        </div>
-      )}
-      <div
-        className={clsx(
-          'relative flex flex-col flex-1 rounded-[8px] min-h-[70px]',
-          display === 'month' && 'mobile:min-h-[44px]',
-          canDrop && 'border border-teal'
-        )}
-      >
-        <div
-          className={clsx(
-            'flex-col text-[12px] pointer w-full flex scrollbar scrollbar-thumb-tableBorder scrollbar-track-secondary',
-            isBeforeNow ? 'flex-1' : 'cursor-pointer',
-            isBeforeNow && postList.length === 0 && 'col-calendar',
-            // the "Date passed" hint is wider than a phone month cell
-            display === 'month' && 'mobile:before:hidden'
-          )}
-        >
-          {loading && (
-            <div className="h-full w-full p-[5px] animate-pulse absolute left-0 top-0 z-[50]">
-              <div className="h-full w-full bg-newSettings rounded-[10px]" />
-            </div>
-          )}
-          {list.map((post) => (
-            <div
-              key={post.id}
-              className={clsx(
-                'text-textColor p-[2.5px] relative flex flex-col justify-center items-center'
-              )}
-            >
-              <div
-                className={clsx(
-                  'relative w-full flex flex-col items-center p-[2.5px]',
-                  display === 'month' && 'mobile:p-0'
-                )}
-              >
-                <CalendarItem
-                  display={display as 'day' | 'week' | 'month'}
-                  isBeforeNow={isBeforeNow}
-                  date={getDate}
-                  state={post.state}
-                  statistics={openStatistics(post.id)}
-                  editPost={editPost(post, false)}
-                  duplicatePost={editPost(post, true)}
-                  post={post}
-                  integrations={integrations}
-                  deletePost={deletePost(post)}
-                />
-              </div>
-            </div>
-          ))}
-          {!showAll && postList.length > 3 && (
-            <div
-              className="text-center hover:underline py-[5px] text-textColor"
-              onClick={showAllFunc}
-            >
-              <span className={clsx(display === 'month' && 'mobile:hidden')}>
-                {t('show_more')} ({postList.length - 3})
-              </span>
-              {display === 'month' && (
-                <span className="hidden mobile:inline">
-                  +{postList.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-          {showAll && postList.length > 3 && (
-            <div
-              className="text-center hover:underline py-[5px]"
-              onClick={showLessFunc}
-            >
-              <span className={clsx(display === 'month' && 'mobile:hidden')}>
-                {t('show_less')}
-              </span>
-              {display === 'month' && (
-                <ChevronUpIcon size={16} className="hidden mobile:inline" />
-              )}
-            </div>
-          )}
-        </div>
-        {!isBeforeNow && (
-          <div
-            className="pb-[2.5px] px-[5px] flex-1 flex"
-            onClick={integrations.length ? addModal : addProvider}
-          >
-            <div
-              className={clsx(
-                display === ('month' as any)
-                  ? 'flex-1 min-h-[40px] w-full'
-                  : !postList.length
-                  ? 'min-h-full w-full p-[5px]'
-                  : 'min-h-[40px] w-full',
-                'flex items-center justify-center cursor-pointer pb-[2.5px]'
-              )}
-            >
-              {display !== 'day' && (
-                <div
-                  className={clsx(
-                    'group hover:before:h-[30px] w-full h-full rounded-[10px] flex justify-center items-center text-surface'
-                  )}
-                >
-                  {/* z-[16]: above the now line (z-[15]), under the sticky day headers (z-[20]) */}
-                  <div
-                    className={`group-hover:before:content-["+"] pb-[5px] flex justify-center items-center rounded-[8px] transition-all group-hover:bg-ink w-full h-full max-w-[40px] max-h-[40px] relative z-[16]`}
-                  />
-                </div>
-              )}
-              {display === 'day' && (
-                <div
-                  className={`w-full h-full rounded-[10px] py-[10px] flex-wrap hover:border hover:border-seventh flex justify-center items-center gap-[20px] mobile:gap-[12px] opacity-30 grayscale hover:grayscale-0 hover:opacity-100`}
-                >
-                  {integrations.map((selectedIntegrations) => (
-                    <div
-                      className="relative"
-                      key={selectedIntegrations.identifier}
-                    >
-                      <div
-                        className={clsx(
-                          'relative w-[34px] h-[34px] rounded-[8px] flex justify-center items-center filter transition-all duration-500'
-                        )}
-                      >
-                        <SafeImage
-                          src={
-                            selectedIntegrations.picture || '/no-picture.jpg'
-                          }
-                          className="rounded-[8px]"
-                          alt={selectedIntegrations.identifier}
-                          width={32}
-                          height={32}
-                        />
-                        <SafeImage
-                          src={`/icons/platforms/${selectedIntegrations.identifier}.png`}
-                          className="rounded-[8px] absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
-                          alt={selectedIntegrations.identifier}
-                          width={20}
-                          height={20}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
-const CalendarItem: FC<{
-  date: dayjs.Dayjs;
-  isBeforeNow: boolean;
-  editPost: () => void;
-  duplicatePost: () => void;
-  deletePost: () => void;
-  statistics: () => void;
-  integrations: Integrations[];
-  state: State;
-  display: 'day' | 'week' | 'month';
-  showTime?: boolean;
-  post: Post & {
-    integration: Integration;
-    tags: {
-      tag: Tags;
-    }[];
-  };
-}> = memo((props) => {
-  const t = useT();
-  const {
-    editPost,
-    statistics,
-    duplicatePost,
-    post,
-    date,
-    isBeforeNow,
-    state,
-    display,
-    deletePost,
-    showTime,
-  } = props;
-  const [{ opacity }, dragRef] = useDrag(
-    () => ({
-      type: 'post',
-      // a published post is out, moving it would not change anything
-      canDrag: state !== 'PUBLISHED',
-      item: {
-        id: post.id,
-        date,
-      },
-      collect: (monitor) => ({
-        opacity: monitor.isDragging() ? 0 : 1,
-      }),
-    }),
-    []
-  );
-  return (
-    <div
-      // @ts-ignore
-      ref={dragRef}
-      className={clsx(
-        'w-full flex h-full flex-1 flex-col group',
-        'relative',
-        state === 'ERROR' && 'rounded-[10px] ring-2 ring-error',
-        state === 'PUBLISHED' && 'rounded-[10px] ring-2 ring-teal'
-      )}
-      style={{
-        opacity,
-      }}
-    >
-      {state === 'ERROR' && (
-        <div
-          className={clsx(
-            'absolute -top-[6px] -start-[6px] z-20 w-[18px] h-[18px] rounded-full bg-error flex items-center justify-center text-white text-[11px] font-bold cursor-pointer',
-            display === 'month' && 'mobile:hidden'
-          )}
-          data-tooltip-id="tooltip"
-          data-tooltip-class-name="!max-w-[400px] break-words"
-          data-tooltip-content={post.error || t('post_publish_error')}
-        >
-          !
-        </div>
-      )}
-      {state === 'PUBLISHED' && (
-        <div
-          className={clsx(
-            'absolute -top-[6px] -start-[6px] z-20 w-[18px] h-[18px] rounded-full bg-teal flex items-center justify-center text-white text-[11px] font-bold',
-            display === 'month' && 'mobile:hidden'
-          )}
-        >
-          ✓
-        </div>
-      )}
-      <div
-        className={clsx(
-          'text-surface text-[11px] max-h-[24px] h-[24px] min-h-[24px] w-full rounded-tr-[10px] rounded-tl-[10px] flex items-center justify-center gap-[6px] px-[5px] bg-ink',
-          display === 'month' && 'mobile:hidden'
-        )}
-        style={{
-          backgroundColor: post?.tags?.[0]?.tag?.color,
-        }}
-      >
-        <div
-          className={clsx(
-            post?.tags?.[0]?.tag?.color ? 'text-shadow-tags' : '',
-            'group-hover:hidden cursor-pointer'
-          )}
-        >
-          {post.tags.map((p) => p.tag.name).join(', ')}
-        </div>
-        {state === 'PUBLISHED' && post.releaseURL?.startsWith('http') && (
-          <a
-            href={post.releaseURL}
-            target="_blank"
-            rel="noreferrer"
-            className="hidden group-hover:block hover:underline cursor-pointer"
-          >
-            <OpenPost />
-          </a>
-        )}
-        {state === 'PUBLISHED' && (
-          <div
-            className={clsx(
-              'hidden group-hover:block hover:underline cursor-pointer',
-              post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
-            )}
-            onClick={statistics}
-          >
-            <Statistics />
-          </div>
-        )}
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
-          )}
-          onClick={duplicatePost}
-        >
-          <Duplicate />
-        </div>
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer text-error',
-            post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
-          )}
-          onClick={deletePost}
-        >
-          <DeletePost />
-        </div>
-      </div>
-      <div
-        onClick={editPost}
-        className={clsx(
-          'gap-[5px] w-full flex h-full flex-1 rounded-br-[10px] rounded-bl-[10px] p-[8px] text-[14px] bg-newColColor',
-          'relative',
-          display === 'month' &&
-            'mobile:p-[4px] mobile:rounded-[10px] mobile:justify-center',
-          isBeforeNow && '!grayscale'
-        )}
-      >
-        <div className={clsx('relative min-w-[20px]')}>
-          <img
-            className="w-[20px] h-[20px] rounded-[8px]"
-            src={post.integration.picture! || '/no-picture.jpg'}
-          />
-          <img
-            className="w-[12px] h-[12px] rounded-[8px] absolute z-10 top-[10px] end-0 border border-fifth"
-            src={`/icons/platforms/${post.integration?.providerIdentifier}.png`}
-          />
-        </div>
-        <div
-          className={clsx(
-            'w-full flex-1 flex flex-col min-h-[40px]',
-            display === 'month' && 'mobile:hidden'
-          )}
-        >
-          <div className="text-start">
-            {state === 'DRAFT' ? t('draft') + ': ' : ''}
-          </div>
-          <div className="w-full relative">
-            <div className="absolute top-0 start-0 w-full text-ellipsis break-words line-clamp-1 text-start">
-              {stripHtmlValidation('none', post.content, false, true, false) ||
-                t('no_content')}
-            </div>
-          </div>
-        </div>
-        {showTime && (
-          <div className="text-textColor/50 text-[12px] whitespace-nowrap flex items-center">
-            {fromUtc(post.publishDate).format('HH:mm')}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
-const Duplicate = () => {
-  const t = useT();
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="15"
-      height="15"
-      viewBox="0 0 32 32"
-      fill="none"
-      data-tooltip-id="tooltip"
-      data-tooltip-content={t('duplicate_post')}
-    >
-      <path
-        d="M27 5H9C8.46957 5 7.96086 5.21071 7.58579 5.58579C7.21071 5.96086 7 6.46957 7 7V9H5C4.46957 9 3.96086 9.21071 3.58579 9.58579C3.21071 9.96086 3 10.4696 3 11V25C3 25.5304 3.21071 26.0391 3.58579 26.4142C3.96086 26.7893 4.46957 27 5 27H23C23.5304 27 24.0391 26.7893 24.4142 26.4142C24.7893 26.0391 25 25.5304 25 25V23H27C27.5304 23 28.0391 22.7893 28.4142 22.4142C28.7893 22.0391 29 21.5304 29 21V7C29 6.46957 28.7893 5.96086 28.4142 5.58579C28.0391 5.21071 27.5304 5 27 5ZM23 11V13H5V11H23ZM23 25H5V15H23V25ZM27 21H25V11C25 10.4696 24.7893 9.96086 24.4142 9.58579C24.0391 9.21071 23.5304 9 23 9H9V7H27V21Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-};
-const OpenPost = () => {
-  const t = useT();
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      data-tooltip-id="tooltip"
-      data-tooltip-content={t('open_post')}
-    >
-      <path
-        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.93 8ZM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96ZM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26Zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.99 7.99 0 0 1 5.08 16Zm2.95-8H5.08a7.99 7.99 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8ZM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96ZM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2Zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56ZM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-};
-export const Statistics = () => {
-  const t = useT();
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="15"
-      height="15"
-      viewBox="0 0 32 32"
-      fill="none"
-      data-tooltip-id="tooltip"
-      data-tooltip-content={t('post_statistics')}
-    >
-      <path
-        d="M28 25H27V5C27 4.73478 26.8946 4.48043 26.7071 4.29289C26.5196 4.10536 26.2652 4 26 4H19C18.7348 4 18.4804 4.10536 18.2929 4.29289C18.1054 4.48043 18 4.73478 18 5V10H12C11.7348 10 11.4804 10.1054 11.2929 10.2929C11.1054 10.4804 11 10.7348 11 11V16H6C5.73478 16 5.48043 16.1054 5.29289 16.2929C5.10536 16.4804 5 16.7348 5 17V25H4C3.73478 25 3.48043 25.1054 3.29289 25.2929C3.10536 25.4804 3 25.7348 3 26C3 26.2652 3.10536 26.5196 3.29289 26.7071C3.48043 26.8946 3.73478 27 4 27H28C28.2652 27 28.5196 26.8946 28.7071 26.7071C28.8946 26.5196 29 26.2652 29 26C29 25.7348 28.8946 25.4804 28.7071 25.2929C28.5196 25.1054 28.2652 25 28 25ZM20 6H25V25H20V6ZM13 12H18V25H13V12ZM7 18H11V25H7V18Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-};
-
-export const DeletePost = () => {
-  const t = useT();
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      data-tooltip-id="tooltip"
-      data-tooltip-content={t('delete_post')}
-    >
-      <path
-        d="M15 10V18H9V10H15ZM14 4H9.9L8.9 5H6V7H18V5H15L14 4ZM17 8H7V18C7 19.1 7.9 20 9 20H15C16.1 20 17 19.1 17 18V8Z"
-        fill="currentColor"
-      />
-    </svg>
+  return display === 'list' ? (
+    <ListView />
+  ) : display === 'day' ? (
+    <DayView />
+  ) : display === 'month' ? (
+    <MonthView />
+  ) : (
+    <WeekView />
   );
 };

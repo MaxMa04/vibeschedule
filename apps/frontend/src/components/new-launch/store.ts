@@ -34,16 +34,19 @@ interface StoreState {
   date: dayjs.Dayjs;
   // the other channels of an existing post, each with its own date
   channelDates: Record<string, dayjs.Dayjs>;
-  totalChars: number;
   tags: { label: string; value: string }[];
   current: string;
   locked: boolean;
-  hide: boolean;
   integrations: Integrations[];
   selectedIntegrations: SelectedIntegrations[];
   global: Values[];
   internal: Internal[];
-  chars: Record<string, number>;
+  formatId: string | null;
+  setFormatId: (formatId: string | null) => void;
+  // inline validation messages, keyed by channel id, 'global' or 'form'
+  errors: Record<string, string>;
+  setErrors: (errors: Record<string, string>) => void;
+  clearError: (key: string) => void;
   setLocked: (locked: boolean) => void;
   setGlobalValue: (value: Values[]) => void;
   setInternalValue: (integrationId: string, value: Values[]) => void;
@@ -64,27 +67,23 @@ interface StoreState {
   setSelectedIntegrations: (
     params: { selectedIntegrations: Integrations; settings: any }[]
   ) => void;
-  setHide: (hide: boolean) => void;
   setDate: (date: dayjs.Dayjs) => void;
   setChannelDate: (integrationId: string, date: dayjs.Dayjs) => void;
   setTags: (tags: { label: string; value: string }[]) => void;
-  setTotalChars: (totalChars: number) => void;
-  setChars: (id: string, chars: number) => void;
 }
 
 const initialState = {
   date: newDayjs(),
   channelDates: {} as Record<string, dayjs.Dayjs>,
   tags: [] as { label: string; value: string }[],
-  totalChars: 0,
   current: 'global',
   locked: false,
-  hide: false,
   integrations: [] as Integrations[],
   selectedIntegrations: [] as SelectedIntegrations[],
   global: [] as Values[],
   internal: [] as Internal[],
-  chars: {} as Record<string, number>,
+  formatId: null as string | null,
+  errors: {} as Record<string, string>,
 };
 
 const updateFirst = (values: Values[], update: Partial<Values>) =>
@@ -104,6 +103,18 @@ const updateInternal = (
 export const useLaunchStore = create<StoreState>()((set) => ({
   ...initialState,
   setCurrent: (current) => set({ current }),
+  setFormatId: (formatId) => set({ formatId }),
+  setErrors: (errors) => set({ errors }),
+  clearError: (key) =>
+    set((state) =>
+      state.errors[key]
+        ? {
+            errors: Object.fromEntries(
+              Object.entries(state.errors).filter(([k]) => k !== key)
+            ),
+          }
+        : state
+    ),
   addOrRemoveSelectedIntegration: (integration, settings) => {
     set((state) => {
       const existing = state.selectedIntegrations.find(
@@ -189,7 +200,6 @@ export const useLaunchStore = create<StoreState>()((set) => ({
   reset: () => set(initialState),
   setAllIntegrations: (integrations) => set({ integrations }),
   setLocked: (locked) => set({ locked }),
-  setHide: (hide) => set({ hide }),
   setDate: (date) => set({ date }),
   setChannelDate: (integrationId, date) =>
     set((state) => ({
@@ -204,7 +214,4 @@ export const useLaunchStore = create<StoreState>()((set) => ({
         ref: createRef(),
       })),
     }),
-  setTotalChars: (totalChars) => set({ totalChars }),
-  setChars: (id, chars) =>
-    set((state) => ({ chars: { ...state.chars, [id]: chars } })),
 }));

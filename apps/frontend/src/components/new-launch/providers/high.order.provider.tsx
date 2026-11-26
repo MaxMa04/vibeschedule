@@ -1,27 +1,34 @@
 'use client';
 
-import React, {
-  FC,
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-} from 'react';
+import React, { FC, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useForm, FormProvider } from 'react-hook-form';
 import { IsOptional } from 'class-validator';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
-import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
-import { GeneralPreviewComponent } from '@vibeschedule/frontend/components/launches/general.preview.component';
+import { useLaunchStore } from '@vibeschedule/frontend/components/new-launch/store';
+import { useEditorSlots } from '@vibeschedule/frontend/components/new-launch/slots';
+import { GeneralPreview } from '@vibeschedule/frontend/components/new-launch/providers/general.preview';
 import { IntegrationContext } from '@vibeschedule/frontend/components/launches/helpers/use.integration';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { createPortal } from 'react-dom';
-import clsx from 'clsx';
-import SafeImage from '@vibeschedule/react/helpers/safe.image';
 
 class Empty {
   @IsOptional()
   empty: string;
+}
+
+export interface ProviderHandle {
+  isValid: () => Promise<{
+    id: string;
+    identifier: string;
+    valid: boolean;
+    settings: Record<string, any>;
+    values: { id: string; content: string; media: { id: string; path: string }[] }[];
+    maximumCharacters: number;
+  }>;
+  trigger: () => Promise<boolean>;
+  // brings the channel's settings into view, showing what is wrong
+  fix: () => void;
 }
 
 // The settings form values are stored as the channel's `settings` and the
@@ -38,55 +45,32 @@ export const withProvider = function (params: {
   const { SettingsComponent, CustomPreviewComponent, dto, maximumCharacters } =
     params;
 
-  const Wrapped = forwardRef((props: { id: string }, ref) => {
+  const Wrapped = forwardRef<ProviderHandle, { id: string }>((props, ref) => {
     const t = useT();
-    const {
-      current,
-      selectedIntegration,
-      setCurrent,
-      internal,
-      global,
-      date,
-      isGlobal,
-      setTotalChars,
-      allIntegrations,
-      setChars,
-      setHide,
-    } = useLaunchStore(
+    const { internal, global, date, allIntegrations, selectedIntegration } =
+      useLaunchStore(
+        useShallow((state) => ({
+          date: state.channelDates[props.id] || state.date,
+          global: state.global,
+          internal: state.internal.find((p) => p.integration.id === props.id),
+          allIntegrations: state.integrations,
+          selectedIntegration: state.selectedIntegrations.find(
+            (p) => p.integration.id === props.id
+          )!,
+        }))
+      );
+    const { settingsSlot, previewSlot } = useEditorSlots(
       useShallow((state) => ({
-        date: state.channelDates[props.id] || state.date,
-        global: state.global,
-        internal: state.internal.find((p) => p.integration.id === props.id),
-        setHide: state.setHide,
-        allIntegrations: state.integrations,
-        current: state.current === props.id,
-        isGlobal: state.current === 'global',
-        setCurrent: state.setCurrent,
-        setTotalChars: state.setTotalChars,
-        setChars: state.setChars,
-        selectedIntegration: state.selectedIntegrations.find(
-          (p) => p.integration.id === props.id
-        )!,
+        settingsSlot: state.settings[props.id],
+        previewSlot: state.previewId === props.id ? state.preview : null,
       }))
     );
 
-    useEffect(() => {
-      setChars(props.id, maximumCharacters);
-      if (isGlobal) {
-        setTotalChars(0);
-      }
-      if (current) {
-        setTotalChars(maximumCharacters);
-      }
-    }, [current, isGlobal]);
-
-    const value = useMemo(() => {
-      if (internal?.integrationValue?.length) {
-        return internal.integrationValue;
-      }
-
-      return global;
-    }, [internal, global]);
+    const value = useMemo(
+      () =>
+        internal?.integrationValue?.length ? internal.integrationValue : global,
+      [internal, global]
+    );
 
     const form = useForm({
       resolver: classValidatorResolver(dto || Empty),
@@ -101,45 +85,27 @@ export const withProvider = function (params: {
     useImperativeHandle(
       ref,
       () => ({
-        isValid: async () => {
-          return {
-            id: props.id,
-            identifier: selectedIntegration.integration.identifier,
-            integration: selectedIntegration.integration,
-            valid: await form.trigger(),
-            err: form.formState.errors,
-            settings: form.getValues(),
-            values: value,
-            maximumCharacters,
-          };
-        },
-        getValues: () => {
-          return {
-            id: props.id,
-            identifier: selectedIntegration.integration.identifier,
-            values: value,
-            settings: form.getValues(),
-          };
-        },
-        trigger: () => {
-          return form.trigger();
-        },
-        // a save that failed on this channel brings it into view, with its
-        // settings showing what is wrong
+        isValid: async () => ({
+          id: props.id,
+          identifier: selectedIntegration.integration.identifier,
+          valid: await form.trigger(),
+          settings: form.getValues(),
+          values: value,
+          maximumCharacters,
+        }),
+        trigger: () => form.trigger(),
         fix: () => {
-          setCurrent(props.id);
-          setHide(true);
           form.trigger();
-        },
-        preview: () => {
-          setCurrent(props.id);
-          setHide(true);
+          settingsSlot?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         },
       }),
-      [value]
+      [value, settingsSlot, selectedIntegration]
     );
 
-    const Preview = CustomPreviewComponent || GeneralPreviewComponent;
+    const Preview = CustomPreviewComponent || GeneralPreview;
+    const hasContent =
+      !!value?.[0]?.content?.replace(/<[^>]*>/g, '').trim() ||
+      !!value?.[0]?.media?.length;
 
     return (
       <IntegrationContext.Provider
@@ -155,76 +121,27 @@ export const withProvider = function (params: {
         }}
       >
         <FormProvider {...form}>
-          <div
-            className={clsx(
-              'border border-borderPreview rounded-[20px] shadow-previewShadow',
-              !current && 'hidden'
+          {SettingsComponent &&
+            settingsSlot &&
+            createPortal(<SettingsComponent />, settingsSlot)}
+          {previewSlot &&
+            createPortal(
+              hasContent ? (
+                <Preview maximumCharacters={maximumCharacters} />
+              ) : (
+                <div className="flex min-h-40 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  {t('start_writing_your_post')}
+                </div>
+              ),
+              previewSlot
             )}
-          >
-            {current && !value?.[0]?.content?.length && (
-              <div className="p-[16px] text-textItemBlur">
-                {t('start_writing_your_post')}
-              </div>
-            )}
-            {current && !!value?.[0]?.content?.length && (
-              <Preview maximumCharacters={maximumCharacters} />
-            )}
-            {SettingsComponent &&
-              createPortal(
-                <div
-                  data-id={props.id}
-                  className={
-                    isGlobal
-                      ? 'bg-newSettings pb-[12px] px-[12px] mobile:bg-transparent mobile:px-[16px]'
-                      : 'hidden bg-newSettings px-[12px] pb-[12px] mobile:bg-transparent mobile:px-[16px]'
-                  }
-                >
-                  {isGlobal && (
-                    <style>{`#wrapper-settings {display: flex !important} #social-empty {display: block !important;}`}</style>
-                  )}
-                  {isGlobal && (
-                    <div className="flex py-[20px] items-center gap-[15px]">
-                      <div className="relative">
-                        <SafeImage
-                          alt={selectedIntegration.integration.name}
-                          width={42}
-                          height={42}
-                          className="min-w-[42px] min-h-[42px] w-[42px] h-[42px] rounded-full"
-                          src={
-                            selectedIntegration.integration.picture ||
-                            '/no-picture.jpg'
-                          }
-                        />
-                        <SafeImage
-                          alt={selectedIntegration.integration.identifier}
-                          width={16}
-                          height={16}
-                          className="rounded-[16px] min-w-[16px] min-h-[16px] w-[16px] h-[16px] absolute bottom-0 end-0"
-                          src={`/icons/platforms/${selectedIntegration.integration.identifier}.png`}
-                        />
-                      </div>
-                      <div className="text-[20px]">
-                        {selectedIntegration.integration.name}
-                      </div>
-                    </div>
-                  )}
-                  <SettingsComponent />
-                </div>,
-                document.querySelector('#social-settings') ||
-                  document.createElement('div')
-              )}
-            {current &&
-              !SettingsComponent &&
-              createPortal(
-                <style>{`#wrapper-settings {display: none !important;} #social-empty {display: block !important;}`}</style>,
-                document.querySelector('#social-settings') ||
-                  document.createElement('div')
-              )}
-          </div>
         </FormProvider>
       </IntegrationContext.Provider>
     );
   });
 
-  return Object.assign(Wrapped, { hasSettings: !!SettingsComponent });
+  return Object.assign(Wrapped, {
+    hasSettings: !!SettingsComponent,
+    maximumCharacters,
+  });
 };

@@ -1,0 +1,7 @@
+/launches
+/post
+/formats
+/analytics
+/media
+/settings
+/auth/login

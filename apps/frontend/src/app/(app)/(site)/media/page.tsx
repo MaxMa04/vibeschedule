@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { MediaLayoutComponent } from '@vibeschedule/frontend/components/new-layout/layout.media.component';
+import { MediaLibraryPage } from '@vibeschedule/frontend/components/media/media.component';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <MediaLayoutComponent />;
+  return <MediaLibraryPage />;
 }

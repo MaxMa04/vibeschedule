@@ -1,9 +1,11 @@
 'use client';
 
 import { withProvider } from '@vibeschedule/frontend/components/new-launch/providers/high.order.provider';
-import { Select } from '@vibeschedule/react/form/select';
-import { Checkbox } from '@vibeschedule/react/form/checkbox';
-import { useSettings } from '@vibeschedule/frontend/components/launches/helpers/use.values';
+import { FieldGroup } from '@vibeschedule/frontend/components/ui/field';
+import {
+  SettingsSelect,
+  SettingsSwitch,
+} from '@vibeschedule/frontend/components/new-launch/providers/settings.fields';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { TiktokPreview } from '@vibeschedule/frontend/components/new-launch/providers/tiktok/tiktok.preview';
 
@@ -35,34 +37,24 @@ const toggles = [
 
 const TikTokSettings = () => {
   const t = useT();
-  const { register } = useSettings();
 
   return (
-    <div className="flex flex-col">
-      <Select
+    <FieldGroup>
+      <SettingsSelect
+        name="privacy_status"
         label={t('privacy_status')}
-        {...register('privacy_status', {
-          value: 'public',
-        })}
-      >
-        {privacyStatuses.map((item) => (
-          <option key={item.value} value={item.value}>
-            {t(item.label)}
-          </option>
-        ))}
-      </Select>
-      <div className="flex flex-col gap-[16px]">
-        {toggles.map((item) => (
-          <Checkbox
-            key={item.name}
-            label={t(item.label)}
-            {...register(item.name, {
-              value: item.value,
-            })}
-          />
-        ))}
-      </div>
-    </div>
+        defaultValue="public"
+        options={privacyStatuses}
+      />
+      {toggles.map((item) => (
+        <SettingsSwitch
+          key={item.name}
+          name={item.name}
+          label={t(item.label)}
+          defaultValue={item.value}
+        />
+      ))}
+    </FieldGroup>
   );
 };
 

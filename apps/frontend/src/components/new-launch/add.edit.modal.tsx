@@ -26,8 +26,13 @@ export interface AddEditModalProps {
   selectedChannels?: string[];
   reopenModal: () => void;
   mutate: () => void;
+  // 'page': the editor fills the Posten page instead of a modal
+  variant?: 'modal' | 'page';
+  // after a save on the page, which then starts a new post
+  onSaved?: () => void;
   onlyValues?: Array<{
     content: string;
+    formatId?: string | null;
     image?: Array<{
       id: string;
       path: string;
@@ -140,6 +145,7 @@ const AddEditModalValues: FC<AddEditModalProps> = (props) => {
     setTags,
     selectedIntegrations,
     setChannelDate,
+    setFormatId,
   } = useLaunchStore(
     useShallow((state) => ({
       reset: state.reset,
@@ -152,6 +158,7 @@ const AddEditModalValues: FC<AddEditModalProps> = (props) => {
       setTags: state.setTags,
       selectedIntegrations: state.selectedIntegrations,
       setChannelDate: state.setChannelDate,
+      setFormatId: state.setFormatId,
     }))
   );
 
@@ -165,10 +172,15 @@ const AddEditModalValues: FC<AddEditModalProps> = (props) => {
       },
     ]);
 
+    setFormatId(first?.formatId || existingData.posts[0]?.formatId || null);
+
     if (existingData.integration) {
       setTags(
-        // @ts-ignore
-        existingData.posts[0]?.tags?.map((p: any) => ({
+        (
+          existingData.posts[0] as ExistingPost & {
+            tags?: { tag: { name: string } }[];
+          }
+        )?.tags?.map((p) => ({
           label: p.tag.name,
           value: p.tag.name,
         })) || []

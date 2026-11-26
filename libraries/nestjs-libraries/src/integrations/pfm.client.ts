@@ -34,7 +34,11 @@ export interface PfmPostResult {
 
 export interface PfmFeedPost {
   social_post_id?: string;
+  platform_post_id?: string;
   posted_at?: string;
+  platform_url?: string;
+  caption?: string;
+  media?: Array<{ url?: string; thumbnail_url?: string }>;
   metrics?: Record<string, unknown>;
 }
 
@@ -57,6 +61,7 @@ export class PfmError extends Error {
 }
 
 const RESULT_EVENT = 'social.post.result.created';
+const RATE_LIMIT_RETRIES = 3;
 
 const webhookUrl = () => {
   const base = process.env.BACKEND_PUBLIC_URL || '';
@@ -96,15 +101,35 @@ export class PfmClient implements OnApplicationBootstrap {
       }
     }
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${process.env.POST_FOR_ME_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: AbortSignal.timeout(15_000),
-    });
+    const send = () =>
+      fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${process.env.POST_FOR_ME_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: AbortSignal.timeout(15_000),
+      });
+
+    // PfM rate limits bursts (several channel feeds at once), reads wait and retry
+    let response = await send();
+    for (
+      let attempt = 1;
+      response.status === 429 &&
+      method === 'GET' &&
+      attempt <= RATE_LIMIT_RETRIES;
+      attempt++
+    ) {
+      const retryAfter = Number(response.headers.get('retry-after'));
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          retryAfter > 0 ? Math.min(retryAfter, 10) * 1000 : attempt * 1000
+        )
+      );
+      response = await send();
+    }
 
     const text = await response.text();
     if (!response.ok) {
