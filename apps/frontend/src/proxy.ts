@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCookieUrlFromDomain } from '@vibeschedule/helpers/subdomain/subdomain.management';
 
+const PUBLIC_PATHS = ['/clipping'];
+
 export async function proxy(request: NextRequest) {
   const nextUrl = request.nextUrl;
   const authCookie =
@@ -31,6 +33,11 @@ export async function proxy(request: NextRequest) {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
     });
     return response;
+  }
+
+  // the public clipper application, with or without a login
+  if (PUBLIC_PATHS.some((path) => nextUrl.pathname.startsWith(path))) {
+    return NextResponse.next();
   }
 
   const search = new URL(nextUrl).search;

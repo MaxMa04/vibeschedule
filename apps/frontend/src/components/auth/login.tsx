@@ -31,7 +31,8 @@ export function Login() {
   const t = useT();
   const id = useId();
   const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // the backend's reason, e.g. that an application is still being checked
+  const [failed, setFailed] = useState<string | null>(null);
   const form = useForm<Inputs>({ defaultValues: { email: '', password: '' } });
   const fetchData = useFetch();
 
@@ -39,13 +40,13 @@ export function Login() {
   // then navigates away, so loading stays on
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
-    setFailed(false);
+    setFailed(null);
     const login = await fetchData('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ ...data, provider: 'LOCAL' }),
     });
     if (login.status >= 400) {
-      setFailed(true);
+      setFailed((await login.text().catch(() => '')) || t('login_failed'));
       setLoading(false);
     }
   };
@@ -62,7 +63,7 @@ export function Login() {
             {failed && (
               <Alert variant="destructive">
                 <CircleAlertIcon />
-                <AlertTitle>{t('login_failed')}</AlertTitle>
+                <AlertTitle>{failed}</AlertTitle>
               </Alert>
             )}
             <Field>
@@ -77,7 +78,7 @@ export function Login() {
                 required
                 placeholder={t('email_placeholder')}
                 className="h-10"
-                aria-invalid={failed || undefined}
+                aria-invalid={!!failed || undefined}
                 {...form.register('email', { required: true })}
               />
             </Field>
@@ -91,7 +92,7 @@ export function Login() {
                 autoComplete="current-password"
                 required
                 className="h-10"
-                aria-invalid={failed || undefined}
+                aria-invalid={!!failed || undefined}
                 {...form.register('password', { required: true })}
               />
             </Field>
@@ -99,6 +100,12 @@ export function Login() {
               {loading && <Spinner data-icon="inline-start" />}
               {t('sign_in_1')}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              {t('login_clipping')}{' '}
+              <a href="/clipping" className="font-medium text-foreground underline underline-offset-4">
+                {t('login_clipping_link')}
+              </a>
+            </p>
           </FieldGroup>
         </form>
       </CardContent>

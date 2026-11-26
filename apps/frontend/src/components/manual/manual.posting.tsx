@@ -16,6 +16,7 @@ import {
   SmartphoneIcon,
 } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import {
@@ -62,7 +63,10 @@ import {
   ManualMedia,
   useManualMedia,
 } from '@vibeschedule/frontend/components/manual/use.manual.media';
-import { ClipperAccounts } from '@vibeschedule/frontend/components/manual/clipper.accounts';
+import {
+  ClipperAccounts,
+  ClipperStartBanner,
+} from '@vibeschedule/frontend/components/manual/clipper.accounts';
 import { useUser } from '@vibeschedule/frontend/components/layout/user.context';
 
 interface ManualPost {
@@ -83,10 +87,6 @@ interface Metric {
   data: { total: string }[];
 }
 
-const responseMessage = async (response: Response) => {
-  const { message } = await response.json().catch(() => ({}));
-  return (Array.isArray(message) ? message[0] : message) as string | undefined;
-};
 
 const numberFormat = new Intl.NumberFormat('de-DE');
 
@@ -257,6 +257,7 @@ const ManualList: FC<{
         title={t('manual_posting')}
         description={t('manual_posting_description')}
       />
+      {user?.role === 'CLIPPER' && <ClipperStartBanner />}
       <Tabs
         value={tab}
         onValueChange={(value) =>

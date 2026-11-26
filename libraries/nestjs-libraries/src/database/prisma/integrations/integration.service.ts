@@ -12,6 +12,7 @@ import {
   toTeamUsers,
 } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.repository';
 import {
+  connectAccount,
   connectExternalId,
   connectOwner,
 } from '@vibeschedule/helpers/channels/connect.owner';
@@ -95,7 +96,9 @@ export class IntegrationService {
     identifier: string,
     fields: Record<string, string>,
     // the clipper the account is for, it lands with them after the sync
-    ownerId?: string
+    ownerId?: string,
+    // the clipper's onboarding account (ClipperAccount) it is connected for
+    accountId?: string
   ) {
     const platform = getPfmPlatform(identifier);
     if (!platform) {
@@ -105,7 +108,7 @@ export class IntegrationService {
     return {
       url: await this._pfmClient.authUrl(
         identifier,
-        connectExternalId(orgId, ownerId),
+        connectExternalId(orgId, ownerId, accountId),
         platform.platformData?.(fields)
       ),
     };
@@ -129,7 +132,11 @@ export class IntegrationService {
     );
     // new channels connected through a clipper's link, see connect.owner.ts.
     // Only new ones: an admin may take a channel away from its clipper later.
-    const owned: { channelId: string; userId: string }[] = [];
+    const owned: {
+      channelId: string;
+      userId: string;
+      accountId: string | null;
+    }[] = [];
     for (const account of accounts) {
       // an expired photo keeps the last stable copy, otherwise initials show
       const previous = stored.get(account.id);
@@ -143,7 +150,11 @@ export class IntegrationService {
       );
       const userId = connectOwner(orgId, account.external_id);
       if (userId && !known.has(account.id)) {
-        owned.push({ channelId: id, userId });
+        owned.push({
+          channelId: id,
+          userId,
+          accountId: connectAccount(orgId, account.external_id),
+        });
       }
     }
 

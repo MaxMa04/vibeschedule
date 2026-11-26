@@ -1,11 +1,14 @@
 'use client';
 
-import { FC, useState } from 'react';
+import { FC } from 'react';
 import useSWR from 'swr';
-import { BookOpenIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
+import { BookOpenIcon, ListChecksIcon, TriangleAlertIcon } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
-import { useToaster } from '@vibeschedule/react/toaster/toaster';
+import {
+  onboardingProgress,
+  useOnboarding,
+} from '@vibeschedule/frontend/components/onboarding/clipper.start';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import { CLIPPER_GUIDE_URL } from '@vibeschedule/frontend/components/clippers/clipper.guide';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
@@ -17,8 +20,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@vibeschedule/frontend/components/ui/card';
+import { Progress } from '@vibeschedule/frontend/components/ui/progress';
 import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
-import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 
 interface ClipperChannel {
   id: string;
@@ -28,13 +31,45 @@ interface ClipperChannel {
   disabled: boolean;
 }
 
-// A clipper's own accounts with the way to connect another one. The connect
-// link carries the clipper, so the account lands here after the consent.
+// Until a clipper has set everything up, the posting page leads to the start
+export const ClipperStartBanner: FC = () => {
+  const t = useT();
+  const { data } = useOnboarding();
+  if (!data || data.done) {
+    return null;
+  }
+  const progress = onboardingProgress(data);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('start_banner_title')}</CardTitle>
+        <CardDescription>{t('start_banner_text')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <div className="flex justify-end text-sm text-muted-foreground tabular-nums">
+          {t('start_progress_count', progress)}
+        </div>
+        <Progress value={(progress.done / progress.total) * 100} />
+      </CardContent>
+      <CardFooter>
+        <Button
+          className="h-10 md:h-9"
+          nativeButton={false}
+          render={<a href="/start" />}
+        >
+          <ListChecksIcon data-icon="inline-start" />
+          {t('start_banner_button')}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
+// A clipper's own accounts. New accounts are created, warmed up and
+// connected on the start page (/start), one by one.
 export const ClipperAccounts: FC = () => {
   const t = useT();
   const fetch = useFetch();
-  const toaster = useToaster();
-  const [connecting, setConnecting] = useState(false);
   const { data } = useSWR('/manual/channels', async (url: string) => {
     const response = await fetch(url);
     if (!response.ok) {
@@ -47,26 +82,6 @@ export const ClipperAccounts: FC = () => {
     };
   });
   const connected = data?.channels.filter((c) => !c.disabled).length ?? 0;
-  const full =
-    !!data && data.maxAccounts !== null && connected >= data.maxAccounts;
-
-  const connect = async () => {
-    setConnecting(true);
-    try {
-      const response = await fetch('/manual/connect/tiktok');
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok || !body.url) {
-        throw new Error(body.message);
-      }
-      window.location.href = body.url;
-    } catch (e) {
-      setConnecting(false);
-      toaster.show(
-        (e instanceof Error && e.message) || t('clipper_connect_failed'),
-        'warning'
-      );
-    }
-  };
 
   return (
     <Card className="gap-0 pb-0">
@@ -96,7 +111,10 @@ export const ClipperAccounts: FC = () => {
         ) : (
           <ul className="divide-y">
             {data.channels.map((channel) => (
-              <li key={channel.id} className="flex items-center gap-2.5 px-4 py-3">
+              <li
+                key={channel.id}
+                className="flex items-center gap-2.5 px-4 py-3"
+              >
                 <ChannelAvatar
                   picture={channel.picture}
                   identifier={channel.identifier}
@@ -117,24 +135,21 @@ export const ClipperAccounts: FC = () => {
         )}
       </CardContent>
       <CardFooter className="flex-wrap gap-2 border-t py-3">
-        {full && (
-          <p className="w-full text-sm text-muted-foreground">
-            {t('clipper_accounts_full', { max: data?.maxAccounts })}
-          </p>
-        )}
         <Button
           className="h-10 md:h-9"
-          onClick={connect}
-          disabled={connecting || full}
+          nativeButton={false}
+          render={<a href="/start" />}
         >
-          {connecting ? <Spinner data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
-          {t('clipper_connect_tiktok')}
+          <ListChecksIcon data-icon="inline-start" />
+          {t('start_nav')}
         </Button>
         <Button
           variant="ghost"
           className="h-10 md:h-9"
           nativeButton={false}
-          render={<a href={CLIPPER_GUIDE_URL} target="_blank" rel="noreferrer" />}
+          render={
+            <a href={CLIPPER_GUIDE_URL} target="_blank" rel="noreferrer" />
+          }
         >
           <BookOpenIcon data-icon="inline-start" />
           {t('clipper_guide')}

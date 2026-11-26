@@ -17,7 +17,10 @@ import {
 import { Separator } from '@vibeschedule/frontend/components/ui/separator';
 import { TooltipProvider } from '@vibeschedule/frontend/components/ui/tooltip';
 import { AppSidebar } from '@vibeschedule/frontend/components/new-layout/app-sidebar';
-import { navItemFor } from '@vibeschedule/frontend/components/new-layout/nav';
+import {
+  CLIPPER_PATHS,
+  navItemFor,
+} from '@vibeschedule/frontend/components/new-layout/nav';
 
 const PageTitle = () => {
   const t = useT();
@@ -52,11 +55,11 @@ export const LayoutComponent = ({
     refreshWhenHidden: false,
   });
 
-  // a clipper has the posting page and the password, the backend refuses
-  // everything else anyway
+  // a clipper has the start, the posting page and the password, the backend
+  // refuses everything else anyway
   const misplaced =
     user?.role === 'CLIPPER' &&
-    !['/manual', '/settings'].some((path) => pathname.startsWith(path));
+    !CLIPPER_PATHS.some((path) => pathname.startsWith(path));
   useEffect(() => {
     if (misplaced) {
       router.replace('/manual');

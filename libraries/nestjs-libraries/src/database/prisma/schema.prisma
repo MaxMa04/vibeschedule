@@ -9,45 +9,53 @@ datasource db {
 }
 
 model Organization {
-  id           String             @id @default(uuid())
-  name         String
-  apiKey       String?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  apps         App[]
-  formats      Format[]
-  integrations Integration[]
-  media        Media[]
-  posts        Post[]
-  tags         Tags[]
-  users        UserOrganization[]
+  id                  String               @id @default(uuid())
+  name                String
+  apiKey              String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  apps                App[]
+  formats             Format[]
+  integrations        Integration[]
+  media               Media[]
+  posts               Post[]
+  tags                Tags[]
+  users               UserOrganization[]
+  clipperApplications ClipperApplication[]
+  clipperAccounts     ClipperAccount[]
 
   @@index([apiKey])
 }
 
 model User {
-  id            String             @id @default(uuid())
-  email         String             @unique
-  password      String
-  name          String?
-  timezoneName  String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  organizations UserOrganization[]
-  channels      UserIntegration[]
+  id              String             @id @default(uuid())
+  email           String             @unique
+  password        String
+  name            String?
+  /// WhatsApp number, from a clipper application
+  phone           String?
+  timezoneName    String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  organizations   UserOrganization[]
+  channels        UserIntegration[]
+  clipperAccounts ClipperAccount[]
 }
 
 model UserOrganization {
-  id             String       @id @default(uuid())
-  userId         String
-  organizationId String
-  role           Role         @default(USER)
+  id              String       @id @default(uuid())
+  userId          String
+  organizationId  String
+  role            Role         @default(USER)
   /// how many TikTok accounts a clipper runs for us, connecting more is blocked
-  clipperAccounts Int         @default(3)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clipperAccounts Int          @default(3)
+  /// where a clipper's pay goes, entered by the clipper during the onboarding
+  payoutName      String?
+  payoutIban      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -190,6 +198,7 @@ model Integration {
   formats            IntegrationFormat[]
   feedFormats        FeedPostFormat[]
   users              UserIntegration[]
+  clipperAccount     ClipperAccount?
 
   @@unique([organizationId, internalId])
   @@index([organizationId])
@@ -207,6 +216,72 @@ model UserIntegration {
 
   @@id([userId, integrationId])
   @@index([integrationId])
+}
+
+/// Someone who applied on the public page /clipping. Accepting creates the
+/// clipper login from it (with the password chosen here).
+model ClipperApplication {
+  id           String            @id @default(cuid())
+  orgId        String
+  status       ApplicationStatus @default(PENDING)
+  name         String
+  email        String
+  /// WhatsApp number
+  phone        String
+  age          Int
+  /// iphone or android
+  device       String
+  /// how many accounts they want to run
+  accounts     Int
+  experience   String?
+  source       String?
+  /// bcrypt hash, becomes the login password on acceptance
+  password     String
+  /// the clipper login created on acceptance
+  userId       String?
+  decidedAt    DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  organization Organization      @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, status])
+  @@index([email])
+}
+
+/// One TikTok account a clipper runs for us: the profile we hand out (picture,
+/// name, username, niche) and how far the clipper got with creating and warming
+/// it up (rules in libraries/helpers/src/clippers/clipper.onboarding.ts).
+model ClipperAccount {
+  id            String       @id @default(cuid())
+  orgId         String
+  userId        String
+  /// 0, 1, 2 … the order the clipper creates the accounts in
+  position      Int
+  name          String?
+  username      String?
+  bio           String?
+  /// public R2 URL of the profile picture
+  avatar        String?
+  /// the niche the account warms up in, e.g. "Zunehmen / Gym"
+  topic         String?
+  /// search terms for the warm-up, one per line
+  searchTerms   String?
+  /// when the clipper created the account in TikTok
+  createdOn     DateTime?
+  /// one entry per warm-up day the clipper checked off
+  warmups       DateTime[]
+  /// the For You page shows the niche after the warm-up
+  fypOkAt       DateTime?
+  /// the vibeschedule channel once the account is connected
+  integrationId String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  organization  Organization @relation(fields: [orgId], references: [id])
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, position])
+  @@index([orgId])
 }
 
 /// One row per channel. Posts saved together for several channels share a batchId.
@@ -255,6 +330,12 @@ enum State {
   PUBLISHED
   ERROR
   DRAFT
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
 
 enum FormatStatus {

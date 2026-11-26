@@ -1,7 +1,8 @@
 'use client';
 
 import { FC, useEffect, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -17,6 +18,20 @@ import {
 } from '@vibeschedule/frontend/components/layout/page-header';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import { CLIPPER_GUIDE_URL } from '@vibeschedule/frontend/components/clippers/clipper.guide';
+import {
+  ClipperApplications,
+  useApplications,
+} from '@vibeschedule/frontend/components/clippers/clipper.applications';
+import {
+  ClipperSetup,
+  SETUP_KEY,
+} from '@vibeschedule/frontend/components/clippers/clipper.setup';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@vibeschedule/frontend/components/ui/tabs';
 import { Alert, AlertTitle } from '@vibeschedule/frontend/components/ui/alert';
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
@@ -69,6 +84,8 @@ interface PayMonth {
   missedPostPenaltyCents: number;
   clippers: {
     user: { id: string; name: string | null; email: string };
+    /** entered by the clipper in the onboarding */
+    payout: { name: string | null; iban: string | null };
     /** accounts agreed with the clipper */
     maxAccounts: number;
     /** accounts connected and not lost */
@@ -232,7 +249,7 @@ const AccountsInput: FC<{
   );
 };
 
-export const ClippersPage = () => {
+const ClipperPay: FC = () => {
   const t = useT();
   const fetch = useFetch();
   const [month, setMonth] = useState<string | null>(null);
@@ -250,19 +267,17 @@ export const ClippersPage = () => {
   const current = data?.month;
 
   return (
-    <PageBody className="max-w-5xl">
-      <PageHeader
-        title={t('clippers')}
-        description={
-          data
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {data
             ? t('clippers_description', {
                 free: data.freeMissedPosts,
                 penalty: money(data.missedPostPenaltyCents),
               })
-            : null
-        }
-        actions={
-          <>
+            : null}
+        </p>
+        <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
@@ -284,9 +299,8 @@ export const ClippersPage = () => {
             >
               <ChevronRightIcon />
             </Button>
-          </>
-        }
-      />
+        </div>
+      </div>
 
       {error ? (
         <Alert variant="destructive">
@@ -334,7 +348,14 @@ export const ClippersPage = () => {
                   </span>
                 </CardTitle>
                 <CardDescription className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  <span className="truncate">{clipper.user.email}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{clipper.user.email}</span>
+                    <span className="truncate font-mono text-xs">
+                      {clipper.payout.iban
+                        ? `${clipper.payout.name} · ${clipper.payout.iban}`
+                        : t('setup_payout_missing')}
+                    </span>
+                  </span>
                   <span className="flex items-center gap-2">
                     <span className="tabular-nums">
                       {t('clippers_connected_of', {
@@ -420,6 +441,50 @@ export const ClippersPage = () => {
           ))}
         </>
       )}
+    </div>
+  );
+};
+
+type Tab = 'applications' | 'setup' | 'pay';
+const TABS: Tab[] = ['applications', 'setup', 'pay'];
+
+// Clippers for admins: applications from /clipping, the accounts we hand out
+// and their warm-up, and the pay per account and month
+export const ClippersPage = () => {
+  const t = useT();
+  const router = useRouter();
+  const params = useSearchParams();
+  const tab = TABS.find((value) => value === params.get('tab')) || 'applications';
+  const { data: applications } = useApplications();
+  const { mutate } = useSWRConfig();
+  const pending = applications?.filter((a) => a.status === 'PENDING').length;
+  const setTab = (value: Tab) =>
+    router.replace(value === 'applications' ? '/clippers' : `/clippers?tab=${value}`);
+
+  return (
+    <PageBody className="max-w-5xl">
+      <PageHeader title={t('clippers')} description={t('clippers_page_description')} />
+      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+        <TabsList className="w-full sm:w-fit group-data-horizontal/tabs:h-10 sm:group-data-horizontal/tabs:h-8">
+          <TabsTrigger value="applications">
+            {t('clippers_tab_applications')}
+            {!!pending && (
+              <Badge className="h-5 min-w-5 px-1.5 tabular-nums">{pending}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="setup">{t('clippers_tab_setup')}</TabsTrigger>
+          <TabsTrigger value="pay">{t('clippers_tab_pay')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="applications" className="pt-2">
+          <ClipperApplications onAccepted={() => mutate(SETUP_KEY)} />
+        </TabsContent>
+        <TabsContent value="setup" className="pt-2">
+          <ClipperSetup />
+        </TabsContent>
+        <TabsContent value="pay" className="pt-2">
+          <ClipperPay />
+        </TabsContent>
+      </Tabs>
     </PageBody>
   );
 };

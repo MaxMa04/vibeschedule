@@ -5,11 +5,12 @@ import { ChannelUsersService } from './channel.users.service';
 // a sync that found these new channels from clipper links, the members and
 // the channels each user already has
 const setup = (
-  owned: { channelId: string; userId: string }[],
+  owned: { channelId: string; userId: string; accountId?: string | null }[],
   roles: Record<string, string>,
   assigned: string[] = []
 ) => {
   const added: string[] = [];
+  const arrived: string[] = [];
   const manualOnly: string[] = [];
   const fees: string[] = [];
   const service = new ChannelUsersService(
@@ -42,9 +43,19 @@ const setup = (
     } as never,
     {
       sync: async () => ({ total: 3, added: owned.length, disabled: 0, owned }),
+    } as never,
+    {
+      channelArrived: async (
+        _org: string,
+        userId: string,
+        channelId: string,
+        accountId?: string | null
+      ) => {
+        arrived.push(`${userId}:${channelId}:${accountId ?? '-'}`);
+      },
     } as never
   );
-  return { service, added, manualOnly, fees };
+  return { service, added, manualOnly, fees, arrived };
 };
 
 test('a channel from a clipper link lands with the clipper, manual-only', async () => {
@@ -64,6 +75,15 @@ test('a channel from a clipper link lands with the clipper, manual-only', async 
   assert.deepEqual(fees, ['c1:3000']);
 });
 
+test('a channel from the link of an onboarding account fills that account', async () => {
+  const { service, arrived } = setup(
+    [{ channelId: 'c1', userId: 'clipper', accountId: 'acc2' }],
+    { clipper: 'CLIPPER' }
+  );
+  await service.sync('org');
+  assert.deepEqual(arrived, ['clipper:c1:acc2']);
+});
+
 test('only clippers of the workspace get channels from a link', async () => {
   const { service, added, manualOnly } = setup(
     [
@@ -78,13 +98,14 @@ test('only clippers of the workspace get channels from a link', async () => {
 });
 
 test('a channel the clipper already has stays as it is', async () => {
-  const { service, manualOnly } = setup(
+  const { service, manualOnly, arrived } = setup(
     [{ channelId: 'c1', userId: 'clipper' }],
     { clipper: 'CLIPPER' },
     ['clipper:c1']
   );
   assert.equal((await service.sync('org')).assigned, 0);
   assert.deepEqual(manualOnly, []);
+  assert.deepEqual(arrived, []);
 });
 
 // a clipper with these channels and this many agreed accounts
@@ -121,7 +142,8 @@ const connectSetup = (disabled: boolean[], clipperAccounts: number) => {
         links.push(owner);
         return { url: 'https://www.tiktok.com/auth' };
       },
-    } as never
+    } as never,
+    {} as never
   );
   const clipper = { id: 'clipper', role: 'CLIPPER' } as never;
   return { service, clipper, links };

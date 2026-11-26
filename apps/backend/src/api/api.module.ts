@@ -15,6 +15,8 @@ import { PfmWebhookController } from '@vibeschedule/backend/api/routes/pfm.webho
 import { ClippersController } from '@vibeschedule/backend/api/routes/clippers.controller';
 import { ManualController } from '@vibeschedule/backend/api/routes/manual.controller';
 import { ClipperGuard } from '@vibeschedule/backend/services/auth/clipper.guard';
+import { ClippingController } from '@vibeschedule/backend/api/routes/clipping.controller';
+import { OnboardingController } from '@vibeschedule/backend/api/routes/onboarding.controller';
 
 const authenticatedControllers = [
   UsersController,
@@ -27,6 +29,7 @@ const authenticatedControllers = [
   MediaController,
   ManualController,
   ClippersController,
+  OnboardingController,
 ];
 
 @Module({
@@ -34,6 +37,8 @@ const authenticatedControllers = [
     RootController,
     AuthController,
     PfmWebhookController,
+    // the public application page, no login
+    ClippingController,
     ...authenticatedControllers,
   ],
   // clippers reach only what is marked with @AllowClipper()

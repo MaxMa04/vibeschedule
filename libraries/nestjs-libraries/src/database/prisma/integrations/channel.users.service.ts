@@ -13,6 +13,7 @@ import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/pris
 import { TeamUser } from '@vibeschedule/helpers/channels/channel.filter';
 import { SessionUser } from '@vibeschedule/nestjs-libraries/user/user.from.request';
 import { DEFAULT_MONTHLY_FEE_CENTS } from '@vibeschedule/helpers/clippers/clipper.billing';
+import { ClipperOnboardingService } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.onboarding.service';
 
 // clippers connect their own accounts, only where we post by hand
 const CLIPPER_PLATFORMS = ['tiktok'];
@@ -28,11 +29,13 @@ export class ChannelUsersService {
     private _organizationRepository: OrganizationRepository,
     private _organizationService: OrganizationService,
     private _postsService: PostsService,
-    private _integrationService: IntegrationService
+    private _integrationService: IntegrationService,
+    private _onboardingService: ClipperOnboardingService
   ) {}
 
   // Mirrors the PfM accounts and hands a channel a clipper connected through
-  // their own link to that clipper, manual-only from the start
+  // their own link to that clipper, manual-only from the start, and to the
+  // onboarding account the link was made for
   async sync(orgId: string) {
     const { owned, ...result } = await this._integrationService.sync(orgId);
     const members = owned.length
@@ -42,13 +45,19 @@ export class ChannelUsersService {
         )
       : [];
     let assigned = 0;
-    for (const { channelId, userId } of owned) {
+    for (const { channelId, userId, accountId } of owned) {
       const member = members.find((m) => m.userId === userId);
       if (member?.role !== Role.CLIPPER) {
         continue;
       }
       if (await this._integrationRepository.addUserChannel(userId, channelId)) {
         await this.handToClipper(orgId, channelId);
+        await this._onboardingService.channelArrived(
+          orgId,
+          userId,
+          channelId,
+          accountId
+        );
         assigned++;
       }
     }
@@ -132,6 +141,7 @@ export class ChannelUsersService {
     if (member.role === Role.CLIPPER) {
       for (const id of added) {
         await this.handToClipper(orgId, id);
+        await this._onboardingService.channelArrived(orgId, userId, id);
       }
     }
     return { channels };
@@ -164,11 +174,19 @@ export class ChannelUsersService {
       integrationId,
       userIds
     );
-    const clipperAdded = members.some(
+    const clippersAdded = members.filter(
       (member) => member.role === Role.CLIPPER && added.includes(member.userId)
     );
+    const clipperAdded = clippersAdded.length > 0;
     if (clipperAdded) {
       await this.handToClipper(orgId, integrationId);
+    }
+    for (const clipper of clippersAdded) {
+      await this._onboardingService.channelArrived(
+        orgId,
+        clipper.userId,
+        integrationId
+      );
     }
 
     return {
