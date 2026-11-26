@@ -730,6 +730,69 @@ yargs(hideBin(process.argv))
     }
   )
   .command(
+    'posts:set-format <id> [post] [format]',
+    'Format eines veröffentlichten Posts setzen, auch wenn er von Hand gepostet wurde',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'Kanal-ID',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('post', {
+          describe: 'Link des Posts, Plattform-ID oder Post-for-Me-ID',
+          type: 'string',
+        })
+        .positional('format', {
+          describe: 'Format-ID oder Name, `none` entfernt das Format',
+          type: 'string',
+        })
+        .option('file', {
+          alias: 'f',
+          describe:
+            'Viele auf einmal: JSON-Datei mit [{"post": "<link>", "format": "<name>"}]',
+          type: 'string',
+        })
+        .check((argv) => {
+          if (argv.file || (argv.post && argv.format)) return true;
+          throw new Error('Post und Format angeben oder --file');
+        })
+        .example(
+          '$0 posts:set-format abc123 https://www.tiktok.com/@leon.gains/video/7712451143204408615 "Video-Roast"',
+          'Von Hand geposteten TikTok einem Format zuordnen'
+        )
+        .example(
+          '$0 posts:set-format abc123 --file zuordnung.json',
+          'Viele Posts eines Kanals auf einmal zuordnen'
+        ),
+    async (argv) => {
+      const items: { post: string; format: string }[] = argv.file
+        ? JSON.parse(readFileSync(argv.file, 'utf8'))
+        : [{ post: argv.post!, format: argv.format! }];
+      const formats = await request('/formats');
+      const results: Record<string, unknown>[] = [];
+      for (const item of items) {
+        const formatId =
+          item.format.toLowerCase() === 'none'
+            ? null
+            : resolveId(item.format, formats, 'Format');
+        try {
+          results.push(
+            await request(`/formats/posts/${enc(argv.id)}`, {
+              method: 'PUT',
+              body: { post: item.post, formatId },
+            })
+          );
+        } catch (err) {
+          if (!argv.file) throw err;
+          results.push({ post: item.post, error: (err as Error).message });
+        }
+      }
+      print(argv.file ? results : results[0]);
+      if (results.some((r) => 'error' in r)) process.exitCode = 1;
+    }
+  )
+  .command(
     'analytics:overview',
     'Kennzahlen aller Kanäle mit Vergleich zum Zeitraum davor',
     (y) =>

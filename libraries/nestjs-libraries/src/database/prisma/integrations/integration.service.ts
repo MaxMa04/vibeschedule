@@ -441,6 +441,10 @@ export class IntegrationService {
       uniq(report.currentPosts.flatMap((p) => p.social_post_id || [])),
       uniq(report.currentPosts.flatMap((p) => p.platform_post_id || []))
     );
+    const feedFormats = await this._integrationRepository.feedFormatsFor(
+      integration.id,
+      uniq(report.currentPosts.flatMap((p) => p.platform_post_id || []))
+    );
     const linkOf = (p: PfmFeedPost) =>
       links.find(
         (l) =>
@@ -470,6 +474,11 @@ export class IntegrationService {
           metrics,
           engagementRate: engagementRate(metrics, report.defs, report.primary),
           post: link ? { id: link.id, format: link.format } : null,
+          format:
+            link?.format ||
+            feedFormats.find((f) => f.platformPostId === p.platform_post_id)
+              ?.format ||
+            null,
         };
       }),
       fetchedAt: new Date().toISOString(),

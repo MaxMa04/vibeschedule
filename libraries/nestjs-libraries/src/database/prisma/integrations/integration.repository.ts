@@ -47,7 +47,8 @@ export class IntegrationRepository {
     private _integration: PrismaRepository<'integration'>,
     private _posts: PrismaRepository<'post'>,
     private _apps: PrismaRepository<'app'>,
-    private _userIntegration: PrismaRepository<'userIntegration'>
+    private _userIntegration: PrismaRepository<'userIntegration'>,
+    private _feedFormats: PrismaRepository<'feedPostFormat'>
   ) {}
 
   getIntegrationsList(org: string, filter?: ChannelFilter) {
@@ -417,6 +418,22 @@ export class IntegrationRepository {
         id: true,
         pfmPostId: true,
         releaseId: true,
+        format: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  // formats given afterwards to posts published without vibeschedule
+  feedFormatsFor(integrationId: string, platformPostIds: string[]) {
+    if (!platformPostIds.length) return Promise.resolve([]);
+    return this._feedFormats.model.feedPostFormat.findMany({
+      where: {
+        integrationId,
+        platformPostId: { in: platformPostIds },
+        format: { deletedAt: null },
+      },
+      select: {
+        platformPostId: true,
         format: { select: { id: true, name: true } },
       },
     });

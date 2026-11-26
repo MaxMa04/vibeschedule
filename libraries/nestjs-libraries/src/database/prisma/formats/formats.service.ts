@@ -11,9 +11,11 @@ import { get } from 'lodash';
 import { FormatsRepository } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.repository';
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
 import {
+  FeedPostFormatDto,
   FormatDto,
   IntegrationFormatDto,
 } from '@vibeschedule/nestjs-libraries/dtos/formats/format.dto';
+import { findFeedPost } from '@vibeschedule/helpers/formats/feed.post.ref';
 import {
   getPfmPlatform,
   PfmPlatform,
@@ -34,6 +36,8 @@ export interface FormatStats {
 }
 
 const FEED_CONCURRENCY = 3;
+// how far back a published post can be found to give it a format
+const FEED_LOOKUP_DAYS = 365;
 const VIEW_LABELS = ['Aufrufe', 'Impressionen'];
 const LIKE_LABELS = ['Likes', 'Reaktionen'];
 
@@ -134,6 +138,66 @@ export class FormatsService {
     return { ok: true };
   }
 
+  // Gives a published post the format it belongs to. A post made in
+  // vibeschedule keeps it on the post itself; a post published by hand only
+  // exists in the PfM feed and gets a FeedPostFormat row instead.
+  async setFeedPostFormat(
+    orgId: string,
+    integrationId: string,
+    body: FeedPostFormatDto
+  ) {
+    const channel = await this._formatsRepository.channel(orgId, integrationId);
+    if (!channel) {
+      throw new NotFoundException('Kanal nicht gefunden');
+    }
+    const formatId = body.formatId || null;
+    const format = formatId
+      ? await this._formatsRepository.get(orgId, formatId)
+      : null;
+    if (formatId && !format) {
+      throw new NotFoundException('Format nicht gefunden');
+    }
+    const feed = await this._integrationService.feedPosts(
+      channel.internalId,
+      dayjs.utc().subtract(FEED_LOOKUP_DAYS, 'day').startOf('day'),
+      true
+    );
+    const item = findFeedPost(feed, body.post);
+    if (!item?.platform_post_id) {
+      throw new NotFoundException(
+        'Post nicht im Feed dieses Kanals gefunden (Link oder ID prüfen)'
+      );
+    }
+    const platformPostId = item.platform_post_id;
+    const own = await this._formatsRepository.ownPost(
+      orgId,
+      channel.id,
+      platformPostId,
+      item.social_post_id || null
+    );
+    if (own) {
+      await this._formatsRepository.setPostFormat(own.id, formatId);
+      // the post carries it now, a row from before would count twice
+      await this._formatsRepository.removeFeedFormat(channel.id, platformPostId);
+    } else if (formatId) {
+      await this._formatsRepository.upsertFeedFormat(
+        channel.id,
+        platformPostId,
+        formatId
+      );
+    } else {
+      await this._formatsRepository.removeFeedFormat(channel.id, platformPostId);
+    }
+    return {
+      integrationId: channel.id,
+      platformPostId,
+      url: item.platform_url || null,
+      postedAt: item.posted_at || null,
+      formatId,
+      postId: own?.id || null,
+    };
+  }
+
   // Per channel: its formats with the posts of the range and, for published
   // posts, the views and likes from the PfM feed
   async overview(orgId: string, filter: ChannelFilter, days: number) {
@@ -150,6 +214,9 @@ export class FormatsService {
       orgId,
       channels.map((c) => c.id),
       since.toDate()
+    );
+    const feedFormats = await this._formatsRepository.feedFormats(
+      channels.map((c) => c.id)
     );
 
     const feedErrors = new Map<string, string>();
@@ -245,6 +312,30 @@ export class FormatsService {
               }
             : entry;
         };
+
+        // posts published by hand that were given a format afterwards
+        const byFeedId = new Map(
+          feedFormats
+            .filter((f) => f.integrationId === channel.id)
+            .map((f) => [f.platformPostId, f.format])
+        );
+        for (const item of feed || []) {
+          if (linked.has(item) || !item.platform_post_id) continue;
+          const format = byFeedId.get(item.platform_post_id);
+          if (!format) continue;
+          linked.add(item);
+          if (!channel.formats.some((f) => f.format.id === format.id)) {
+            extraFormats.set(format.id, format);
+          }
+          const entry = stats.get(format.id) || emptyStats();
+          stats.set(format.id, entry);
+          entry.published++;
+          if (item.posted_at) {
+            entry.lastPostAt = later(entry.lastPostAt, new Date(item.posted_at));
+          }
+          if (viewsPath) entry.views = (entry.views || 0) + metric(item, viewsPath);
+          if (likesPath) entry.likes = (entry.likes || 0) + metric(item, likesPath);
+        }
 
         const unlinked = (feed || []).filter((item) => !linked.has(item));
         const sum = (items: PfmFeedPost[], path: string | undefined) =>

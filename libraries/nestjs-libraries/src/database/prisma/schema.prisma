@@ -122,6 +122,7 @@ model Format {
   organization Organization        @relation(fields: [orgId], references: [id])
   integrations IntegrationFormat[]
   posts        Post[]
+  feedPosts    FeedPostFormat[]
 
   @@index([orgId])
 }
@@ -139,6 +140,23 @@ model IntegrationFormat {
   format        Format       @relation(fields: [formatId], references: [id], onDelete: Cascade)
 
   @@id([integrationId, formatId])
+  @@index([formatId])
+}
+
+/// The format of a post that was published without vibeschedule (posted by
+/// hand) and only shows up in the channel's PfM feed. Never a Post: it has
+/// no date in the calendar, no clipper pay and nothing to publish.
+model FeedPostFormat {
+  integrationId  String
+  /// platform_post_id from the PfM feed (TikTok video id, YouTube video id …)
+  platformPostId String
+  formatId       String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  integration    Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  format         Format      @relation(fields: [formatId], references: [id], onDelete: Cascade)
+
+  @@id([integrationId, platformPostId])
   @@index([formatId])
 }
 
@@ -170,6 +188,7 @@ model Integration {
   organization       Organization        @relation(fields: [organizationId], references: [id])
   posts              Post[]
   formats            IntegrationFormat[]
+  feedFormats        FeedPostFormat[]
   users              UserIntegration[]
 
   @@unique([organizationId, internalId])

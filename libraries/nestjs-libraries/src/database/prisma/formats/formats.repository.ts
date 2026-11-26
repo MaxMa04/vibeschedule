@@ -19,7 +19,8 @@ export class FormatsRepository {
     private _formats: PrismaRepository<'format'>,
     private _integrationFormats: PrismaRepository<'integrationFormat'>,
     private _integrations: PrismaRepository<'integration'>,
-    private _posts: PrismaRepository<'post'>
+    private _posts: PrismaRepository<'post'>,
+    private _feedFormats: PrismaRepository<'feedPostFormat'>
   ) {}
 
   list(orgId: string) {
@@ -175,6 +176,73 @@ export class FormatsRepository {
         pfmPostId: true,
         format: { select: { id: true, name: true, description: true } },
       },
+    });
+  }
+
+  channel(orgId: string, integrationId: string) {
+    return this._integrations.model.integration.findFirst({
+      where: { id: integrationId, organizationId: orgId, deletedAt: null },
+      select: { id: true, internalId: true },
+    });
+  }
+
+  // formats given to posts that only exist in the PfM feed
+  feedFormats(integrationIds: string[]) {
+    return this._feedFormats.model.feedPostFormat.findMany({
+      where: {
+        integrationId: { in: integrationIds },
+        format: { deletedAt: null },
+      },
+      select: {
+        integrationId: true,
+        platformPostId: true,
+        format: { select: { id: true, name: true, description: true } },
+      },
+    });
+  }
+
+  // the vibeschedule post a feed post belongs to, if any
+  ownPost(
+    orgId: string,
+    integrationId: string,
+    platformPostId: string | null,
+    pfmPostId: string | null
+  ) {
+    const or = [
+      ...(platformPostId ? [{ releaseId: platformPostId }] : []),
+      ...(pfmPostId ? [{ pfmPostId }] : []),
+    ];
+    if (!or.length) return Promise.resolve(null);
+    return this._posts.model.post.findFirst({
+      where: { organizationId: orgId, integrationId, deletedAt: null, OR: or },
+      select: { id: true },
+    });
+  }
+
+  setPostFormat(postId: string, formatId: string | null) {
+    return this._posts.model.post.update({
+      where: { id: postId },
+      data: { formatId },
+      select: { id: true },
+    });
+  }
+
+  upsertFeedFormat(
+    integrationId: string,
+    platformPostId: string,
+    formatId: string
+  ) {
+    return this._feedFormats.model.feedPostFormat.upsert({
+      where: { integrationId_platformPostId: { integrationId, platformPostId } },
+      create: { integrationId, platformPostId, formatId },
+      update: { formatId },
+      select: { platformPostId: true },
+    });
+  }
+
+  removeFeedFormat(integrationId: string, platformPostId: string) {
+    return this._feedFormats.model.feedPostFormat.deleteMany({
+      where: { integrationId, platformPostId },
     });
   }
 }

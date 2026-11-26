@@ -12,6 +12,7 @@ import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
 import { FormatsService } from '@vibeschedule/nestjs-libraries/database/prisma/formats/formats.service';
 import {
+  FeedPostFormatDto,
   FormatDto,
   FormatsOverviewQueryDto,
   IntegrationFormatDto,
@@ -37,6 +38,16 @@ export class PublicFormatsController {
       channelFilter(query),
       query.days || 30
     );
+  }
+
+  // format of a published post, also one posted by hand outside vibeschedule
+  @Put('/posts/:integrationId')
+  setPostFormat(
+    @GetOrgFromRequest() org: Organization,
+    @Param('integrationId') integrationId: string,
+    @Body() body: FeedPostFormatDto
+  ) {
+    return this._formatsService.setFeedPostFormat(org.id, integrationId, body);
   }
 
   @Post('/')

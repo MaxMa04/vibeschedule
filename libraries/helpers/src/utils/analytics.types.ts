@@ -46,6 +46,9 @@ export interface AnalyticsPost {
   engagementRate: number | null;
   // the vibeschedule post this feed post was published from
   post: { id: string; format: { id: string; name: string } | null } | null;
+  // its format: the one of that post or the one given afterwards to a post
+  // published by hand
+  format: { id: string; name: string } | null;
 }
 
 export interface AccountAnalytics {
