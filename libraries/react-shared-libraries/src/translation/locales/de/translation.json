@@ -627,6 +627,8 @@
   "analytics_no_channels_filtered": "Zu diesem Filter passt kein Kanal.",
   "responsible": "Zuständig",
   "responsible_filter": "Nach Zuständigen filtern",
+  "responsible_clippers": "Clipper",
+  "responsible_clippers_filter": "Kanäle von Clippern zeigen",
   "responsible_me": "Ich",
   "responsible_set": "Zuständige festlegen",
   "responsible_names": "Zuständig: {{names}}",

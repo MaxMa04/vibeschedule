@@ -36,7 +36,7 @@ vibeschedule auth:check
 | Befehl | Zweck |
 | --- | --- |
 | `auth:check` | Schlüssel prüfen, zeigt API-URL und Anzahl Kanäle |
-| `integrations:list [--app <id>] [--user <nutzer-id>]` | Verbundene Kanäle mit ID, Plattform (`identifier`), App, `manualOnly` und den zuständigen Nutzern (`users`). `--app none` zeigt Kanäle ohne App |
+| `integrations:list [--app <id>] [--user <nutzer-id>] [--no-clippers]` | Verbundene Kanäle mit ID, Plattform (`identifier`), App, `manualOnly` und den zuständigen Nutzern (`users`). `--app none` zeigt Kanäle ohne App |
 | `integrations:app <kanal-id> <app>` | App eines Kanals setzen (App-ID oder Name), `none` entfernt sie |
 | `integrations:users <kanal-id> <nutzer>` | Zuständige eines Kanals setzen, ersetzt die bisherigen. Nutzer-IDs oder E-Mails kommagetrennt, `none` für keine. Ein Clipper darunter stellt den Kanal auf „Nur manuell“ |
 | `users:list` | Nutzer des Workspace mit ID, Name, E-Mail und Rolle (`ADMIN`, `USER`, `CLIPPER`) |
@@ -66,12 +66,12 @@ vibeschedule auth:check
 | `upload <datei-oder-url>` | In die Mediathek hochladen, gibt `path` (öffentliche URL) zurück |
 | `media:list [-s <suche>] [-p <seite>]` | Mediathek, neueste zuerst |
 | `posts:create ...` | Post anlegen, siehe unten |
-| `posts:list [--start <iso>] [--end <iso>] [--app <id>] [--user <nutzer-id>]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
+| `posts:list [--start <iso>] [--end <iso>] [--app <id>] [--user <nutzer-id>] [--no-clippers]` | Posts im Zeitraum, Standard 30 Tage zurück bis 30 Tage voraus |
 | `posts:delete <post-id>` | Post mit allen Kanälen seiner Gruppe löschen |
 | `posts:delete-group <gruppe>` | Alle Posts einer Gruppe löschen |
 | `posts:find-slot <kanal-id>` | Nächster freier Zeitslot des Kanals |
 | `formats:list` | Formate mit ID, Beschreibung und den Kanälen, auf denen sie laufen (`status` ACTIVE, TESTING oder PAUSED) |
-| `formats:overview [--app <id>] [--user <nutzer-id>] [-d <tage>]` | Pro Kanal seine Formate mit Posts, Aufrufen und Likes im Zeitraum (Standard 30 Tage), dazu `feed.withoutFormat`: veröffentlichte Posts ohne Format. `--app none` zeigt Kanäle ohne App |
+| `formats:overview [--app <id>] [--user <nutzer-id>] [--no-clippers] [-d <tage>]` | Pro Kanal seine Formate mit Posts, Aufrufen und Likes im Zeitraum (Standard 30 Tage), dazu `feed.withoutFormat`: veröffentlichte Posts ohne Format. `--app none` zeigt Kanäle ohne App |
 | `formats:create <name> [-d <beschreibung>]` | Format anlegen |
 | `formats:update <format> [--name <name>] [-d <beschreibung>]` | Format umbenennen oder Beschreibung ändern, was fehlt, bleibt. `-d ""` leert die Beschreibung |
 | `formats:delete <format>` | Format löschen. Es verschwindet von allen Kanälen, Posts behalten ihren Bezug |
@@ -82,12 +82,12 @@ vibeschedule auth:check
 | `inspiration:add <link…> [--app <app>] [-n <notiz>]` | Links speichern, auch mehrere auf einmal oder mit Text drumherum. TikTok-Kurzlinks (`vm.tiktok.com`) werden aufgelöst; ein schon gespeichertes Video kommt mit `duplicate: true` zurück. Das Vorschaubild holt vibeschedule beim Speichern; fehlt es, lädt erneutes Hinzufügen es nach |
 | `inspiration:update <id> [-f <format>] [-s open\|done\|skipped] [--app <app>] [-n <notiz>]` | Link dem Format zuordnen, das daraus wurde (ein offener Link ist damit erledigt), verwerfen (`-s skipped`), App oder Notiz ändern. `none` entfernt Format bzw. App, `-n ""` die Notiz |
 | `inspiration:delete <id>` | Gespeicherten Link löschen |
-| `analytics:overview [-d <tage>] [--app <id>] [--user <nutzer-id>] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
+| `analytics:overview [-d <tage>] [--app <id>] [--user <nutzer-id>] [--no-clippers] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
 | `analytics:account <kanal-id> [-d <tage>] [--fresh]` | Ein Kanal: Kennzahlen mit Vergleich, `series` pro Tag und alle Posts des Zeitraums mit Metriken, Link, Vorschaubild und zugehörigem vibeschedule-Post samt Format |
 | `analytics:channel <kanal-id> [-d <tage>]` | Statistiken eines Kanals, Standard 7 Tage |
 | `analytics:post <post-id>` | Statistiken eines veröffentlichten Posts |
 
-`<format>` und `<app>` nehmen die ID oder den Namen (Groß- und Kleinschreibung egal). `--user` filtert auf die Kanäle, für die dieser Nutzer zuständig ist (ID aus `users:list`).
+`<format>` und `<app>` nehmen die ID oder den Namen (Groß- und Kleinschreibung egal). `--user` filtert auf die Kanäle, für die dieser Nutzer zuständig ist (ID aus `users:list`), dazu die Kanäle der Clipper, die er betreut. `--no-clippers` lässt alle Kanäle weg, für die ein Clipper zuständig ist.
 
 Zuständige: Jeder Nutzer kann für Kanäle zuständig sein. Bei Admins und Team ist das nur eine Zuordnung zum Filtern. Ein Clipper sieht in der App nur seine Kanäle und postet sie von Hand, deshalb geht ein Kanal, den ein Clipper bekommt, auf „Nur manuell“. Wird der Clipper wieder entfernt, bleibt „Nur manuell“ stehen (`integrations:manual-only <kanal-id> --off` hebt es auf).
 

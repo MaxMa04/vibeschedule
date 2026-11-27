@@ -91,12 +91,13 @@ export class PublicIntegrationsController {
   async listIntegrations(
     @GetOrgFromRequest() org: Organization,
     @Query('app') app?: string,
-    @Query('user') user?: string
+    @Query('user') user?: string,
+    @Query('clippers') clippers?: string
   ) {
     return (
       await this._integrationService.getIntegrationsList(
         org.id,
-        channelFilter({ app, user })
+        channelFilter({ app, user, clippers })
       )
     ).map((integration) => ({
       id: integration.id,
@@ -264,12 +265,13 @@ export class PublicIntegrationsController {
     @Query('days') days: string,
     @Query('app') app?: string,
     @Query('user') user?: string,
+    @Query('clippers') clippers?: string,
     @Query('fresh') fresh?: string
   ) {
     return this._integrationService.analyticsOverview(
       org.id,
       analyticsDays(days),
-      channelFilter({ app, user }),
+      channelFilter({ app, user, clippers }),
       fresh === '1'
     );
   }

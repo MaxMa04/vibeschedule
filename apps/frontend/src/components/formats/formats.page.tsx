@@ -69,7 +69,7 @@ const channelRef = (channel: OverviewChannel) => ({
   identifier: channel.identifier,
 });
 
-const FILTER_KEYS = ['app', 'user', 'days', 'view'];
+const FILTER_KEYS = ['app', 'user', 'clippers', 'days', 'view'];
 
 const useQueryState = () => {
   const { ready, params, setParams } = usePersistedFilters(
@@ -81,10 +81,12 @@ const useQueryState = () => {
     ready,
     app: params.get('app'),
     user: params.get('user'),
+    clippers: params.get('clippers'),
     days: PERIODS.includes(days) ? days : 30,
     view: (params.get('view') === 'formats' ? 'formats' : 'accounts') as View,
     setApp: (app: string | null) => setParams({ app }),
     setUser: (user: string | null) => setParams({ user }),
+    setClippers: (clippers: string | null) => setParams({ clippers }),
     setDays: (value: number) =>
       setParams({ days: value === 30 ? null : String(value) }),
     setView: (view: View) =>
@@ -124,11 +126,22 @@ const Section = ({
 
 export const FormatsPage = () => {
   const t = useT();
-  const { ready, app, user, days, view, setApp, setUser, setDays, setView } =
-    useQueryState();
+  const {
+    ready,
+    app,
+    user,
+    clippers,
+    days,
+    view,
+    setApp,
+    setUser,
+    setClippers,
+    setDays,
+    setView,
+  } = useQueryState();
   const { data: apps } = useApps();
   const { data: formats } = useFormats();
-  const overview = useOverview(app, user, days, ready);
+  const overview = useOverview(app, user, clippers, days, ready);
   const channels = overview.data?.channels;
 
   const [formatSheet, setFormatSheet] = useState<FormatSheetState | null>(null);
@@ -219,6 +232,8 @@ export const FormatsPage = () => {
       <ResponsibleFilter
         value={user}
         onChange={setUser}
+        clippers={clippers}
+        onClippersChange={setClippers}
         className="data-[size=default]:h-10 max-md:min-w-0 max-md:flex-1 md:data-[size=default]:h-8"
       />
       <Select

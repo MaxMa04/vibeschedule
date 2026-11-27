@@ -3,10 +3,17 @@
 import { FC, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
-import { CheckIcon, TriangleAlertIcon, UserPlusIcon, UserRoundIcon } from 'lucide-react';
+import {
+  CheckIcon,
+  ScissorsIcon,
+  TriangleAlertIcon,
+  UserPlusIcon,
+  UserRoundIcon,
+} from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import {
   ME,
+  NO_CLIPPERS,
   TeamUser,
 } from '@vibeschedule/helpers/channels/channel.filter';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
@@ -318,16 +325,60 @@ export const ChannelResponsible: FC<{
   );
 };
 
+const WITH_CLIPPERS = 'yes';
+
+interface FilterItem {
+  value: string;
+  label: string;
+}
+
+/** One filter as a list of rows, for the mobile filter sheet */
+const FilterList: FC<{
+  label: string;
+  items: FilterItem[];
+  current: string;
+  onPick: (value: string) => void;
+  icon: typeof UserRoundIcon;
+}> = ({ label, items, current, onPick, icon: Icon }) => (
+  <div className="flex flex-col gap-1">
+    <div className="px-1 text-xs font-medium text-muted-foreground">
+      {label}
+    </div>
+    {items.map((item) => {
+      const selected = current === item.value;
+      return (
+        <button
+          key={item.value}
+          type="button"
+          onClick={() => onPick(item.value)}
+          className={cn(
+            'flex h-10 items-center gap-2 rounded-lg px-2 text-start text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
+            selected && 'bg-muted font-medium'
+          )}
+        >
+          <Icon className="size-4 text-muted-foreground" />
+          <span className="flex-1 truncate">{item.label}</span>
+          {selected && <CheckIcon className="size-4" />}
+        </button>
+      );
+    })}
+  </div>
+);
+
 /**
- * The "Zuständig" filter: everyone, me or one team member. A saved member
- * who left the team falls back to everyone.
+ * The "Zuständig" filter: everyone, me or one team member, and whether the
+ * channels of clippers count (`clippers`, see `NO_CLIPPERS`). With them, a
+ * person also covers the channels of the clippers they look after. A saved
+ * member who left the team falls back to everyone.
  */
 export const ResponsibleFilter: FC<{
   value: string | null;
   onChange: (value: string | null) => void;
+  clippers: string | null;
+  onClippersChange: (value: string | null) => void;
   list?: boolean;
   className?: string;
-}> = ({ value, onChange, list, className }) => {
+}> = ({ value, onChange, clippers, onClippersChange, list, className }) => {
   const t = useT();
   const me = useUser();
   const { data: team } = useTeam();
@@ -346,6 +397,13 @@ export const ResponsibleFilter: FC<{
     ],
     [others, t]
   );
+  const clipperItems = useMemo(
+    () => [
+      { value: WITH_CLIPPERS, label: t('yes') },
+      { value: NO_CLIPPERS, label: t('no') },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     if (team && value && value !== ME && !team.some((u) => u.id === value)) {
@@ -355,76 +413,104 @@ export const ResponsibleFilter: FC<{
 
   const current = value || ALL;
   const pick = (next: string) => onChange(next === ALL ? null : next);
+  const currentClippers =
+    clippers === NO_CLIPPERS ? NO_CLIPPERS : WITH_CLIPPERS;
+  const pickClippers = (next: string) =>
+    onClippersChange(next === NO_CLIPPERS ? NO_CLIPPERS : null);
 
   if (list) {
     return (
-      <div className={cn('flex flex-col gap-1', className)}>
-        <div className="px-1 text-xs font-medium text-muted-foreground">
-          {t('responsible')}
-        </div>
-        {items.map((item) => {
-          const selected = current === item.value;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => pick(item.value)}
-              className={cn(
-                'flex h-10 items-center gap-2 rounded-lg px-2 text-start text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
-                selected && 'bg-muted font-medium'
-              )}
-            >
-              <UserRoundIcon className="size-4 text-muted-foreground" />
-              <span className="flex-1 truncate">{item.label}</span>
-              {selected && <CheckIcon className="size-4" />}
-            </button>
-          );
-        })}
+      <div className={cn('flex flex-col gap-5', className)}>
+        <FilterList
+          label={t('responsible')}
+          items={items}
+          current={current}
+          onPick={pick}
+          icon={UserRoundIcon}
+        />
+        <FilterList
+          label={t('responsible_clippers_filter')}
+          items={clipperItems}
+          current={currentClippers}
+          onPick={pickClippers}
+          icon={ScissorsIcon}
+        />
       </div>
     );
   }
 
   return (
-    <Select
-      items={items}
-      value={current}
-      onValueChange={(next) => pick(next ? String(next) : ALL)}
-    >
-      <SelectTrigger
-        className={cn(
-          'h-9 min-w-36 md:h-8',
-          value && 'border-primary/40 bg-muted',
-          className
-        )}
-        aria-label={t('responsible_filter')}
+    <>
+      <Select
+        items={items}
+        value={current}
+        onValueChange={(next) => pick(next ? String(next) : ALL)}
       >
-        <UserRoundIcon className="text-muted-foreground" />
-        <span className="text-muted-foreground max-sm:hidden">
-          {t('responsible')}:
-        </span>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {items.slice(0, 2).map((item) => (
+        <SelectTrigger
+          className={cn(
+            'h-9 min-w-36 md:h-8',
+            value && 'border-primary/40 bg-muted',
+            className
+          )}
+          aria-label={t('responsible_filter')}
+        >
+          <UserRoundIcon className="text-muted-foreground" />
+          <span className="text-muted-foreground max-sm:hidden">
+            {t('responsible')}:
+          </span>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {items.slice(0, 2).map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+          {others.length > 0 && (
+            <>
+              <SelectSeparator />
+              <SelectGroup>
+                {items.slice(2).map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </>
+          )}
+        </SelectContent>
+      </Select>
+      <Select
+        items={clipperItems}
+        value={currentClippers}
+        onValueChange={(next) =>
+          pickClippers(next ? String(next) : WITH_CLIPPERS)
+        }
+      >
+        <SelectTrigger
+          className={cn(
+            'h-9 md:h-8',
+            currentClippers === NO_CLIPPERS && 'border-primary/40 bg-muted',
+            className
+          )}
+          aria-label={t('responsible_clippers_filter')}
+        >
+          <ScissorsIcon className="text-muted-foreground" />
+          <span className="text-muted-foreground max-sm:hidden">
+            {t('responsible_clippers')}:
+          </span>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {clipperItems.map((item) => (
             <SelectItem key={item.value} value={item.value}>
               {item.label}
             </SelectItem>
           ))}
-        </SelectGroup>
-        {others.length > 0 && (
-          <>
-            <SelectSeparator />
-            <SelectGroup>
-              {items.slice(2).map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </>
-        )}
-      </SelectContent>
-    </Select>
+        </SelectContent>
+      </Select>
+    </>
   );
 };

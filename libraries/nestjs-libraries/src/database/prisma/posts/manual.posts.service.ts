@@ -13,6 +13,7 @@ import {
   PostWithIntegration,
 } from '@vibeschedule/nestjs-libraries/database/prisma/posts/posts.repository';
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
+import { manualListWhere } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/channel.filter';
 import {
   PfmClient,
   PfmFeedPost,
@@ -114,7 +115,13 @@ export class ManualPostsService {
     const now = dayjs.utc();
     const posts = await this._postRepository.getManualPosts(
       orgId,
-      await this.channelIds(user),
+      user.role === Role.CLIPPER
+        ? {
+            id: {
+              in: await this._integrationService.getUserChannelIds(user.id),
+            },
+          }
+        : manualListWhere(user.id),
       {
         openFrom: now.subtract(30, 'day').toDate(),
         openTo: now.add(14, 'day').toDate(),

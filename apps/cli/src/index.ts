@@ -9,8 +9,15 @@ const print = (data: unknown) => console.log(JSON.stringify(data, null, 2));
 const enc = encodeURIComponent;
 
 const userOption = {
-  describe: 'Nur Kanäle, für die dieser Nutzer zuständig ist (Nutzer-ID)',
+  describe:
+    'Nur Kanäle, für die dieser Nutzer zuständig ist (Nutzer-ID), auch die seiner betreuten Clipper',
   type: 'string',
+} as const;
+
+const clippersOption = {
+  describe: 'Kanäle von Clippern einbeziehen (--no-clippers lässt sie weg)',
+  type: 'boolean',
+  default: true,
 } as const;
 
 const resolveFormat = async (value: string) =>
@@ -52,11 +59,13 @@ yargs(hideBin(process.argv))
           describe: 'Nur Kanäle dieser App (App-ID, "none" für ohne App)',
           type: 'string',
         })
-        .option('user', userOption),
+        .option('user', userOption)
+        .option('clippers', clippersOption),
     async (argv) => {
       const query = new URLSearchParams();
       if (argv.app) query.set('app', argv.app);
       if (argv.user) query.set('user', argv.user);
+      if (!argv.clippers) query.set('clippers', 'no');
       print(await request(`/integrations${query.size ? `?${query}` : ''}`));
     }
   )
@@ -826,7 +835,8 @@ yargs(hideBin(process.argv))
           describe: 'Nur Posts dieser App (App-ID, "none" für ohne App)',
           type: 'string',
         })
-        .option('user', userOption),
+        .option('user', userOption)
+        .option('clippers', clippersOption),
     async (argv) => {
       const day = 24 * 60 * 60 * 1000;
       const query = new URLSearchParams({
@@ -835,6 +845,7 @@ yargs(hideBin(process.argv))
       });
       if (argv.app) query.set('app', argv.app);
       if (argv.user) query.set('user', argv.user);
+      if (!argv.clippers) query.set('clippers', 'no');
       print(await request(`/posts?${query}`));
     }
   )
@@ -902,11 +913,13 @@ yargs(hideBin(process.argv))
           type: 'number',
           default: 30,
         })
-        .option('user', userOption),
+        .option('user', userOption)
+        .option('clippers', clippersOption),
     async (argv) => {
       const query = new URLSearchParams({ days: String(argv.days) });
       if (argv.app) query.set('app', argv.app);
       if (argv.user) query.set('user', argv.user);
+      if (!argv.clippers) query.set('clippers', 'no');
       print(await request(`/formats/overview?${query}`));
     }
   )
@@ -1300,6 +1313,7 @@ yargs(hideBin(process.argv))
           type: 'string',
         })
         .option('user', userOption)
+        .option('clippers', clippersOption)
         .option('fresh', {
           describe: 'Cache umgehen und den Feed neu laden',
           type: 'boolean',
@@ -1309,6 +1323,7 @@ yargs(hideBin(process.argv))
       const query = new URLSearchParams({ days: String(argv.days) });
       if (argv.app) query.set('app', argv.app);
       if (argv.user) query.set('user', argv.user);
+      if (!argv.clippers) query.set('clippers', 'no');
       if (argv.fresh) query.set('fresh', '1');
       print(await request(`/analytics/overview?${query}`));
     }

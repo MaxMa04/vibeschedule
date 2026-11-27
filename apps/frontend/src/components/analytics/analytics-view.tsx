@@ -37,7 +37,7 @@ import { OverviewSection } from '@vibeschedule/frontend/components/analytics/ove
 import { AccountSection } from '@vibeschedule/frontend/components/analytics/account-section';
 
 const ALL = '__all';
-const FILTER_KEYS = ['account', 'app', 'user', 'days'];
+const FILTER_KEYS = ['account', 'app', 'user', 'clippers', 'days'];
 
 export function AnalyticsView() {
   const t = useT();
@@ -49,6 +49,7 @@ export function AnalyticsView() {
   const account = params.get('account');
   const app = params.get('app');
   const user = params.get('user');
+  const clippers = params.get('clippers');
   const daysParam = Number(params.get('days'));
   const days = (PERIODS as readonly number[]).includes(daysParam)
     ? daysParam
@@ -56,7 +57,7 @@ export function AnalyticsView() {
 
   const channels = useChannels();
   const apps = useApps();
-  const overview = useOverview(days, app, user, ready && !account);
+  const overview = useOverview(days, app, user, clippers, ready && !account);
   const detail = useAccount(ready ? account : null, days);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -137,6 +138,8 @@ export function AnalyticsView() {
               <ResponsibleFilter
                 value={user}
                 onChange={(next) => setParams({ user: next })}
+                clippers={clippers}
+                onClippersChange={(next) => setParams({ clippers: next })}
                 className="h-10 w-full sm:w-auto md:h-8"
               />
             ) : null}

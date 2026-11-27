@@ -77,3 +77,19 @@ test('filters channels by app and responsible user like the API', () => {
   assert.equal(channelMatches(loose, { user: 'u1' }), false);
   assert.equal(channelMatches(channel, { app: 'a1', user: 'u2' }), false);
 });
+
+test('a user covers the channels of their clippers, clippers=no hides them', () => {
+  const clipped = {
+    app: null,
+    users: [{ id: 'c1', role: 'CLIPPER', managerId: 'u1' }],
+  };
+  const own = { app: null, users: [{ id: 'u1', role: 'USER' }] };
+  assert.equal(channelMatches(clipped, { user: 'u1' }), true);
+  assert.equal(channelMatches(clipped, { user: 'me' }, 'u1'), true);
+  assert.equal(channelMatches(clipped, { user: 'u2' }), false);
+  assert.equal(channelMatches(clipped, { user: 'c1' }), true);
+  assert.equal(channelMatches(clipped, { clippers: 'no' }), false);
+  assert.equal(channelMatches(clipped, { user: 'u1', clippers: 'no' }), false);
+  assert.equal(channelMatches(own, { user: 'u1', clippers: 'no' }), true);
+  assert.equal(channelMatches(own, { clippers: 'no' }), true);
+});

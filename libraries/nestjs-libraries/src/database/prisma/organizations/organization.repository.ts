@@ -60,6 +60,7 @@ export class OrganizationRepository {
       orderBy: { createdAt: 'asc' },
       select: {
         role: true,
+        managerId: true,
         user: {
           select: {
             ...teamUserSelect,
@@ -71,9 +72,10 @@ export class OrganizationRepository {
         },
       },
     });
-    return members.map(({ role, user: { channels, ...user } }) => ({
+    return members.map(({ role, managerId, user: { channels, ...user } }) => ({
       ...user,
       role,
+      managerId,
       channels: channels.map((channel) => channel.integrationId),
     }));
   }
