@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Post,
+  Put,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.
 import { UsersService } from '@vibeschedule/nestjs-libraries/database/prisma/users/users.service';
 import { OrganizationService } from '@vibeschedule/nestjs-libraries/database/prisma/organizations/organization.service';
 import { TimezoneDto } from '@vibeschedule/nestjs-libraries/dtos/users/timezone.dto';
+import { NameDto } from '@vibeschedule/nestjs-libraries/dtos/users/name.dto';
 import { ChangePasswordDto } from '@vibeschedule/nestjs-libraries/dtos/users/change.password.dto';
 import { AdminGuard } from '@vibeschedule/backend/services/auth/admin.guard';
 import { clearAuthCookie } from '@vibeschedule/backend/services/auth/auth.cookie';
@@ -61,6 +63,12 @@ export class UsersController {
     @Body() body: ChangePasswordDto
   ) {
     return this._usersService.changePassword(user.id, body);
+  }
+
+  @Put('/name')
+  @AllowClipper()
+  updateName(@GetUserFromRequest() user: SessionUser, @Body() body: NameDto) {
+    return this._usersService.updateName(user.id, body.name);
   }
 
   @Post('/timezone')

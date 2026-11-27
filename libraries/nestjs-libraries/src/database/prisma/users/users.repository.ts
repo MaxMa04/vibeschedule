@@ -47,6 +47,14 @@ export class UsersRepository {
     });
   }
 
+  async updateName(id: string, name: string) {
+    await this._user.model.user.update({
+      where: { id },
+      data: { name },
+      select: { id: true },
+    });
+  }
+
   async updateTimezone(id: string, timezoneName: string | null) {
     await this._user.model.user.update({
       where: { id },
