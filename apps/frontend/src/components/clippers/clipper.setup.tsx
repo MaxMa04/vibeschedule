@@ -11,6 +11,7 @@ import {
 } from 'react';
 import useSWR from 'swr';
 import {
+  CheckCheckIcon,
   CircleAlertIcon,
   ImageUpIcon,
   LinkIcon,
@@ -439,6 +440,25 @@ export const ProfileSheet: FC<{
     onClose();
   };
 
+  // created and warmed up outside the app: the clipper connects today
+  const markSetUp = async () => {
+    if (!account) {
+      return;
+    }
+    const response = await fetch(`/clippers/accounts/${account.id}/set-up`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      toaster.show(
+        (await responseMessage(response)) || t('setup_save_failed'),
+        'warning'
+      );
+      return;
+    }
+    toaster.show(t('setup_mark_set_up_done'), 'success');
+    onSaved();
+  };
+
   const restart = async () => {
     if (!account) {
       return;
@@ -624,6 +644,22 @@ export const ProfileSheet: FC<{
                 </Field>
               </FieldGroup>
               <TaskEditor account={account} onSaved={onSaved} />
+              {!account.channel && account.plan.stage !== 'connect' && (
+                <div className="flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 self-start md:h-8"
+                    onClick={markSetUp}
+                  >
+                    <CheckCheckIcon data-icon="inline-start" />
+                    {t('setup_mark_set_up')}
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    {t('setup_mark_set_up_hint')}
+                  </p>
+                </div>
+              )}
               {(account.createdDay || account.channel) && (
                 <AlertDialog>
                   <AlertDialogTrigger

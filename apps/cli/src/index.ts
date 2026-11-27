@@ -423,6 +423,39 @@ yargs(hideBin(process.argv))
     }
   )
   .command(
+    'clippers:payout <user>',
+    'Kontodaten eines Clippers eintragen, z. B. per WhatsApp geschickt',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Clipper (Nutzer-ID oder E-Mail)',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('name', { describe: 'Kontoinhaber', type: 'string', demandOption: true })
+        .option('iban', { describe: 'IBAN, Leerzeichen erlaubt', type: 'string', demandOption: true }),
+    async (argv) => {
+      const [user] = await resolveUsers(argv.user);
+      const clipper = await request(`/clippers/users/${enc(user)}/payout`, {
+        method: 'PUT',
+        body: { name: argv.name, iban: argv.iban },
+      });
+      print({ user: clipper.user, payout: clipper.payout });
+    }
+  )
+  .command(
+    'clippers:set-up <account-id>',
+    'Account schon außerhalb der App erstellt und aufgewärmt: der Clipper verbindet ihn heute',
+    (y) => y.positional('account-id', { type: 'string', demandOption: true }),
+    async (argv) => {
+      print(
+        await request(`/clippers/accounts/${enc(argv['account-id'])}/set-up`, {
+          method: 'POST',
+        })
+      );
+    }
+  )
+  .command(
     'clippers:manager <user> <manager>',
     'Wer aus dem Team den Clipper betreut',
     (y) =>

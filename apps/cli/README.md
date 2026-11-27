@@ -48,6 +48,8 @@ vibeschedule auth:check
 | `clippers:tasks [nutzer] [--open] [--team \| --no-team]` | Aufgaben mit Clipper, Betreuer, Account (`null` bei allgemeinen) und Kanal. `--team`: nur Aufgaben für uns, `--no-team`: nur die des Clippers |
 | `clippers:task <account-id> [titel] [-d <beschreibung>] [--profile] [--team]` | Aufgabe zu einem Account anlegen. Der Clipper sieht offene Aufgaben oben auf „Manuell posten“ und hakt sie ab. `--profile` zeigt ihm dazu Bild, Name, Username und Bio zum Übernehmen; eine zweite offene Profil-Aufgabe entsteht nicht. `--team`: Aufgabe für uns, der Clipper sieht sie nicht |
 | `clippers:user-task <nutzer> <titel> [-d <beschreibung>] [--team]` | Allgemeine Aufgabe zu einem Clipper, nicht zu einem Account (z. B. „Auszahlung November“ mit `--team`) |
+| `clippers:payout <nutzer> --name <kontoinhaber> --iban <iban>` | Kontodaten eines Clippers eintragen, wenn er sie z. B. per WhatsApp geschickt hat. Die IBAN wird geprüft |
+| `clippers:set-up <account-id>` | Der Clipper hat den Account schon außerhalb der App erstellt und aufgewärmt: Erstellen, Aufwärmen und Für-dich-Seite gelten als erledigt, er kann ihn heute verbinden. Geht nicht bei einem verbundenen Account |
 | `clippers:manager <nutzer> <betreuer>` | Wer aus dem Team (Admin oder Nutzer, ID oder E-Mail) den Clipper betreut, `none` für niemanden. Der Clipper sieht den Namen als Ansprechperson |
 | `clippers:task-done <task-id> [--undo]` | Aufgabe abhaken oder wieder öffnen |
 | `clippers:task-delete <task-id>` | Aufgabe löschen |

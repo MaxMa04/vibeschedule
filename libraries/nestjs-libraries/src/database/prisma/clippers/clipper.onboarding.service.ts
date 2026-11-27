@@ -17,6 +17,7 @@ import {
   AccountTaskKey,
   profileCheck,
   onboardingDone,
+  setUpBefore,
   openWarmup,
   planAccounts,
   taskState,
@@ -399,16 +400,49 @@ export class ClipperOnboardingService {
   }
 
   async setPayout(orgId: string, user: SessionUser, body: PayoutDto) {
+    await this.savePayout(orgId, user.id, body);
+    return this.state(orgId, user);
+  }
+
+  // an admin enters the payout details the clipper sent another way
+  async setPayoutFor(orgId: string, userId: string, body: PayoutDto) {
+    if (!(await this._clipperRepository.clipperMember(orgId, userId))) {
+      throw new NotFoundException('Clipper nicht gefunden');
+    }
+    await this.savePayout(orgId, userId, body);
+    return (await this.overview(orgId, userId)).clippers[0];
+  }
+
+  private async savePayout(orgId: string, userId: string, body: PayoutDto) {
     if (!isValidIban(body.iban)) {
       throw new BadRequestException(
         'Die IBAN stimmt nicht. Prüf sie bitte noch mal.'
       );
     }
-    await this._clipperRepository.setPayout(orgId, user.id, {
+    await this._clipperRepository.setPayout(orgId, userId, {
       payoutName: body.name,
       payoutIban: normalizeIban(body.iban),
     });
-    return this.state(orgId, user);
+  }
+
+  // The clipper already created and warmed up the account outside the app:
+  // an admin marks it, so connecting opens today (see setUpBefore)
+  async markSetUp(orgId: string, id: string) {
+    const account = await this._clipperRepository.getAccount(orgId, id);
+    if (!account) {
+      throw new NotFoundException('Account nicht gefunden');
+    }
+    if (account.integration && !account.integration.deletedAt) {
+      throw new BadRequestException('Der Account ist schon verbunden.');
+    }
+    const day = (value: string) => new Date(`${value}T12:00:00Z`);
+    const before = setUpBefore(billingDay(new Date()));
+    await this._clipperRepository.updateAccount(id, {
+      createdOn: day(before.createdDay),
+      warmups: before.warmupDays.map(day),
+      fypOkAt: new Date(),
+    });
+    return this.account(orgId, id);
   }
 
   // the account with its plan, only the clipper's own
