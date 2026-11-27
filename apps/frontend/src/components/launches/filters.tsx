@@ -265,12 +265,27 @@ const ViewSwitch: FC<{ className?: string }> = ({ className }) => {
 };
 
 const AppFilter: FC<{ list?: boolean }> = ({ list }) => {
-  const { app, user, integrations, setFilters, startDate, endDate, display } =
-    useCalendar();
+  const {
+    app,
+    user,
+    clippers,
+    integrations,
+    setFilters,
+    startDate,
+    endDate,
+    display,
+  } = useCalendar();
   const onChange = useCallback(
     (next: string) =>
-      setFilters({ startDate, endDate, display, app: next || null, user }),
-    [setFilters, startDate, endDate, display, user]
+      setFilters({
+        startDate,
+        endDate,
+        display,
+        app: next || null,
+        user,
+        clippers,
+      }),
+    [setFilters, startDate, endDate, display, user, clippers]
   );
   return (
     <SelectApp
@@ -283,21 +298,35 @@ const AppFilter: FC<{ list?: boolean }> = ({ list }) => {
 };
 
 const UserFilter: FC<{ list?: boolean }> = ({ list }) => {
-  const { app, user, setFilters, startDate, endDate, display } = useCalendar();
+  const { app, user, clippers, setFilters, startDate, endDate, display } =
+    useCalendar();
   const onChange = useCallback(
     (next: string | null) =>
-      setFilters({ startDate, endDate, display, app, user: next }),
-    [setFilters, startDate, endDate, display, app]
+      setFilters({ startDate, endDate, display, app, user: next, clippers }),
+    [setFilters, startDate, endDate, display, app, clippers]
   );
-  return <ResponsibleFilter list={list} value={user} onChange={onChange} />;
+  const onClippersChange = useCallback(
+    (next: string | null) =>
+      setFilters({ startDate, endDate, display, app, user, clippers: next }),
+    [setFilters, startDate, endDate, display, app, user]
+  );
+  return (
+    <ResponsibleFilter
+      list={list}
+      value={user}
+      onChange={onChange}
+      clippers={clippers}
+      onClippersChange={onClippersChange}
+    />
+  );
 };
 
 const MobileFilters: FC = () => {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const { app, user } = useCalendar();
+  const { app, user, clippers } = useCalendar();
   const { active } = useChannelFilter();
-  const filtered = active || !!app || !!user;
+  const filtered = active || !!app || !!user || !!clippers;
   return (
     <>
       <Button

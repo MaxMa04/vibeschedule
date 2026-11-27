@@ -50,6 +50,11 @@ export class FormatsOverviewQueryDto {
   @IsString()
   user?: string;
 
+  /** `no` leaves out clipper channels, otherwise `user` includes the channels of their clippers */
+  @IsOptional()
+  @IsString()
+  clippers?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

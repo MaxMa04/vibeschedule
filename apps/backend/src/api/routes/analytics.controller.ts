@@ -27,12 +27,13 @@ export class AnalyticsController {
     @Query('days') days: string,
     @Query('app') app?: string,
     @Query('user') responsible?: string,
+    @Query('clippers') clippers?: string,
     @Query('fresh') fresh?: string
   ) {
     return this._integrationService.analyticsOverview(
       org.id,
       analyticsDays(days),
-      channelFilter({ app, user: responsible }, user.id),
+      channelFilter({ app, user: responsible, clippers }, user.id),
       fresh === '1'
     );
   }

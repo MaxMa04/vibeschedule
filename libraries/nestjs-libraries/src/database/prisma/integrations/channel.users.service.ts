@@ -123,7 +123,13 @@ export class ChannelUsersService {
 
   async team(orgId: string): Promise<TeamUser[]> {
     return (await this._organizationRepository.getTeam(orgId)).map(
-      ({ id, name, email, role }) => ({ id, name, email, role })
+      ({ id, name, email, role, managerId }) => ({
+        id,
+        name,
+        email,
+        role,
+        managerId,
+      })
     );
   }
 

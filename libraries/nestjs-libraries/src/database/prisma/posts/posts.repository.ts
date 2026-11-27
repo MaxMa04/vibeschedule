@@ -363,7 +363,7 @@ export class PostsRepository {
   // lately. `integrationIds` limits it to the channels of a clipper.
   getManualPosts(
     orgId: string,
-    integrationIds: string[] | undefined,
+    channels: Prisma.IntegrationWhereInput,
     range: { openFrom: Date; openTo: Date; postedSince: Date }
   ) {
     return this._post.model.post.findMany({
@@ -371,10 +371,7 @@ export class PostsRepository {
         organizationId: orgId,
         manual: true,
         deletedAt: null,
-        integration: {
-          deletedAt: null,
-          ...(integrationIds ? { id: { in: integrationIds } } : {}),
-        },
+        integration: { deletedAt: null, ...channels },
         OR: [
           {
             state: State.QUEUE,

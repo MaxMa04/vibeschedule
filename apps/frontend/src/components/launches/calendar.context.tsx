@@ -71,6 +71,8 @@ export interface CalendarFilters {
   app: string | null;
   // responsible user id or `me`
   user: string | null;
+  // `no` leaves out clipper channels, see NO_CLIPPERS
+  clippers: string | null;
 }
 
 /** The calendar params that survive leaving the page (not the date) */
@@ -78,6 +80,7 @@ export const CALENDAR_FILTER_KEYS = [
   'display',
   'app',
   'user',
+  'clippers',
   'channels',
   'state',
 ] as const;
@@ -113,6 +116,7 @@ export const CalendarContext = createContext({
   endDate: newDayjs().endOf('isoWeek').format('YYYY-MM-DD'),
   app: null as string | null,
   user: null as string | null,
+  clippers: null as string | null,
   loading: true,
   // every channel, for the editor
   integrations: [] as Integrations[],
@@ -233,15 +237,20 @@ export const CalendarWeekProvider: FC<{
     endDate: initialRange.endDate,
     app: searchParams.get('app') || null,
     user: searchParams.get('user') || null,
+    clippers: searchParams.get('clippers') || null,
     display,
   });
 
   const channels = useMemo(
     () =>
       integrations.filter((i) =>
-        channelMatches(i, { app: filters.app, user: filters.user }, me?.id)
+        channelMatches(
+          i,
+          { app: filters.app, user: filters.user, clippers: filters.clippers },
+          me?.id
+        )
       ),
-    [integrations, filters.app, filters.user, me?.id]
+    [integrations, filters.app, filters.user, filters.clippers, me?.id]
   );
 
   // a saved selection may name channels that are gone or filtered out
@@ -263,6 +272,7 @@ export const CalendarWeekProvider: FC<{
       display: filters.display,
       ...(filters.app ? { app: filters.app } : {}),
       ...(filters.user ? { user: filters.user } : {}),
+      ...(filters.clippers ? { clippers: filters.clippers } : {}),
       ...(selectedChannels ? { channels: selectedChannels.join(',') } : {}),
       ...(listState !== 'all' ? { state: listState } : {}),
     });
@@ -274,6 +284,7 @@ export const CalendarWeekProvider: FC<{
       display: filters.display,
       app: filters.app || '',
       user: filters.user || '',
+      clippers: filters.clippers || '',
       startDate: newDayjs(filters.startDate).startOf('day').utc().format(),
       endDate: newDayjs(filters.endDate).endOf('day').utc().format(),
     }).toString();
@@ -287,10 +298,18 @@ export const CalendarWeekProvider: FC<{
       limit: '100',
       app: filters.app || '',
       user: filters.user || '',
+      clippers: filters.clippers || '',
       state: listState,
       ...(selectedChannels ? { integrations: selectedChannels.join(',') } : {}),
     }).toString();
-  }, [listPage, filters.app, filters.user, listState, selectedChannels]);
+  }, [
+    listPage,
+    filters.app,
+    filters.user,
+    filters.clippers,
+    listState,
+    selectedChannels,
+  ]);
 
   const loadListData = useCallback(async () => {
     const response = await fetch(`/posts/list?${listParams}`);
@@ -301,7 +320,7 @@ export const CalendarWeekProvider: FC<{
     filters.display !== 'list'
       ? `/posts-${filters.display}-${filters.startDate}-${filters.endDate}-${
           filters.app || ''
-        }-${filters.user || ''}`
+        }-${filters.user || ''}-${filters.clippers || ''}`
       : null;
   const {
     data: calendarData,
@@ -322,7 +341,11 @@ export const CalendarWeekProvider: FC<{
   const setFilters = useCallback(
     (next: CalendarFilters) => {
       // a channel selection belongs to the channels of the old filter
-      if (next.app !== filters.app || next.user !== filters.user) {
+      if (
+        next.app !== filters.app ||
+        next.user !== filters.user ||
+        next.clippers !== filters.clippers
+      ) {
         setSelectedChannelsRaw(null);
       }
       setFiltersState(next);
@@ -330,7 +353,7 @@ export const CalendarWeekProvider: FC<{
         setListPage(0);
       }
     },
-    [filters.app, filters.user]
+    [filters.app, filters.user, filters.clippers]
   );
 
   const goTo = useCallback(
@@ -340,9 +363,10 @@ export const CalendarWeekProvider: FC<{
         display: nextDisplay,
         app: filters.app,
         user: filters.user,
+        clippers: filters.clippers,
       });
     },
-    [filters.app, filters.user, setFilters]
+    [filters.app, filters.user, filters.clippers, setFilters]
   );
 
   const filterByChannels = useCallback(

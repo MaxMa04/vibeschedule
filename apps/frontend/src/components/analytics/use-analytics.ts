@@ -57,11 +57,13 @@ export function useOverview(
   days: number,
   app: string | null,
   user: string | null,
+  clippers: string | null,
   enabled = true
 ) {
   const query = new URLSearchParams({ days: String(days) });
   if (app) query.set('app', app);
   if (user) query.set('user', user);
+  if (clippers) query.set('clippers', clippers);
   return useJson<AnalyticsOverview>(
     enabled ? `/analytics/overview?${query}` : null
   );

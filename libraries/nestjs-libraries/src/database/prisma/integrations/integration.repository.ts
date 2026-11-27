@@ -20,7 +20,7 @@ const channelUsersInclude = (org: string) =>
           email: true,
           organizations: {
             where: { organizationId: org },
-            select: { role: true },
+            select: { role: true, managerId: true },
           },
         },
       },
@@ -32,13 +32,21 @@ type ChannelUserRow = {
     id: string;
     name: string | null;
     email: string;
-    organizations: { role: TeamUser['role'] }[];
+    organizations: { role: TeamUser['role']; managerId: string | null }[];
   };
 };
 
 export const toTeamUsers = (rows: ChannelUserRow[]): TeamUser[] =>
   rows.flatMap(({ user: { organizations, ...user } }) =>
-    organizations[0] ? [{ ...user, role: organizations[0].role }] : []
+    organizations[0]
+      ? [
+          {
+            ...user,
+            role: organizations[0].role,
+            managerId: organizations[0].managerId,
+          },
+        ]
+      : []
   );
 
 @Injectable()
