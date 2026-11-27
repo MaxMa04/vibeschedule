@@ -221,6 +221,18 @@ export const planAccounts = (
     return planOne(account, today, previousCreated);
   });
 
+/**
+ * An account the clipper already created and warmed up outside the app (an
+ * admin says so): created WARMUP_DAYS days ago with a warm-up on each day
+ * since, so connecting opens today once the For You page is checked.
+ */
+export const setUpBefore = (today: string) => ({
+  createdDay: addDays(today, -WARMUP_DAYS),
+  warmupDays: Array.from({ length: WARMUP_DAYS }, (_, i) =>
+    addDays(today, i - WARMUP_DAYS)
+  ),
+});
+
 export const taskState = (plan: AccountPlan, key: AccountTaskKey) =>
   plan.tasks.find((task) => task.key === key)?.state ?? 'locked';
 

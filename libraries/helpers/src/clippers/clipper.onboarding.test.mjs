@@ -5,6 +5,7 @@ import {
   normalizeUsername,
   planAccounts,
   profileCheck,
+  setUpBefore,
   WARMUP_DAYS,
 } from './clipper.onboarding.ts';
 
@@ -144,4 +145,18 @@ test('an account from before the onboarding gets switched over, a new one is the
   const profile = { name: 'Ethan', username: 'ethanbulking' };
   assert.equal(profileCheck('Kira', profile, false), 'rebrand');
   assert.equal(profileCheck('Kira', profile, true), 'mismatch');
+});
+
+test('an account set up outside the app can be connected today, the next one created today', () => {
+  const today = '2026-11-27';
+  const before = setUpBefore(today);
+  assert.equal(before.createdDay, '2026-11-24');
+  assert.deepEqual(before.warmupDays, ['2026-11-24', '2026-11-25', '2026-11-26']);
+  const [first, second] = planAccounts(
+    [account({ ...before, fypOk: true }), account({ id: 'b' })],
+    today
+  );
+  assert.equal(first.stage, 'connect');
+  assert.equal(states(first).connect, 'open');
+  assert.equal(states(second).create, 'open');
 });

@@ -7,6 +7,7 @@ import {
   CircleCheckIcon,
   FileTextIcon,
   InboxIcon,
+  LandmarkIcon,
   MessageCircleIcon,
   PencilIcon,
   PlusIcon,
@@ -63,6 +64,15 @@ import {
   CardTitle,
 } from '@vibeschedule/frontend/components/ui/card';
 import { Checkbox } from '@vibeschedule/frontend/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@vibeschedule/frontend/components/ui/dialog';
 import {
   Empty,
   EmptyDescription,
@@ -157,6 +167,85 @@ const useCall = (onSaved: () => void) => {
     return true;
   };
   return { busy, call };
+};
+
+// payout details the clipper sent another way, e.g. on WhatsApp
+const PayoutDialog: FC<{ clipper: OnboardingClipper; onSaved: () => void }> = ({
+  clipper,
+  onSaved,
+}) => {
+  const t = useT();
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [iban, setIban] = useState('');
+  const { busy, call } = useCall(onSaved);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const ok = await call('payout', `/clippers/users/${clipper.user.id}/payout`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, iban }),
+    });
+    if (ok) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="h-10 md:h-8">
+            <LandmarkIcon data-icon="inline-start" />
+            {t('overview_payout_missing')}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{t('start_payout_title')}</DialogTitle>
+            <DialogDescription>
+              {t('overview_payout_description', {
+                name: nameOf(clipper.user),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor={`${id}-name`}>
+              {t('start_payout_name')}
+            </FieldLabel>
+            <Input
+              id={`${id}-name`}
+              className="h-10 md:h-8"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${id}-iban`}>IBAN</FieldLabel>
+            <Input
+              id={`${id}-iban`}
+              className="h-10 font-mono md:h-8"
+              value={iban}
+              onChange={(e) => setIban(e.target.value)}
+            />
+          </Field>
+          <DialogFooter>
+            <Button
+              type="submit"
+              className="h-10 md:h-8"
+              disabled={!name.trim() || !iban.trim() || busy === 'payout'}
+            >
+              {busy === 'payout' && <Spinner data-icon="inline-start" />}
+              {t('save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 // the team member who looks after the clipper
@@ -505,7 +594,7 @@ const ClipperCard: FC<{
             </a>
           )}
           {!clipper.payout.iban && (
-            <span className="text-foreground">{t('overview_payout_missing')}</span>
+            <PayoutDialog clipper={clipper} onSaved={onSaved} />
           )}
         </CardDescription>
       </CardHeader>

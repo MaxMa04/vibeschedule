@@ -28,6 +28,7 @@ import {
   AcceptApplicationDto,
   ClipperManagerDto,
   ClipperProfileDto,
+  PayoutDto,
   ClipperTaskDto,
   ClipperTaskUpdateDto,
 } from '@vibeschedule/nestjs-libraries/dtos/clippers/clipper.dto';
@@ -140,6 +141,22 @@ export class ClippersController {
     @Body() body: ClipperTaskDto
   ) {
     return this._onboardingService.addGeneralTask(org.id, id, body);
+  }
+
+  // payout details the clipper sent another way
+  @Put('/users/:id/payout')
+  setPayout(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: PayoutDto
+  ) {
+    return this._onboardingService.setPayoutFor(org.id, id, body);
+  }
+
+  // created and warmed up outside the app: connecting opens today
+  @Post('/accounts/:id/set-up')
+  markSetUp(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    return this._onboardingService.markSetUp(org.id, id);
   }
 
   // the team member who looks after the clipper

@@ -975,5 +975,9 @@
   "name_title": "Name",
   "name_description": "So sehen dich andere, z. B. Clipper als ihre Ansprechperson.",
   "name_saved": "Name gespeichert",
-  "name_save_failed": "Der Name konnte nicht gespeichert werden."
+  "name_save_failed": "Der Name konnte nicht gespeichert werden.",
+  "overview_payout_description": "Die Kontodaten, die {{name}} dir geschickt hat. Die IBAN wird geprüft.",
+  "setup_mark_set_up": "Schon erstellt und aufgewärmt",
+  "setup_mark_set_up_hint": "Wenn der Clipper den Account schon außerhalb der App erstellt und aufgewärmt hat. Er kann ihn dann heute verbinden.",
+  "setup_mark_set_up_done": "Account kann jetzt verbunden werden"
 }
