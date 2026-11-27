@@ -73,6 +73,10 @@ vibeschedule auth:check
 | `formats:assign <format> <kanal-id> [--status active\|testing\|paused] [--note <text>] [--position <n>]` | Format auf einem Kanal laufen lassen oder Status, Notiz und Reihenfolge ändern. Neu zugewiesen ist der Status `active`, was fehlt, bleibt |
 | `formats:unassign <format> <kanal-id>` | Format von einem Kanal nehmen |
 | `posts:set-format <kanal-id> <post> <format>` / `--file <json>` | Format eines veröffentlichten Posts setzen, auch eines von Hand geposteten, der nur im Feed des Kanals steht. `<post>` ist der Link (TikTok, YouTube, Instagram), die Plattform-ID oder die Post-for-Me-ID, `<format>` ID oder Name, `none` entfernt es. `--file` nimmt `[{"post": "…", "format": "…"}]`. Gefunden werden Posts der letzten 365 Tage. Ein in vibeschedule angelegter Post bekommt das Format direkt, sonst merkt sich vibeschedule es zum Feed-Post (kein Kalendereintrag, keine Clipper-Abrechnung). Danach zählt der Post in `formats:overview` beim Format statt unter `feed.withoutFormat`, und `analytics:account` zeigt es als `format` |
+| `inspiration:list [--app <app>] [-s open\|done\|skipped\|all] [--format <format>]` | Gespeicherte Video-Links zum Nachmachen (Seite „Inspiration“), neueste zuerst, Standard nur offene. Jeder Eintrag mit `url`, `platform`, `author` (@Handle, wenn der Link ihn nennt), `thumbnail` (Vorschaubild auf R2), `note`, `app`, `format`. `--app none` / `--format none` zeigt Links ohne App bzw. ohne Format |
+| `inspiration:add <link…> [--app <app>] [-n <notiz>]` | Links speichern, auch mehrere auf einmal oder mit Text drumherum. TikTok-Kurzlinks (`vm.tiktok.com`) werden aufgelöst; ein schon gespeichertes Video kommt mit `duplicate: true` zurück. Das Vorschaubild holt vibeschedule beim Speichern; fehlt es, lädt erneutes Hinzufügen es nach |
+| `inspiration:update <id> [-f <format>] [-s open\|done\|skipped] [--app <app>] [-n <notiz>]` | Link dem Format zuordnen, das daraus wurde (ein offener Link ist damit erledigt), verwerfen (`-s skipped`), App oder Notiz ändern. `none` entfernt Format bzw. App, `-n ""` die Notiz |
+| `inspiration:delete <id>` | Gespeicherten Link löschen |
 | `analytics:overview [-d <tage>] [--app <id>] [--user <nutzer-id>] [--fresh]` | Alle Kanäle: Summen des Zeitraums (Standard 7 Tage, höchstens 90), Vergleich zum gleich langen Zeitraum davor (`change` in Prozent), Tagesverlauf und `summary` über alle Kanäle. `--app none` zeigt Kanäle ohne App |
 | `analytics:account <kanal-id> [-d <tage>] [--fresh]` | Ein Kanal: Kennzahlen mit Vergleich, `series` pro Tag und alle Posts des Zeitraums mit Metriken, Link, Vorschaubild und zugehörigem vibeschedule-Post samt Format |
 | `analytics:channel <kanal-id> [-d <tage>]` | Statistiken eines Kanals, Standard 7 Tage |
@@ -146,6 +150,17 @@ vibeschedule clippers:profile <account-id> --name Ethan --username ethanbulking 
   --bio "19 · skinny → strong · bulking diary" --topic "Zunehmen / Gym" \
   --search-terms "weight gain,bulking,gym food" --avatar ./ethan.jpg
 vibeschedule clippers:tasks clipping.anna@vibelabs.to --open    # „Profil umstellen“ ist da
+```
+
+Gesammelte Inspiration mit dem Agent durchgehen: offene Links einer App holen, jedes Video ansehen, dann einem bestehenden Format zuordnen, ein neues anlegen oder verwerfen:
+
+```bash
+vibeschedule inspiration:list --app "Recipe Manager"
+vibeschedule formats:list
+vibeschedule inspiration:update <id> -f "Storytime"
+vibeschedule formats:create "Fridge-Roast" -d "Kühlschrank zeigen, App bewertet die Reste"
+vibeschedule inspiration:update <id> -f "Fridge-Roast" -n "Hook aus Sekunde 1 übernehmen"
+vibeschedule inspiration:update <id> -s skipped -n "zu teuer zu drehen"
 ```
 
 Weitere Vorlagen liegen in [examples/](examples/): `tiktok-video.json`, `youtube-video.json`, `multi-platform-post.json`.

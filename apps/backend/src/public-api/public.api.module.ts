@@ -3,6 +3,7 @@ import { PublicIntegrationsController } from '@vibeschedule/backend/public-api/r
 import { PublicFormatsController } from '@vibeschedule/backend/public-api/routes/v1/public.formats.controller';
 import { PublicAppsController } from '@vibeschedule/backend/public-api/routes/v1/public.apps.controller';
 import { PublicClippersController } from '@vibeschedule/backend/public-api/routes/v1/public.clippers.controller';
+import { PublicInspirationController } from '@vibeschedule/backend/public-api/routes/v1/public.inspiration.controller';
 import { PublicAuthMiddleware } from '@vibeschedule/backend/services/auth/public.auth.middleware';
 
 @Module({
@@ -11,6 +12,7 @@ import { PublicAuthMiddleware } from '@vibeschedule/backend/services/auth/public
     PublicFormatsController,
     PublicAppsController,
     PublicClippersController,
+    PublicInspirationController,
   ],
 })
 export class PublicApiModule implements NestModule {
@@ -21,7 +23,8 @@ export class PublicApiModule implements NestModule {
         PublicIntegrationsController,
         PublicFormatsController,
         PublicAppsController,
-        PublicClippersController
+        PublicClippersController,
+        PublicInspirationController
       );
   }
 }

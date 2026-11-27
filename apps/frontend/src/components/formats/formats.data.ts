@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
+import { useJson } from '@vibeschedule/frontend/lib/use-json';
 import {
   APPS_KEY,
   CHANNELS_KEY,
@@ -89,26 +89,6 @@ export interface Channel {
   disabled: boolean;
   app: { id: string; name: string } | null;
 }
-
-const errorMessage = async (response: Response) => {
-  const { message } = await response.json().catch(() => ({}));
-  return (Array.isArray(message) ? message[0] : message) as string | undefined;
-};
-
-const useJson = () => {
-  const fetch = useFetch();
-  return useCallback(
-    async (path: string, init?: RequestInit) => {
-      const response = await fetch(path, init);
-      if (!response.ok) {
-        throw new Error((await errorMessage(response)) || response.statusText);
-      }
-      const text = await response.text();
-      return text ? JSON.parse(text) : null;
-    },
-    [fetch]
-  );
-};
 
 const swrOptions = {
   revalidateOnFocus: false,

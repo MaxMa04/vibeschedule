@@ -1,6 +1,7 @@
 /launches
 /post
 /formats
+/inspiration
 /analytics
 /media
 /settings

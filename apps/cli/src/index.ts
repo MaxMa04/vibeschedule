@@ -32,6 +32,8 @@ const resolveUsers = async (value: string) => {
 };
 
 const statuses = ['active', 'testing', 'paused'] as const;
+const inspirationStatuses = ['open', 'done', 'skipped'] as const;
+const isNone = (value: string) => value.trim().toLowerCase() === 'none';
 
 yargs(hideBin(process.argv))
   .scriptName('vibeschedule')
@@ -972,6 +974,157 @@ yargs(hideBin(process.argv))
       }
       print(argv.file ? results : results[0]);
       if (results.some((r) => 'error' in r)) process.exitCode = 1;
+    }
+  )
+  .command(
+    'inspiration:list',
+    'Gespeicherte Video-Links zum Nachmachen, neueste zuerst',
+    (y) =>
+      y
+        .option('app', {
+          describe: 'Nur Links dieser App (ID oder Name, "none" für ohne App)',
+          type: 'string',
+        })
+        .option('status', {
+          alias: 's',
+          describe: 'open (Standard), done, skipped oder all',
+          choices: [...inspirationStatuses, 'all'],
+          default: 'open',
+        })
+        .option('format', {
+          describe: 'Nur Links dieses Formats (ID oder Name, "none" für ohne)',
+          type: 'string',
+        }),
+    async (argv) => {
+      const query = new URLSearchParams();
+      if (argv.app) {
+        query.set('app', isNone(argv.app) ? 'none' : await resolveApp(argv.app));
+      }
+      if (argv.status !== 'all') query.set('status', argv.status.toUpperCase());
+      if (argv.format) {
+        query.set(
+          'format',
+          isNone(argv.format) ? 'none' : await resolveFormat(argv.format)
+        );
+      }
+      print(await request(`/inspiration?${query}`));
+    }
+  )
+  .command(
+    'inspiration:add <links..>',
+    'Video-Links speichern (TikTok, Instagram, YouTube), doppelte nur einmal',
+    (y) =>
+      y
+        .positional('links', {
+          describe: 'Ein oder mehrere Links',
+          type: 'string',
+          array: true,
+          demandOption: true,
+        })
+        .option('app', {
+          describe: 'App-ID oder Name',
+          type: 'string',
+        })
+        .option('note', {
+          alias: 'n',
+          describe: 'Notiz, was am Video gut ist',
+          type: 'string',
+        }),
+    async (argv) => {
+      const appId = argv.app ? await resolveApp(argv.app) : undefined;
+      const results: Record<string, unknown>[] = [];
+      for (const url of argv.links) {
+        try {
+          results.push(
+            await request('/inspiration', {
+              method: 'POST',
+              body: { url, appId, note: argv.note },
+            })
+          );
+        } catch (err) {
+          results.push({ url, error: (err as Error).message });
+        }
+      }
+      print(results.length === 1 ? results[0] : results);
+      if (results.some((r) => 'error' in r)) process.exitCode = 1;
+    }
+  )
+  .command(
+    'inspiration:update <id>',
+    'Link einem Format zuordnen, Status, App oder Notiz ändern',
+    (y) =>
+      y
+        .positional('id', {
+          describe: 'ID aus inspiration:list',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('format', {
+          alias: 'f',
+          describe:
+            'Format-ID oder Name, "none" entfernt es. Ein offener Link wird damit erledigt',
+          type: 'string',
+        })
+        .option('status', {
+          alias: 's',
+          describe: 'open, done oder skipped',
+          choices: inspirationStatuses,
+        })
+        .option('app', {
+          describe: 'App-ID oder Name, "none" entfernt sie',
+          type: 'string',
+        })
+        .option('note', {
+          alias: 'n',
+          describe: 'Notiz, "" leert sie',
+          type: 'string',
+        })
+        .check((argv) => {
+          if (
+            [argv.format, argv.status, argv.app, argv.note].every(
+              (v) => v === undefined
+            )
+          ) {
+            throw new Error('--format, --status, --app oder --note fehlt.');
+          }
+          return true;
+        })
+        .example(
+          '$0 inspiration:update clx123 --format "Video-Roast"',
+          'Link dem Format zuordnen, das daraus wurde'
+        )
+        .example(
+          '$0 inspiration:update clx123 --status skipped --note "passt nicht"',
+          'Link verwerfen'
+        ),
+    async (argv) => {
+      const body: Record<string, unknown> = {};
+      if (argv.format !== undefined) {
+        body.formatId = isNone(argv.format)
+          ? null
+          : await resolveFormat(argv.format);
+      }
+      if (argv.app !== undefined) {
+        body.appId = isNone(argv.app) ? null : await resolveApp(argv.app);
+      }
+      if (argv.status) body.status = argv.status.toUpperCase();
+      if (argv.note !== undefined) body.note = argv.note || null;
+      print(
+        await request(`/inspiration/${enc(argv.id)}`, { method: 'PUT', body })
+      );
+    }
+  )
+  .command(
+    'inspiration:delete <id>',
+    'Gespeicherten Link löschen',
+    (y) =>
+      y.positional('id', {
+        describe: 'ID aus inspiration:list',
+        type: 'string',
+        demandOption: true,
+      }),
+    async (argv) => {
+      print(await request(`/inspiration/${enc(argv.id)}`, { method: 'DELETE' }));
     }
   )
   .command(
