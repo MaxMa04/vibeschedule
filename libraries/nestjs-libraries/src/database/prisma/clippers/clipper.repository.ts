@@ -7,6 +7,20 @@ import {
 } from '@prisma/client';
 import { PrismaRepository } from '@vibeschedule/nestjs-libraries/database/prisma/prisma.service';
 
+const appSelect = {
+  select: { id: true, name: true, brief: true, deletedAt: true },
+} as const;
+
+const taskSelect = {
+  id: true,
+  kind: true,
+  title: true,
+  description: true,
+  forTeam: true,
+  doneAt: true,
+  createdAt: true,
+} as const;
+
 const accountSelect = {
   id: true,
   userId: true,
@@ -20,6 +34,7 @@ const accountSelect = {
   createdOn: true,
   warmups: true,
   fypOkAt: true,
+  app: appSelect,
   integration: {
     select: {
       id: true,
@@ -29,24 +44,33 @@ const accountSelect = {
       picture: true,
       disabled: true,
       deletedAt: true,
+      appId: true,
+      clipPostsPerDay: true,
+      app: appSelect,
     },
   },
   tasks: {
     orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      kind: true,
-      title: true,
-      description: true,
-      doneAt: true,
-      createdAt: true,
-    },
+    select: taskSelect,
   },
 } as const;
 
 export type ClipperAccountRow = Prisma.ClipperAccountGetPayload<{
   select: typeof accountSelect;
 }>;
+
+export type ClipperTaskRow = Prisma.ClipperTaskGetPayload<{
+  select: typeof taskSelect;
+}>;
+
+const memberSelect = {
+  clipperAccounts: true,
+  payoutName: true,
+  payoutIban: true,
+  createdAt: true,
+  manager: { select: { id: true, name: true, email: true, phone: true } },
+  user: { select: { id: true, name: true, email: true, phone: true } },
+} as const;
 
 const applicationSelect = {
   id: true,
@@ -73,7 +97,10 @@ export class ClipperRepository {
     private _task: PrismaRepository<'clipperTask'>,
     private _organization: PrismaRepository<'organization'>,
     private _userIntegration: PrismaRepository<'userIntegration'>,
-    private _userOrg: PrismaRepository<'userOrganization'>
+    private _userOrg: PrismaRepository<'userOrganization'>,
+    private _integration: PrismaRepository<'integration'>,
+    private _post: PrismaRepository<'post'>,
+    private _app: PrismaRepository<'app'>
   ) {}
 
   // there is exactly one workspace, the public page applies to it
@@ -192,18 +219,33 @@ export class ClipperRepository {
     });
   }
 
+  // userId: the clipper, accountId: null for a general task
   createTask(
     orgId: string,
-    accountId: string,
-    data: { kind: ClipperTaskKind; title: string; description?: string | null }
+    target: { userId: string; accountId: string | null },
+    data: {
+      kind: ClipperTaskKind;
+      title: string;
+      description?: string | null;
+      forTeam?: boolean;
+    }
   ) {
     return this._task.model.clipperTask.create({
-      data: { ...data, orgId, accountId },
+      data: { ...data, ...target, orgId },
       select: { id: true },
     });
   }
 
-  // with the account it belongs to, for the owner check
+  // tasks about the clipper in general, not about one account
+  generalTasks(orgId: string, userIds: string[]) {
+    return this._task.model.clipperTask.findMany({
+      where: { orgId, accountId: null, userId: { in: userIds } },
+      orderBy: { createdAt: 'asc' },
+      select: { ...taskSelect, userId: true },
+    });
+  }
+
+  // with the clipper it belongs to, for the owner check
   getTask(orgId: string, id: string) {
     return this._task.model.clipperTask.findFirst({
       where: { orgId, id },
@@ -211,6 +253,8 @@ export class ClipperRepository {
         id: true,
         kind: true,
         doneAt: true,
+        forTeam: true,
+        userId: true,
         account: { select: { id: true, userId: true } },
       },
     });
@@ -267,12 +311,7 @@ export class ClipperRepository {
   clipperMember(orgId: string, userId: string) {
     return this._userOrg.model.userOrganization.findFirst({
       where: { organizationId: orgId, userId, role: Role.CLIPPER },
-      select: {
-        clipperAccounts: true,
-        payoutName: true,
-        payoutIban: true,
-        user: { select: { id: true, name: true, email: true, phone: true } },
-      },
+      select: memberSelect,
     });
   }
 
@@ -280,13 +319,59 @@ export class ClipperRepository {
     return this._userOrg.model.userOrganization.findMany({
       where: { organizationId: orgId, role: Role.CLIPPER },
       orderBy: { createdAt: 'asc' },
-      select: {
-        clipperAccounts: true,
-        payoutName: true,
-        payoutIban: true,
-        createdAt: true,
-        user: { select: { id: true, name: true, email: true, phone: true } },
+      select: memberSelect,
+    });
+  }
+
+  // only someone from the team (ADMIN or USER) looks after clippers
+  teamMember(orgId: string, userId: string) {
+    return this._userOrg.model.userOrganization.findFirst({
+      where: {
+        organizationId: orgId,
+        userId,
+        role: { in: [Role.ADMIN, Role.USER] },
       },
+      select: { userId: true },
+    });
+  }
+
+  async setManager(orgId: string, userId: string, managerId: string | null) {
+    const { count } = await this._userOrg.model.userOrganization.updateMany({
+      where: { organizationId: orgId, userId, role: Role.CLIPPER },
+      data: { managerId },
+    });
+    return count > 0;
+  }
+
+  getApp(orgId: string, id: string) {
+    return this._app.model.app.findFirst({
+      where: { orgId, id, deletedAt: null },
+      select: { id: true },
+    });
+  }
+
+  // the channel runs for the app of its account
+  async setChannelApp(integrationId: string, appId: string | null) {
+    await this._integration.model.integration.update({
+      where: { id: integrationId },
+      data: { appId },
+      select: { id: true },
+    });
+  }
+
+  // when posts were marked as posted since a time, for the posts of the day
+  postedSince(orgId: string, integrationIds: string[], since: Date) {
+    if (!integrationIds.length) {
+      return Promise.resolve([]);
+    }
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        integrationId: { in: integrationIds },
+        deletedAt: null,
+        postedAt: { gte: since },
+      },
+      select: { integrationId: true, postedAt: true },
     });
   }
 

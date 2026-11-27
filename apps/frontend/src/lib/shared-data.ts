@@ -16,6 +16,8 @@ export const TEAM_KEY = '/user/team';
 export interface AppListItem {
   id: string;
   name: string;
+  /** what clippers read about the app */
+  brief?: string | null;
   _count?: { integrations: number };
 }
 

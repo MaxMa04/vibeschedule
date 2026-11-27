@@ -20,6 +20,7 @@ import {
   MAX_OFFER_ACCOUNTS,
 } from '@vibeschedule/helpers/clippers/clipper.offer';
 import {
+  APP_BRIEF_MAX,
   TASK_DESCRIPTION_MAX,
   TASK_TITLE_MAX,
 } from '@vibeschedule/helpers/clippers/clipper.tasks';
@@ -128,6 +129,26 @@ export class ClipperProfileDto {
   @IsString()
   @MaxLength(1000)
   searchTerms?: string;
+
+  // the app the account runs for, null or "" removes it
+  @IsOptional()
+  @IsString()
+  appId?: string | null;
+}
+
+// the team member who looks after a clipper, null for nobody
+export class ClipperManagerDto {
+  @IsOptional()
+  @IsString()
+  managerId?: string | null;
+}
+
+// what clippers read about an app, empty removes it
+export class AppBriefDto {
+  @Transform(trim)
+  @IsString()
+  @MaxLength(APP_BRIEF_MAX)
+  brief: string;
 }
 
 export class PayoutDto {
@@ -164,6 +185,11 @@ export class ClipperTaskDto {
   @IsString()
   @MaxLength(TASK_DESCRIPTION_MAX)
   description?: string;
+
+  // a task for us, the clipper does not see it
+  @IsOptional()
+  @IsBoolean()
+  forTeam?: boolean;
 }
 
 export class ClipperTaskUpdateDto {

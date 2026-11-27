@@ -75,6 +75,16 @@ import {
 } from '@vibeschedule/frontend/components/ui/field';
 import { Input } from '@vibeschedule/frontend/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@vibeschedule/frontend/components/ui/select';
+import { Switch } from '@vibeschedule/frontend/components/ui/switch';
+import { useAppList } from '@vibeschedule/frontend/lib/shared-data';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -89,7 +99,9 @@ import { cn } from '@vibeschedule/frontend/lib/utils';
 
 export const SETUP_KEY = '/clippers/onboarding';
 
-const useSetup = () => {
+const NO_APP = '__none';
+
+export const useSetup = () => {
   const fetch = useFetch();
   return useSWR(SETUP_KEY, async (url: string) => {
     const response = await fetch(url);
@@ -100,8 +112,38 @@ const useSetup = () => {
   });
 };
 
-type Editing = { clipper: OnboardingClipper; account: OnboardingAccount };
-type EditingIds = { clipperId: string; accountId: string };
+export type Editing = {
+  clipper: OnboardingClipper;
+  account: OnboardingAccount;
+};
+export type EditingIds = { clipperId: string; accountId: string };
+
+/** "Für uns" next to a task the clipper does not see */
+export const TeamBadge: FC = () => {
+  const t = useT();
+  return (
+    <Badge variant="secondary" className="shrink-0">
+      {t('setup_task_for_team')}
+    </Badge>
+  );
+};
+
+/** the switch under a new task: for the clipper or for us */
+export const ForTeamSwitch: FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}> = ({ checked, onChange }) => {
+  const t = useT();
+  const id = useId();
+  return (
+    <Field orientation="horizontal" className="w-auto items-center">
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+      <FieldLabel htmlFor={id} className="font-normal">
+        {t('setup_task_for_team_switch')}
+      </FieldLabel>
+    </Field>
+  );
+};
 
 // Tasks for one account: the clipper sees the open ones on the posting page
 // and checks them off, also while the account is already running
@@ -115,6 +157,7 @@ const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
   const toaster = useToaster();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [forTeam, setForTeam] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const call = async (key: string, url: string, init: RequestInit) => {
@@ -139,12 +182,13 @@ const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
     const ok = await call(kind, `/clippers/accounts/${account.id}/tasks`, {
       method: 'POST',
       body: JSON.stringify(
-        kind === 'PROFILE' ? { kind } : { kind, title, description }
+        kind === 'PROFILE' ? { kind } : { kind, title, description, forTeam }
       ),
     });
     if (ok && kind === 'CUSTOM') {
       setTitle('');
       setDescription('');
+      setForTeam(false);
     }
   };
 
@@ -189,14 +233,17 @@ const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
                 htmlFor={`${id}-${task.id}`}
                 className="flex min-w-0 flex-1 flex-col text-sm"
               >
-                <span
-                  className={cn(
-                    'font-medium',
-                    task.doneDay &&
-                      'font-normal text-muted-foreground line-through'
-                  )}
-                >
-                  {task.title}
+                <span className="flex items-start justify-between gap-2">
+                  <span
+                    className={cn(
+                      'font-medium',
+                      task.doneDay &&
+                        'font-normal text-muted-foreground line-through'
+                    )}
+                  >
+                    {task.title}
+                  </span>
+                  {task.forTeam && <TeamBadge />}
                 </span>
                 {task.description && (
                   <span className="whitespace-pre-line text-muted-foreground">
@@ -264,6 +311,9 @@ const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
             />
           </Field>
         )}
+        {!!title.trim() && (
+          <ForTeamSwitch checked={forTeam} onChange={setForTeam} />
+        )}
       </FieldGroup>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -301,7 +351,7 @@ const TaskEditor: FC<{ account: OnboardingAccount; onSaved: () => void }> = ({
   );
 };
 
-const ProfileSheet: FC<{
+export const ProfileSheet: FC<{
   editing: Editing | null;
   onClose: () => void;
   onSaved: () => void;
@@ -311,12 +361,14 @@ const ProfileSheet: FC<{
   const fetch = useFetch();
   const toaster = useToaster();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { data: apps } = useAppList();
   const [form, setForm] = useState({
     name: '',
     username: '',
     bio: '',
     topic: '',
     searchTerms: '',
+    appId: NO_APP,
   });
   const [avatar, setAvatar] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -333,6 +385,7 @@ const ProfileSheet: FC<{
       bio: account.profile.bio || '',
       topic: account.profile.topic || '',
       searchTerms: account.profile.searchTerms.join('\n'),
+      appId: account.app?.id || NO_APP,
     });
     setAvatar(account.profile.avatar);
   }, [account?.id]);
@@ -368,7 +421,10 @@ const ProfileSheet: FC<{
     setSaving(true);
     const response = await fetch(`/clippers/accounts/${account.id}`, {
       method: 'PUT',
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        appId: form.appId === NO_APP ? null : form.appId,
+      }),
     });
     setSaving(false);
     if (!response.ok) {
@@ -404,6 +460,10 @@ const ProfileSheet: FC<{
   const set =
     (key: keyof typeof form) => (event: { target: { value: string } }) =>
       setForm((current) => ({ ...current, [key]: event.target.value }));
+  const appItems = [
+    { value: NO_APP, label: t('setup_no_app') },
+    ...(apps || []).map((app) => ({ value: app.id, label: app.name })),
+  ];
 
   return (
     <Sheet open={!!editing} onOpenChange={(open) => !open && onClose()}>
@@ -504,6 +564,36 @@ const ProfileSheet: FC<{
                     value={form.bio}
                     onChange={set('bio')}
                   />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${id}-app`}>{t('setup_app')}</FieldLabel>
+                  <Select
+                    value={form.appId}
+                    items={appItems}
+                    onValueChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        appId: value ? String(value) : NO_APP,
+                      }))
+                    }
+                  >
+                    <SelectTrigger
+                      id={`${id}-app`}
+                      className="w-full data-[size=default]:h-10 md:data-[size=default]:h-8"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {appItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>{t('setup_app_hint')}</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`${id}-topic`}>

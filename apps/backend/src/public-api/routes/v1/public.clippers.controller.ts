@@ -15,6 +15,7 @@ import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
 import { ClipperOnboardingService } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.onboarding.service';
 import {
+  ClipperManagerDto,
   ClipperProfileDto,
   ClipperTaskDto,
   ClipperTaskUpdateDto,
@@ -68,6 +69,26 @@ export class PublicClippersController {
     @Body() body: ClipperTaskDto
   ) {
     return this._onboardingService.addTask(org.id, id, body);
+  }
+
+  // a task about the clipper in general, not about one account
+  @Post('/users/:id/tasks')
+  addGeneralTask(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ClipperTaskDto
+  ) {
+    return this._onboardingService.addGeneralTask(org.id, id, body);
+  }
+
+  // the team member who looks after the clipper
+  @Put('/users/:id/manager')
+  setManager(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: ClipperManagerDto
+  ) {
+    return this._onboardingService.setManager(org.id, id, body);
   }
 
   @Put('/tasks/:id')

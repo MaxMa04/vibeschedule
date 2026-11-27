@@ -11,6 +11,7 @@ import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@vibeschedule/nestjs-libraries/user/org.from.request';
 import { IntegrationService } from '@vibeschedule/nestjs-libraries/database/prisma/integrations/integration.service';
 import { AppNameDto } from '@vibeschedule/nestjs-libraries/dtos/integrations/app.dto';
+import { AppBriefDto } from '@vibeschedule/nestjs-libraries/dtos/clippers/clipper.dto';
 
 @Controller('/public/v1/apps')
 export class PublicAppsController {
@@ -33,6 +34,16 @@ export class PublicAppsController {
     @Body() body: AppNameDto
   ) {
     return this._integrationService.updateAppName(org.id, id, body.name.trim());
+  }
+
+  // what clippers read about the app, see ClipperOnboardingService.state
+  @Put('/:id/brief')
+  brief(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: AppBriefDto
+  ) {
+    return this._integrationService.setAppBrief(org.id, id, body.brief);
   }
 
   @Delete('/:id')

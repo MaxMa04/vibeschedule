@@ -42,17 +42,20 @@ vibeschedule auth:check
 | `users:list` | Nutzer des Workspace mit ID, Name, E-Mail und Rolle (`ADMIN`, `USER`, `CLIPPER`) |
 | `users:create <email> --name <name> --password-file <datei> [--role CLIPPER] [--accounts 3]` | Zugang anlegen (Standardrolle `CLIPPER`, `--accounts`: wie viele TikTok-Accounts er verbinden darf). Das Passwort kommt aus einer Datei, damit es nicht in der Shell-History landet |
 | `clippers:accounts <nutzer> <anzahl>` | Wie viele Accounts ein Clipper verbinden darf (ID oder E-Mail). Verbundene, nicht getrennte Accounts zählen |
-| `clippers:onboarding [nutzer]` | Onboarding-Accounts aller Clipper oder eines Clippers (ID oder E-Mail): Account-ID, vergebenes Profil, Stand (`plan.stage`), verbundener Kanal (`channel`, `channel.username` ist der TikTok-Anzeigename), Aufgaben (`tasks`, `openTasks`), `rebrand` (Kanal trägt noch nicht das vergebene Profil) |
+| `clippers:onboarding [nutzer]` | Onboarding-Accounts aller Clipper oder eines Clippers (ID oder E-Mail): Betreuer (`manager`), allgemeine Aufgaben (`tasks`), was heute offen ist (`todo.open`, `todo.waitingForUs`), je Account die ID, das vergebene Profil, die App mit Brief (`app`), Stand (`plan.stage`), was heute dran ist (`todo`: `open` mit Schritt, `locked` mit Grund und Tag, `post` mit `posted`/`due` von heute), verbundener Kanal (`channel`, `channel.username` ist der TikTok-Anzeigename), Aufgaben (`tasks`, `openTasks` für den Clipper, `teamTasks` für uns), `rebrand` (Kanal trägt noch nicht das vergebene Profil) |
 | `clippers:account <account-id>` | Ein Onboarding-Account wie in `clippers:onboarding` |
-| `clippers:profile <account-id> [--name] [--username] [--bio] [--topic] [--search-terms <a,b>] [--avatar <datei>]` | Profil setzen, das der Clipper für den Account bekommt. Was fehlt, bleibt, `""` leert ein Feld. Ändern sich Name, Username, Bio oder Bild bei einem Account, der schon erstellt oder verbunden ist, entsteht automatisch die Aufgabe „Profil umstellen“ (Regel in `libraries/helpers/src/clippers/clipper.tasks.ts`) |
-| `clippers:tasks [nutzer] [--open]` | Aufgaben je Account mit Clipper, Account und Kanal |
-| `clippers:task <account-id> [titel] [-d <beschreibung>] [--profile]` | Aufgabe anlegen. Der Clipper sieht offene Aufgaben oben auf „Manuell posten“ und hakt sie ab. `--profile` zeigt ihm dazu Bild, Name, Username und Bio zum Übernehmen; eine zweite offene Profil-Aufgabe entsteht nicht |
+| `clippers:profile <account-id> [--name] [--username] [--bio] [--topic] [--search-terms <a,b>] [--avatar <datei>] [--app <app>]` | Profil setzen, das der Clipper für den Account bekommt. `--app` (ID oder Name, `none` entfernt sie): App des Accounts, der Clipper sieht ihren Brief; ein verbundener Kanal bekommt dieselbe App. Was fehlt, bleibt, `""` leert ein Feld. Ändern sich Name, Username, Bio oder Bild bei einem Account, der schon erstellt oder verbunden ist, entsteht automatisch die Aufgabe „Profil umstellen“ (Regel in `libraries/helpers/src/clippers/clipper.tasks.ts`) |
+| `clippers:tasks [nutzer] [--open] [--team \| --no-team]` | Aufgaben mit Clipper, Betreuer, Account (`null` bei allgemeinen) und Kanal. `--team`: nur Aufgaben für uns, `--no-team`: nur die des Clippers |
+| `clippers:task <account-id> [titel] [-d <beschreibung>] [--profile] [--team]` | Aufgabe zu einem Account anlegen. Der Clipper sieht offene Aufgaben oben auf „Manuell posten“ und hakt sie ab. `--profile` zeigt ihm dazu Bild, Name, Username und Bio zum Übernehmen; eine zweite offene Profil-Aufgabe entsteht nicht. `--team`: Aufgabe für uns, der Clipper sieht sie nicht |
+| `clippers:user-task <nutzer> <titel> [-d <beschreibung>] [--team]` | Allgemeine Aufgabe zu einem Clipper, nicht zu einem Account (z. B. „Auszahlung November“ mit `--team`) |
+| `clippers:manager <nutzer> <betreuer>` | Wer aus dem Team (Admin oder Nutzer, ID oder E-Mail) den Clipper betreut, `none` für niemanden. Der Clipper sieht den Namen als Ansprechperson |
 | `clippers:task-done <task-id> [--undo]` | Aufgabe abhaken oder wieder öffnen |
 | `clippers:task-delete <task-id>` | Aufgabe löschen |
 | `clippers:pay [JJJJ-MM]` | Was jeder Clipper pro Account im Monat bekommt: Gepostet, Verpasst, Abzug, Betrag (Regeln in `libraries/helpers/src/clippers/clipper.billing.ts`) |
 | `apps:list` | Apps mit ID und Anzahl Kanäle |
 | `apps:create <name>` | App anlegen |
 | `apps:rename <app> <name>` | App umbenennen (App-ID oder bisheriger Name) |
+| `apps:brief <app> [text] [--file <datei>]` | Brief der App setzen, `""` entfernt ihn. Clipper sehen ihn auf „Dein Start“ und „Manuell posten“ für Accounts dieser App |
 | `apps:delete <app>` | App löschen, ihre Kanäle bleiben ohne App |
 | `integrations:settings <kanal-id>` | Einstellungen und Textlimit eines Kanals |
 | `integrations:connect-url <plattform>` | Link, mit dem der Besitzer ein Konto verbindet (auf seinem Gerät öffnen, anmelden, zustimmen) |

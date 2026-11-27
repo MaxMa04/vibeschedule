@@ -252,6 +252,13 @@ export class IntegrationService {
     return this._integrationRepository.updateAppName(orgId, id, name);
   }
 
+  async setAppBrief(orgId: string, id: string, brief: string) {
+    if (!(await this._integrationRepository.getApp(orgId, id))) {
+      throw new NotFoundException('App nicht gefunden');
+    }
+    return this._integrationRepository.setAppBrief(orgId, id, brief || null);
+  }
+
   async deleteApp(orgId: string, id: string) {
     if (!(await this._integrationRepository.getApp(orgId, id))) {
       throw new NotFoundException('App nicht gefunden');

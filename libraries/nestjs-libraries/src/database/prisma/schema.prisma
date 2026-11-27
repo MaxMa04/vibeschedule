@@ -39,7 +39,10 @@ model User {
   timezoneName     String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
-  organizations    UserOrganization[]
+  organizations    UserOrganization[] @relation("Member")
+  /// clippers this team member looks after (UserOrganization.managerId)
+  managedClippers  UserOrganization[] @relation("ClipperManager")
+  clipperTasks     ClipperTask[]
   channels         UserIntegration[]
   clipperAccounts  ClipperAccount[]
   inspirationLinks InspirationLink[]
@@ -55,10 +58,13 @@ model UserOrganization {
   /// where a clipper's pay goes, entered by the clipper during the onboarding
   payoutName      String?
   payoutIban      String?
+  /// the team member (ADMIN or USER) who looks after this clipper
+  managerId       String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   organization    Organization @relation(fields: [organizationId], references: [id])
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User         @relation("Member", fields: [userId], references: [id], onDelete: Cascade)
+  manager         User?        @relation("ClipperManager", fields: [managerId], references: [id], onDelete: SetNull)
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -107,15 +113,18 @@ model Media {
 /// An app of VibeLabs (UBulk, Amelie, ...). Channels belong to at most one app.
 /// Stored in the former Postiz "Customer" table.
 model App {
-  id           String            @id @default(uuid())
-  name         String
-  orgId        String
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  deletedAt    DateTime?
-  organization Organization      @relation(fields: [orgId], references: [id])
-  integrations Integration[]
-  inspiration  InspirationLink[]
+  id              String            @id @default(uuid())
+  name            String
+  orgId           String
+  /// short brief clippers see for the accounts they run for this app
+  brief           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  organization    Organization      @relation(fields: [orgId], references: [id])
+  integrations    Integration[]
+  inspiration     InspirationLink[]
+  clipperAccounts ClipperAccount[]
 
   @@unique([orgId, name, deletedAt])
   @@map("Customer")
@@ -309,9 +318,12 @@ model ClipperAccount {
   fypOkAt       DateTime?
   /// the vibeschedule channel once the account is connected
   integrationId String?       @unique
+  /// the app the account runs for, its brief is shown to the clipper
+  appId         String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   organization  Organization  @relation(fields: [orgId], references: [id])
+  app           App?          @relation(fields: [appId], references: [id], onDelete: SetNull)
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   integration   Integration?  @relation(fields: [integrationId], references: [id], onDelete: SetNull)
   tasks         ClipperTask[]
@@ -326,7 +338,13 @@ model ClipperAccount {
 model ClipperTask {
   id           String          @id @default(cuid())
   orgId        String
-  accountId    String
+  /// the account it is about, null for a task about the clipper in general
+  accountId    String?
+  /// the clipper; what a general task hangs on (older account tasks only
+  /// have the account)
+  userId       String?
+  /// a task for us (the team), not shown to the clipper
+  forTeam      Boolean         @default(false)
   /// PROFILE shows the handed-out profile (picture, name, username, bio)
   kind         ClipperTaskKind @default(CUSTOM)
   title        String
@@ -336,9 +354,11 @@ model ClipperTask {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   organization Organization    @relation(fields: [orgId], references: [id])
-  account      ClipperAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account      ClipperAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([accountId])
+  @@index([userId])
   @@index([orgId])
 }
 
