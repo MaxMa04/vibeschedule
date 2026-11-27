@@ -23,6 +23,8 @@ export interface InspirationLink {
   url: string;
   platform: 'tiktok' | 'instagram' | 'youtube' | 'other';
   author: string | null;
+  /** preview image on R2, null when the platform gave none */
+  thumbnail: string | null;
   note: string | null;
   status: InspirationStatus;
   createdAt: string;

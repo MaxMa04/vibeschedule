@@ -8,6 +8,7 @@ const linkSelect = {
   url: true,
   platform: true,
   author: true,
+  thumbnail: true,
   note: true,
   status: true,
   createdAt: true,
@@ -101,6 +102,7 @@ export class InspirationRepository {
       formatId?: string | null;
       status?: InspirationStatus;
       note?: string | null;
+      thumbnail?: string | null;
     }
   ) {
     return visible(

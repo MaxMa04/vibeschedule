@@ -78,7 +78,10 @@ const ssrfSafeDispatcher = new Agent({
 // undici's own fetch: the global one of newer Node versions rejects an Agent
 // from the undici package. Redirects are followed by hand so every hop is
 // checked, and a literal IP never reaches the lookup, so it is checked here.
-export async function ssrfSafeFetch(url: string) {
+export async function ssrfSafeFetch(
+  url: string,
+  init: { headers?: Record<string, string>; signal?: AbortSignal } = {}
+) {
   let current = url;
   for (let hop = 0; hop < 5; hop++) {
     const parsed = new URL(current);
@@ -91,6 +94,7 @@ export async function ssrfSafeFetch(url: string) {
     }
 
     const response = await fetch(current, {
+      ...init,
       dispatcher: ssrfSafeDispatcher,
       redirect: 'manual',
     });

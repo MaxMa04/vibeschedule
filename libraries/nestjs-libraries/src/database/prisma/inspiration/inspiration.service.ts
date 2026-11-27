@@ -9,6 +9,7 @@ import {
   parseInspirationLink,
 } from '@vibeschedule/helpers/inspiration/inspiration.link';
 import { NO_APP } from '@vibeschedule/helpers/channels/channel.filter';
+import { linkPreview } from '@vibeschedule/nestjs-libraries/upload/link.preview';
 import {
   InspirationFilter,
   InspirationRepository,
@@ -49,14 +50,14 @@ export class InspirationService {
     const appId = await this.checkApp(orgId, body.appId);
 
     const existing = await this._repository.getByKey(orgId, ref.key);
-    if (existing) return this.duplicate(existing, appId);
+    if (existing) return this.duplicate(existing, ref, appId);
     try {
       const created = await this._repository.create(orgId, ref, {
         appId,
         note: text(body.note),
         createdById: userId,
       });
-      return { ...created, duplicate: false };
+      return { ...(await this.withThumbnail(created, ref)), duplicate: false };
     } catch (err) {
       // saved at the same moment from another device
       if (
@@ -64,10 +65,21 @@ export class InspirationService {
         err.code === 'P2002'
       ) {
         const saved = await this._repository.getByKey(orgId, ref.key);
-        if (saved) return this.duplicate(saved, appId);
+        if (saved) return this.duplicate(saved, ref, appId);
       }
       throw err;
     }
+  }
+
+  // a missing preview (platform blocked, timeout) is not an error; saving the
+  // same link again tries once more
+  private async withThumbnail<T extends { id: string; thumbnail: string | null }>(
+    link: T,
+    ref: InspirationLinkRef
+  ) {
+    if (link.thumbnail) return link;
+    const thumbnail = await linkPreview(link.id, ref);
+    return thumbnail ? this._repository.update(link.id, { thumbnail }) : link;
   }
 
   async update(orgId: string, id: string, body: UpdateInspirationDto) {
@@ -103,16 +115,15 @@ export class InspirationService {
 
   private async duplicate(
     existing: NonNullable<Awaited<ReturnType<InspirationRepository['get']>>>,
+    ref: InspirationLinkRef,
     appId: string | null
   ) {
     const { appId: savedApp, ...link } = existing;
-    if (appId && !savedApp) {
-      return {
-        ...(await this._repository.update(existing.id, { appId })),
-        duplicate: true,
-      };
-    }
-    return { ...link, duplicate: true };
+    const updated =
+      appId && !savedApp
+        ? await this._repository.update(existing.id, { appId })
+        : link;
+    return { ...(await this.withThumbnail(updated, ref)), duplicate: true };
   }
 
   private async checkApp(orgId: string, appId: string | null | undefined) {

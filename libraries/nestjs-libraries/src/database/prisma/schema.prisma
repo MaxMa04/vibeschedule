@@ -185,6 +185,8 @@ model InspirationLink {
   platform     String
   /// @handle from the URL, if it names one
   author       String?
+  /// preview image, copied to R2
+  thumbnail    String?
   note         String?
   status       InspirationStatus @default(OPEN)
   appId        String?

@@ -10,9 +10,9 @@ import {
 } from 'react';
 import {
   ClipboardPasteIcon,
-  ExternalLinkIcon,
   LightbulbIcon,
   PencilIcon,
+  PlayIcon,
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -48,14 +48,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@vibeschedule/frontend/components/ui/empty';
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-} from '@vibeschedule/frontend/components/ui/item';
 import {
   Select,
   SelectContent,
@@ -319,7 +311,38 @@ const AddLink = ({
 
 /* ------------------------------------------------------------------ list */
 
-const LinkRow = ({
+const Thumbnail = ({ link }: { link: InspirationLink }) => {
+  const t = useT();
+  const [failed, setFailed] = useState(false);
+  return (
+    <a
+      href={link.url}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={t('inspiration_open')}
+      className="relative block aspect-9/16 bg-muted"
+    >
+      {link.thumbnail && !failed ? (
+        <img
+          src={link.thumbnail}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="size-full object-cover"
+        />
+      ) : (
+        <span className="flex size-full items-center justify-center text-muted-foreground">
+          <PlayIcon className="size-8" />
+        </span>
+      )}
+      <Badge variant="secondary" className="absolute top-2 left-2">
+        {PLATFORM_LABEL[link.platform]}
+      </Badge>
+    </a>
+  );
+};
+
+const LinkCard = ({
   link,
   showApp,
   showStatus,
@@ -333,56 +356,52 @@ const LinkRow = ({
   const t = useT();
   const by = link.createdBy?.name || link.createdBy?.email;
   return (
-    <Item variant="outline" size="sm" className="flex-nowrap bg-card">
-      <ItemContent className="min-w-0">
-        <ItemTitle className="w-full min-w-0">
+    <Card size="sm" className="gap-2 pt-0">
+      <Thumbnail link={link} />
+      <CardContent className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 items-center gap-1">
           <a
             href={link.url}
             target="_blank"
             rel="noreferrer"
-            className="truncate hover:underline"
+            className="min-w-0 flex-1 truncate font-medium hover:underline"
           >
             {link.author || shortUrl(link.url)}
           </a>
-        </ItemTitle>
-        {link.note ? (
-          <ItemDescription className="line-clamp-2">{link.note}</ItemDescription>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
-          <Badge variant="secondary">{PLATFORM_LABEL[link.platform]}</Badge>
-          {showApp && link.app ? (
-            <Badge variant="outline">{link.app.name}</Badge>
-          ) : null}
-          {link.format ? <Badge>{link.format.name}</Badge> : null}
-          {showStatus && link.status !== 'OPEN' ? (
-            <Badge variant="outline">{t(statusLabelKey[link.status])}</Badge>
-          ) : null}
-          <span className="tabular-nums">
-            {savedAt(link.createdAt)}
-            {by ? ` · ${by}` : ''}
-          </span>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="-mr-1.5 shrink-0"
+            onClick={onEdit}
+            aria-label={t('inspiration_edit')}
+          >
+            <PencilIcon />
+          </Button>
         </div>
-      </ItemContent>
-      <ItemActions className="gap-1">
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          nativeButton={false}
-          render={<a href={link.url} target="_blank" rel="noreferrer" />}
-          aria-label={t('inspiration_open')}
-        >
-          <ExternalLinkIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          onClick={onEdit}
-          aria-label={t('inspiration_edit')}
-        >
-          <PencilIcon />
-        </Button>
-      </ItemActions>
-    </Item>
+        {link.note ? (
+          <p className="line-clamp-2 text-xs text-muted-foreground">
+            {link.note}
+          </p>
+        ) : null}
+        {(showApp && link.app) ||
+        link.format ||
+        (showStatus && link.status !== 'OPEN') ? (
+          <div className="flex flex-wrap gap-1">
+            {showApp && link.app ? (
+              <Badge variant="outline">{link.app.name}</Badge>
+            ) : null}
+            {link.format ? <Badge>{link.format.name}</Badge> : null}
+            {showStatus && link.status !== 'OPEN' ? (
+              <Badge variant="outline">{t(statusLabelKey[link.status])}</Badge>
+            ) : null}
+          </div>
+        ) : null}
+        <p className="truncate text-xs text-muted-foreground tabular-nums">
+          {savedAt(link.createdAt)}
+          {by ? ` · ${by}` : ''}
+        </p>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -615,9 +634,9 @@ export const InspirationPage = () => {
     }
     if (!links.data) {
       return (
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-20 rounded-lg" />
+            <Skeleton key={i} className="aspect-9/16 rounded-xl" />
           ))}
         </div>
       );
@@ -644,9 +663,9 @@ export const InspirationPage = () => {
       );
     }
     return (
-      <ItemGroup className="gap-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {shown.map((link) => (
-          <LinkRow
+          <LinkCard
             key={link.id}
             link={link}
             showApp={!app}
@@ -654,14 +673,14 @@ export const InspirationPage = () => {
             onEdit={() => setEditId(link.id)}
           />
         ))}
-      </ItemGroup>
+      </div>
     );
   };
 
   const statusItems: StatusFilter[] = [...INSPIRATION_STATUSES, ALL];
 
   return (
-    <PageBody className="max-w-3xl">
+    <PageBody className="max-w-6xl">
       <PageHeader
         title={t('inspiration')}
         description={t('inspiration_page_description')}
