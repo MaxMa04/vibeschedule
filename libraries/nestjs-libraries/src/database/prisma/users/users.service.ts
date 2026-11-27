@@ -35,6 +35,11 @@ export class UsersService {
     );
   }
 
+  async updateName(userId: string, name: string) {
+    await this._usersRepository.updateName(userId, name);
+    return { name };
+  }
+
   updateTimezone(userId: string, timezoneName?: string) {
     return this._usersRepository.updateTimezone(userId, timezoneName || null);
   }

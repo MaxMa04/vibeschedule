@@ -26,6 +26,7 @@ import {
 import { Badge } from '@vibeschedule/frontend/components/ui/badge';
 import { Button } from '@vibeschedule/frontend/components/ui/button';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
+import { Input } from '@vibeschedule/frontend/components/ui/input';
 import {
   Popover,
   PopoverContent,
@@ -212,6 +213,65 @@ const TimezonePicker = () => {
   );
 };
 
+// the name others see, e.g. clippers their contact person
+const NameCard = () => {
+  const user = useUser();
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const { mutate } = useSWRConfig();
+  const t = useT();
+  const [name, setName] = useState(user?.name || '');
+  const [saving, setSaving] = useState(false);
+  const changed = !!name.trim() && name.trim() !== (user?.name || '');
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    const response = await fetch('/user/name', {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+    setSaving(false);
+    if (!response.ok) {
+      toaster.show(t('name_save_failed'), 'warning');
+      return;
+    }
+    await mutate('/user/self');
+    toaster.show(t('name_saved'));
+  }, [fetch, mutate, name, t, toaster]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('name_title')}</CardTitle>
+        <CardDescription>{t('name_description')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Field>
+          <FieldLabel htmlFor="profile-name">{t('name_title')}</FieldLabel>
+          <Input
+            id="profile-name"
+            className="h-10 sm:w-96 md:h-9"
+            maxLength={100}
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+      </CardContent>
+      <CardFooter className="justify-end border-t">
+        <Button
+          className="h-10 w-full sm:w-fit md:h-8"
+          disabled={!changed || saving}
+          onClick={save}
+        >
+          {saving && <Spinner data-icon="inline-start" />}
+          {t('save')}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
 export const ProfileComponent = () => {
   const user = useUser();
   const t = useT();
@@ -248,6 +308,7 @@ export const ProfileComponent = () => {
           </Badge>
         </CardContent>
       </Card>
+      <NameCard />
       <TimezonePicker />
     </div>
   );

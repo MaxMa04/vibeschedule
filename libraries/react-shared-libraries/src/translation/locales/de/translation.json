@@ -971,5 +971,9 @@
   "overview_filter_mine": "Meine Clipper ({{count}})",
   "overview_filter_all": "Alle Clipper ({{count}})",
   "overview_empty_filter": "Keine Clipper in diesem Filter",
-  "overview_empty_filter_hint": "Ordne einem Clipper in seiner Karte einen Betreuer zu oder wähl oben „Alle Clipper“."
+  "overview_empty_filter_hint": "Ordne einem Clipper in seiner Karte einen Betreuer zu oder wähl oben „Alle Clipper“.",
+  "name_title": "Name",
+  "name_description": "So sehen dich andere, z. B. Clipper als ihre Ansprechperson.",
+  "name_saved": "Name gespeichert",
+  "name_save_failed": "Der Name konnte nicht gespeichert werden."
 }
