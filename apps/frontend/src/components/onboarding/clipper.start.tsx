@@ -28,16 +28,22 @@ import { useToaster } from '@vibeschedule/react/toaster/toaster';
 import {
   AccountTask,
   isWarmupKey,
-  WARMUP_DAYS,
   WARMUP_MINUTES,
-  addDays,
 } from '@vibeschedule/helpers/clippers/clipper.onboarding';
 import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
 import {
   Profile,
   useCopy,
 } from '@vibeschedule/frontend/components/onboarding/clipper.profile';
-import { AccountTasks } from '@vibeschedule/frontend/components/onboarding/clipper.tasks';
+import {
+  AccountTasks,
+  ClipperTasks,
+} from '@vibeschedule/frontend/components/onboarding/clipper.tasks';
+import { ClipperBriefs } from '@vibeschedule/frontend/components/onboarding/clipper.briefs';
+import {
+  dayLabel,
+  stepTitle,
+} from '@vibeschedule/frontend/components/onboarding/onboarding.labels';
 import {
   onboardingProgress,
   useOnboarding,
@@ -91,15 +97,6 @@ import { Progress } from '@vibeschedule/frontend/components/ui/progress';
 import { Skeleton } from '@vibeschedule/frontend/components/ui/skeleton';
 import { Spinner } from '@vibeschedule/frontend/components/ui/spinner';
 
-const dayLabel = (day: string, today: string, t: ReturnType<typeof useT>) =>
-  day === addDays(today, 1)
-    ? t('start_tomorrow')
-    : new Intl.DateTimeFormat('de-DE', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'numeric',
-        timeZone: 'UTC',
-      }).format(new Date(`${day}T12:00:00Z`));
 
 const Niche: FC<{ account: OnboardingAccount }> = ({ account }) => {
   const t = useT();
@@ -160,9 +157,7 @@ const Steps: FC<{ items: string[] }> = ({ items }) => (
 );
 
 const taskTitle = (task: AccountTask, t: ReturnType<typeof useT>) =>
-  isWarmupKey(task.key)
-    ? t('start_task_warmup', { day: task.key.split('_')[1], days: WARMUP_DAYS })
-    : t(`start_task_${task.key}`);
+  stepTitle(task.key, t);
 
 const lockText = (
   task: AccountTask,
@@ -681,6 +676,8 @@ export const ClipperStart: FC = () => {
               <Progress value={(progress.done / progress.total) * 100} />
             </div>
           )}
+          <ClipperBriefs />
+          <ClipperTasks generalOnly />
           <Payout payout={data.payout} onChange={onChange} />
           {data.accounts.map((account) => (
             <AccountCard

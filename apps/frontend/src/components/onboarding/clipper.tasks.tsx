@@ -5,12 +5,16 @@ import { ListTodoIcon } from 'lucide-react';
 import { useFetch } from '@vibeschedule/helpers/utils/custom.fetch';
 import { useT } from '@vibeschedule/react/translation/get.transation.service.client';
 import { useToaster } from '@vibeschedule/react/toaster/toaster';
-import { visibleTasks } from '@vibeschedule/helpers/clippers/clipper.tasks';
+import {
+  openTaskCount,
+  visibleTasks,
+} from '@vibeschedule/helpers/clippers/clipper.tasks';
 import { responseMessage } from '@vibeschedule/frontend/lib/response-message';
 import { useOnboarding } from '@vibeschedule/frontend/components/onboarding/use.onboarding';
 import { Profile } from '@vibeschedule/frontend/components/onboarding/clipper.profile';
 import { ChannelAvatar } from '@vibeschedule/frontend/components/launches/channel.avatar';
 import type {
+  ClipperTask,
   OnboardingAccount,
   OnboardingState,
 } from '@vibeschedule/frontend/components/clippers/clipper.types';
@@ -23,19 +27,21 @@ import {
 import { Checkbox } from '@vibeschedule/frontend/components/ui/checkbox';
 import { cn } from '@vibeschedule/frontend/lib/utils';
 
-// The tasks we gave for one account as a checklist. Ticked off today stays
-// visible (struck through) so a wrong tap can be taken back.
-export const AccountTasks: FC<{
-  account: OnboardingAccount;
+// The tasks we gave, for one account or in general, as a checklist. Ticked
+// off today stays visible (struck through) so a wrong tap can be taken back.
+const TaskChecklist: FC<{
+  tasks: ClipperTask[];
+  /** the account of the tasks, shows the profile of a profile task */
+  account?: OnboardingAccount;
   today: string;
   onChange: (state: OnboardingState) => void;
   className?: string;
-}> = ({ account, today, onChange, className }) => {
+}> = ({ tasks: all, account, today, onChange, className }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const [busy, setBusy] = useState<string | null>(null);
-  const tasks = visibleTasks(account.tasks, today);
+  const tasks = visibleTasks(all, today);
 
   const check = async (id: string, done: boolean) => {
     setBusy(id);
@@ -94,7 +100,7 @@ export const AccountTasks: FC<{
                 )}
               </label>
             </div>
-            {task.kind === 'PROFILE' && !done && (
+            {task.kind === 'PROFILE' && !done && account && (
               <div className="ps-9">
                 <Profile account={account} />
               </div>
@@ -106,21 +112,40 @@ export const AccountTasks: FC<{
   );
 };
 
-// On the posting page: what is still to do on the clipper's accounts, also
-// on accounts that already run
-export const ClipperTasks: FC = () => {
+export const AccountTasks: FC<{
+  account: OnboardingAccount;
+  today: string;
+  onChange: (state: OnboardingState) => void;
+  className?: string;
+}> = ({ account, ...props }) => (
+  <TaskChecklist tasks={account.tasks} account={account} {...props} />
+);
+
+// On the posting page: what is still to do, in general and on the clipper's
+// accounts, also on accounts that already run. The start page shows the
+// account tasks on each account, so there only the general ones (generalOnly).
+export const ClipperTasks: FC<{ generalOnly?: boolean }> = ({
+  generalOnly,
+}) => {
   const t = useT();
   const { data, mutate } = useOnboarding();
   if (!data) {
     return null;
   }
-  const accounts = data.accounts.filter(
-    (account) => visibleTasks(account.tasks, data.today).length
-  );
-  if (!accounts.length) {
+  const accounts = generalOnly
+    ? []
+    : data.accounts.filter(
+        (account) => visibleTasks(account.tasks, data.today).length
+      );
+  const general = visibleTasks(data.tasks, data.today);
+  if (!accounts.length && !general.length) {
     return null;
   }
-  const open = accounts.reduce((sum, account) => sum + account.openTasks, 0);
+  const open =
+    openTaskCount(data.tasks) +
+    accounts.reduce((sum, account) => sum + account.openTasks, 0);
+  const onChange = (state: OnboardingState) =>
+    mutate(state, { revalidate: false });
 
   return (
     <Card className="gap-0 pb-0">
@@ -137,6 +162,16 @@ export const ClipperTasks: FC = () => {
         <CardDescription>{t('tasks_description')}</CardDescription>
       </CardHeader>
       <div className="divide-y">
+        {!!general.length && (
+          <section className="flex flex-col px-4 pt-3">
+            <h3 className="text-sm font-medium">{t('tasks_general')}</h3>
+            <TaskChecklist
+              tasks={data.tasks}
+              today={data.today}
+              onChange={onChange}
+            />
+          </section>
+        )}
         {accounts.map((account) => (
           <section key={account.id} className="flex flex-col px-4 pt-3">
             <h3 className="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -156,7 +191,7 @@ export const ClipperTasks: FC = () => {
             <AccountTasks
               account={account}
               today={data.today}
-              onChange={(state) => mutate(state, { revalidate: false })}
+              onChange={onChange}
             />
           </section>
         ))}

@@ -49,7 +49,8 @@ export class IntegrationRepository {
     private _apps: PrismaRepository<'app'>,
     private _userIntegration: PrismaRepository<'userIntegration'>,
     private _feedFormats: PrismaRepository<'feedPostFormat'>,
-    private _inspiration: PrismaRepository<'inspirationLink'>
+    private _inspiration: PrismaRepository<'inspirationLink'>,
+    private _clipperAccounts: PrismaRepository<'clipperAccount'>
   ) {}
 
   getIntegrationsList(org: string, filter?: ChannelFilter) {
@@ -188,9 +189,20 @@ export class IntegrationRepository {
     });
   }
 
+  setAppBrief(orgId: string, id: string, brief: string | null) {
+    return this._apps.model.app.update({
+      where: { id, orgId },
+      data: { brief },
+    });
+  }
+
   async deleteApp(orgId: string, id: string) {
     await this._integration.model.integration.updateMany({
       where: { organizationId: orgId, appId: id },
+      data: { appId: null },
+    });
+    await this._clipperAccounts.model.clipperAccount.updateMany({
+      where: { orgId, appId: id },
       data: { appId: null },
     });
     await this._inspiration.model.inspirationLink.updateMany({

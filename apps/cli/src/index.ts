@@ -252,6 +252,11 @@ yargs(hideBin(process.argv))
           describe: 'Profilbild (JPG, PNG oder WebP), wird auf R2 hochgeladen',
           type: 'string',
         })
+        .option('app', {
+          describe:
+            'App, für die der Account läuft (ID oder Name, none entfernt sie). Der Clipper sieht ihren Brief',
+          type: 'string',
+        })
         .example(
           '$0 clippers:profile <account-id> --name Ethan --username ethanbulking --bio "19 · bulking diary" --avatar ./ethan.jpg',
           'Neues Profil für einen laufenden Account'
@@ -269,6 +274,12 @@ yargs(hideBin(process.argv))
             .map((term) => term.trim())
             .filter(Boolean)
             .join('\n'),
+          appId:
+            argv.app === undefined
+              ? undefined
+              : argv.app === 'none'
+              ? null
+              : await resolveApp(argv.app),
         }).filter(([, value]) => value !== undefined)
       );
       if (argv.avatar) {
@@ -283,37 +294,54 @@ yargs(hideBin(process.argv))
   )
   .command(
     'clippers:tasks [user]',
-    'Aufgaben der Clipper je Account',
+    'Aufgaben der Clipper, allgemein (account null) und je Account',
     (y) =>
       y
         .positional('user', {
           describe: 'Nur dieser Clipper (Nutzer-ID oder E-Mail)',
           type: 'string',
         })
-        .option('open', { describe: 'Nur offene Aufgaben', type: 'boolean' }),
+        .option('open', { describe: 'Nur offene Aufgaben', type: 'boolean' })
+        .option('team', {
+          describe: 'Nur Aufgaben für uns (true) oder nur für den Clipper (false)',
+          type: 'boolean',
+        }),
     async (argv) => {
       const user = argv.user ? (await resolveUsers(argv.user))[0] : undefined;
       const { clippers } = await request(
         `/clippers/onboarding${user ? `?user=${enc(user)}` : ''}`
       );
+      type Task = { doneDay: string | null; forTeam: boolean };
+      const keep = (task: Task) =>
+        (!argv.open || !task.doneDay) &&
+        (argv.team === undefined || task.forTeam === argv.team);
       print(
         clippers.flatMap(
           (clipper: {
             user: { id: string; email: string };
+            manager: { email: string } | null;
+            tasks: Task[];
             accounts: {
               id: string;
               position: number;
               profile: { username: string | null };
               channel: { id: string; name: string } | null;
-              tasks: { doneDay: string | null }[];
+              tasks: Task[];
             }[];
-          }) =>
-            clipper.accounts.flatMap((account) =>
+          }) => [
+            ...clipper.tasks.filter(keep).map((task) => ({
+              ...task,
+              clipper: clipper.user.email,
+              manager: clipper.manager?.email || null,
+              account: null,
+            })),
+            ...clipper.accounts.flatMap((account) =>
               account.tasks
-                .filter((task) => !argv.open || !task.doneDay)
+                .filter(keep)
                 .map((task) => ({
                   ...task,
                   clipper: clipper.user.email,
+                  manager: clipper.manager?.email || null,
                   account: {
                     id: account.id,
                     position: account.position,
@@ -321,7 +349,8 @@ yargs(hideBin(process.argv))
                     channel: account.channel,
                   },
                 }))
-            )
+            ),
+          ]
         )
       );
     }
@@ -339,6 +368,10 @@ yargs(hideBin(process.argv))
             'Aufgabe „Profil umstellen“: zeigt dem Clipper Bild, Name, Username und Bio. Ohne Titel mit Standardtitel',
           type: 'boolean',
         })
+        .option('team', {
+          describe: 'Aufgabe für uns, der Clipper sieht sie nicht',
+          type: 'boolean',
+        })
         .example('$0 clippers:task <account-id> --profile', 'Profil umstellen lassen')
         .example('$0 clippers:task <account-id> "Link in Bio setzen" -d "ubulk.app"', 'Eigene Aufgabe'),
     async (argv) => {
@@ -352,9 +385,67 @@ yargs(hideBin(process.argv))
             kind: argv.profile ? 'PROFILE' : 'CUSTOM',
             ...(argv.title ? { title: argv.title } : {}),
             ...(argv.description ? { description: argv.description } : {}),
+            ...(argv.team ? { forTeam: true } : {}),
           },
         })
       );
+    }
+  )
+  .command(
+    'clippers:user-task <user> <title>',
+    'Allgemeine Aufgabe zu einem Clipper, nicht zu einem Account',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Clipper (Nutzer-ID oder E-Mail)',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('title', { describe: 'Was zu tun ist', type: 'string', demandOption: true })
+        .option('description', { alias: 'd', type: 'string' })
+        .option('team', {
+          describe: 'Aufgabe für uns, der Clipper sieht sie nicht',
+          type: 'boolean',
+        })
+        .example('$0 clippers:user-task clipping.anna@vibelabs.to "Auszahlung November" --team', 'Aufgabe für uns'),
+    async (argv) => {
+      const [user] = await resolveUsers(argv.user);
+      print(
+        await request(`/clippers/users/${enc(user)}/tasks`, {
+          method: 'POST',
+          body: {
+            title: argv.title,
+            ...(argv.description ? { description: argv.description } : {}),
+            ...(argv.team ? { forTeam: true } : {}),
+          },
+        })
+      );
+    }
+  )
+  .command(
+    'clippers:manager <user> <manager>',
+    'Wer aus dem Team den Clipper betreut',
+    (y) =>
+      y
+        .positional('user', {
+          describe: 'Clipper (Nutzer-ID oder E-Mail)',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('manager', {
+          describe: 'Admin oder Nutzer (ID oder E-Mail), none für niemanden',
+          type: 'string',
+          demandOption: true,
+        }),
+    async (argv) => {
+      const [user] = await resolveUsers(argv.user);
+      const managerId =
+        argv.manager === 'none' ? null : (await resolveUsers(argv.manager))[0];
+      const clipper = await request(`/clippers/users/${enc(user)}/manager`, {
+        method: 'PUT',
+        body: { managerId },
+      });
+      print({ user: clipper.user, manager: clipper.manager });
     }
   )
   .command(
@@ -400,6 +491,39 @@ yargs(hideBin(process.argv))
     async (argv) => {
       print(
         await request('/apps', { method: 'POST', body: { name: argv.name } })
+      );
+    }
+  )
+  .command(
+    'apps:brief <app> [brief]',
+    'Brief einer App, den Clipper für ihre Accounts sehen',
+    (y) =>
+      y
+        .positional('app', {
+          describe: 'App-ID oder Name',
+          type: 'string',
+          demandOption: true,
+        })
+        .positional('brief', {
+          describe: 'Text, "" entfernt ihn',
+          type: 'string',
+        })
+        .option('file', {
+          describe: 'Brief aus einer Textdatei',
+          type: 'string',
+        }),
+    async (argv) => {
+      const brief = argv.file
+        ? readFileSync(argv.file, 'utf8')
+        : argv.brief;
+      if (brief === undefined) {
+        throw new Error('Text oder --file fehlt');
+      }
+      print(
+        await request(`/apps/${enc(await resolveApp(argv.app))}/brief`, {
+          method: 'PUT',
+          body: { brief },
+        })
       );
     }
   )

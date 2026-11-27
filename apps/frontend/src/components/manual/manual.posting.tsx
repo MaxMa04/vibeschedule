@@ -64,6 +64,7 @@ import {
   useManualMedia,
 } from '@vibeschedule/frontend/components/manual/use.manual.media';
 import { ClipperTasks } from '@vibeschedule/frontend/components/onboarding/clipper.tasks';
+import { ClipperBriefs } from '@vibeschedule/frontend/components/onboarding/clipper.briefs';
 import {
   ClipperAccounts,
   ClipperStartBanner,
@@ -260,6 +261,7 @@ const ManualList: FC<{
       />
       {user?.role === 'CLIPPER' && <ClipperStartBanner />}
       {user?.role === 'CLIPPER' && <ClipperTasks />}
+      {user?.role === 'CLIPPER' && <ClipperBriefs collapsible />}
       <Tabs
         value={tab}
         onValueChange={(value) =>

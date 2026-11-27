@@ -10,6 +10,8 @@ export const PROFILE_TASK_TITLE =
 
 export const TASK_TITLE_MAX = 200;
 export const TASK_DESCRIPTION_MAX = 2000;
+/** the brief of an app, shown to the clippers running accounts for it */
+export const APP_BRIEF_MAX = 2000;
 
 /** the profile fields the clipper has to carry over into TikTok */
 export interface HandedOutProfile {

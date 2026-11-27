@@ -26,6 +26,7 @@ import {
   ClipperSetup,
   SETUP_KEY,
 } from '@vibeschedule/frontend/components/clippers/clipper.setup';
+import { ClipperOverview } from '@vibeschedule/frontend/components/clippers/clipper.overview';
 import {
   Tabs,
   TabsContent,
@@ -445,27 +446,29 @@ const ClipperPay: FC = () => {
   );
 };
 
-type Tab = 'applications' | 'setup' | 'pay';
-const TABS: Tab[] = ['applications', 'setup', 'pay'];
+type Tab = 'overview' | 'applications' | 'setup' | 'pay';
+const TABS: Tab[] = ['overview', 'applications', 'setup', 'pay'];
 
-// Clippers for admins: applications from /clipping, the accounts we hand out
-// and their warm-up, and the pay per account and month
+// Clippers for admins: what every clipper and we still have to do today,
+// applications from /clipping, the accounts we hand out and their warm-up,
+// and the pay per account and month
 export const ClippersPage = () => {
   const t = useT();
   const router = useRouter();
   const params = useSearchParams();
-  const tab = TABS.find((value) => value === params.get('tab')) || 'applications';
+  const tab = TABS.find((value) => value === params.get('tab')) || 'overview';
   const { data: applications } = useApplications();
   const { mutate } = useSWRConfig();
   const pending = applications?.filter((a) => a.status === 'PENDING').length;
   const setTab = (value: Tab) =>
-    router.replace(value === 'applications' ? '/clippers' : `/clippers?tab=${value}`);
+    router.replace(value === 'overview' ? '/clippers' : `/clippers?tab=${value}`);
 
   return (
     <PageBody className="max-w-5xl">
       <PageHeader title={t('clippers')} description={t('clippers_page_description')} />
       <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
         <TabsList className="w-full sm:w-fit group-data-horizontal/tabs:h-10 sm:group-data-horizontal/tabs:h-8">
+          <TabsTrigger value="overview">{t('clippers_tab_overview')}</TabsTrigger>
           <TabsTrigger value="applications">
             {t('clippers_tab_applications')}
             {!!pending && (
@@ -475,6 +478,9 @@ export const ClippersPage = () => {
           <TabsTrigger value="setup">{t('clippers_tab_setup')}</TabsTrigger>
           <TabsTrigger value="pay">{t('clippers_tab_pay')}</TabsTrigger>
         </TabsList>
+        <TabsContent value="overview" className="pt-2">
+          <ClipperOverview onOpenApplications={() => setTab('applications')} />
+        </TabsContent>
         <TabsContent value="applications" className="pt-2">
           <ClipperApplications onAccepted={() => mutate(SETUP_KEY)} />
         </TabsContent>
