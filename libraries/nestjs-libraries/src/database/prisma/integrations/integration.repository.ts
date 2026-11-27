@@ -48,7 +48,8 @@ export class IntegrationRepository {
     private _posts: PrismaRepository<'post'>,
     private _apps: PrismaRepository<'app'>,
     private _userIntegration: PrismaRepository<'userIntegration'>,
-    private _feedFormats: PrismaRepository<'feedPostFormat'>
+    private _feedFormats: PrismaRepository<'feedPostFormat'>,
+    private _inspiration: PrismaRepository<'inspirationLink'>
   ) {}
 
   getIntegrationsList(org: string, filter?: ChannelFilter) {
@@ -190,6 +191,10 @@ export class IntegrationRepository {
   async deleteApp(orgId: string, id: string) {
     await this._integration.model.integration.updateMany({
       where: { organizationId: orgId, appId: id },
+      data: { appId: null },
+    });
+    await this._inspiration.model.inspirationLink.updateMany({
+      where: { orgId, appId: id },
       data: { appId: null },
     });
     return this._apps.model.app.update({

@@ -14,6 +14,7 @@ import { FormatsController } from '@vibeschedule/backend/api/routes/formats.cont
 import { PfmWebhookController } from '@vibeschedule/backend/api/routes/pfm.webhook.controller';
 import { ClippersController } from '@vibeschedule/backend/api/routes/clippers.controller';
 import { ManualController } from '@vibeschedule/backend/api/routes/manual.controller';
+import { InspirationController } from '@vibeschedule/backend/api/routes/inspiration.controller';
 import { ClipperGuard } from '@vibeschedule/backend/services/auth/clipper.guard';
 import { ClippingController } from '@vibeschedule/backend/api/routes/clipping.controller';
 import { OnboardingController } from '@vibeschedule/backend/api/routes/onboarding.controller';
@@ -24,6 +25,7 @@ const authenticatedControllers = [
   IntegrationsController,
   AppsController,
   FormatsController,
+  InspirationController,
   SettingsController,
   PostsController,
   MediaController,

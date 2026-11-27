@@ -18,6 +18,8 @@ import { ClipperPayService } from '@vibeschedule/nestjs-libraries/database/prism
 import { ClipperRepository } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.repository';
 import { ClipperOnboardingService } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.onboarding.service';
 import { ClipperApplicationsService } from '@vibeschedule/nestjs-libraries/database/prisma/clippers/clipper.applications.service';
+import { InspirationService } from '@vibeschedule/nestjs-libraries/database/prisma/inspiration/inspiration.service';
+import { InspirationRepository } from '@vibeschedule/nestjs-libraries/database/prisma/inspiration/inspiration.repository';
 import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.client';
 
 @Global()
@@ -43,6 +45,8 @@ import { PfmClient } from '@vibeschedule/nestjs-libraries/integrations/pfm.clien
     MediaRepository,
     FormatsService,
     FormatsRepository,
+    InspirationService,
+    InspirationRepository,
     PfmClient,
   ],
   get exports() {

@@ -24,23 +24,25 @@ model Organization {
   clipperApplications ClipperApplication[]
   clipperAccounts     ClipperAccount[]
   clipperTasks        ClipperTask[]
+  inspirationLinks    InspirationLink[]
 
   @@index([apiKey])
 }
 
 model User {
-  id              String             @id @default(uuid())
-  email           String             @unique
-  password        String
-  name            String?
+  id               String             @id @default(uuid())
+  email            String             @unique
+  password         String
+  name             String?
   /// WhatsApp number, from a clipper application
-  phone           String?
-  timezoneName    String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  organizations   UserOrganization[]
-  channels        UserIntegration[]
-  clipperAccounts ClipperAccount[]
+  phone            String?
+  timezoneName     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  organizations    UserOrganization[]
+  channels         UserIntegration[]
+  clipperAccounts  ClipperAccount[]
+  inspirationLinks InspirationLink[]
 }
 
 model UserOrganization {
@@ -105,14 +107,15 @@ model Media {
 /// An app of VibeLabs (UBulk, Amelie, ...). Channels belong to at most one app.
 /// Stored in the former Postiz "Customer" table.
 model App {
-  id           String        @id @default(uuid())
+  id           String            @id @default(uuid())
   name         String
   orgId        String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   deletedAt    DateTime?
-  organization Organization  @relation(fields: [orgId], references: [id])
+  organization Organization      @relation(fields: [orgId], references: [id])
   integrations Integration[]
+  inspiration  InspirationLink[]
 
   @@unique([orgId, name, deletedAt])
   @@map("Customer")
@@ -132,6 +135,7 @@ model Format {
   integrations IntegrationFormat[]
   posts        Post[]
   feedPosts    FeedPostFormat[]
+  inspiration  InspirationLink[]
 
   @@index([orgId])
 }
@@ -167,6 +171,34 @@ model FeedPostFormat {
 
   @@id([integrationId, platformPostId])
   @@index([formatId])
+}
+
+/// A video from TikTok, Instagram or YouTube saved during research, to copy
+/// or remake. Only the link is stored. A format marks what it became.
+model InspirationLink {
+  id           String            @id @default(cuid())
+  orgId        String
+  url          String
+  /// one row per video, see libraries/helpers/src/inspiration/inspiration.link.ts
+  key          String
+  /// tiktok, instagram, youtube or other
+  platform     String
+  /// @handle from the URL, if it names one
+  author       String?
+  note         String?
+  status       InspirationStatus @default(OPEN)
+  appId        String?
+  formatId     String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  organization Organization      @relation(fields: [orgId], references: [id])
+  app          App?              @relation(fields: [appId], references: [id], onDelete: SetNull)
+  format       Format?           @relation(fields: [formatId], references: [id], onDelete: SetNull)
+  createdBy    User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, key])
+  @@index([orgId, createdAt])
 }
 
 /// A Post for Me social account. internalId is the PfM account id (spc_...),
@@ -365,6 +397,12 @@ enum ApplicationStatus {
   PENDING
   ACCEPTED
   DECLINED
+}
+
+enum InspirationStatus {
+  OPEN
+  DONE
+  SKIPPED
 }
 
 enum FormatStatus {
